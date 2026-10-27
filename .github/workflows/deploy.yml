@@ -34,14 +34,21 @@ jobs:
         id: cf
         env:
           TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
-          if [ -n "$TOKEN" ]; then echo "ready=true" >> "$GITHUB_OUTPUT"
-          else echo "::warning::CLOUDFLARE_API_TOKEN is not set; skipping deploy"; fi
+          if [ -z "$TOKEN" ]; then echo "::warning::CLOUDFLARE_API_TOKEN is not set; skipping deploy"; exit 0; fi
+          # Accept a pasted dashboard URL or stray whitespace: keep only the 32-hex account id.
+          id=$(printf '%s' "$ACCOUNT" | tr 'A-F' 'a-f' | grep -oE '[0-9a-f]{32}' | head -n1 || true)
+          if [ -z "$id" ]; then
+            echo "::error::CLOUDFLARE_ACCOUNT_ID must contain the 32-character account id (dash.cloudflare.com/<id>/...)"; exit 1
+          fi
+          echo "::add-mask::$id"
+          echo "CLOUDFLARE_ACCOUNT_ID=$id" >> "$GITHUB_ENV"
+          echo "ready=true" >> "$GITHUB_OUTPUT"
       - name: Create Pages project if missing
         if: steps.cf.outputs.ready == 'true'
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           npx --yes wrangler@3.114.0 pages project list | grep -qw "$PAGES_PROJECT" \
             || npx --yes wrangler@3.114.0 pages project create "$PAGES_PROJECT" \
@@ -51,5 +58,4 @@ jobs:
         if: steps.cf.outputs.ready == 'true'
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: npx --yes wrangler@3.114.0 pages deploy dist --project-name "$PAGES_PROJECT" --branch "${{ github.ref_name }}"
