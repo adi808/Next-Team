@@ -1,0 +1,28 @@
+project_id = "next-team"
+
+[api]
+port = 54321
+
+[db]
+port = 54322
+major_version = 15
+
+[auth]
+site_url = "http://localhost:5173"
+enable_signup = true
+
+[auth.sms]
+enable_signup = true
+enable_confirmations = true
+template = "Next Team: קוד האימות שלך הוא {{ .Code }}"
+
+# Production: configure a provider (Twilio shown). Secrets come from env.
+[auth.sms.twilio]
+enabled = false
+account_sid = "env(TWILIO_ACCOUNT_SID)"
+message_service_sid = "env(TWILIO_MESSAGE_SERVICE_SID)"
+auth_token = "env(TWILIO_AUTH_TOKEN)"
+
+# Local development: fixed code for a test number (E.164, no +).
+[auth.sms.test_otp]
+972500000000 = "123456"
