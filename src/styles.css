@@ -1,0 +1,44 @@
+:root {
+  --green: #0c3d24;
+  --green-light: #e8f3ec;
+  --text: #14211a;
+  --danger: #b3261e;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, 'Segoe UI', Arial, sans-serif;
+  color: var(--text);
+  background: #fff;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+.center { text-align: center; margin-top: 4rem; }
+button {
+  font: inherit; padding: 0.75rem 1rem; border: 0; border-radius: 8px;
+  background: var(--green); color: #fff; min-height: 44px;
+}
+button:disabled { opacity: 0.6; }
+button.link { background: none; color: var(--green); text-decoration: underline; }
+input {
+  font: inherit; width: 100%; padding: 0.75rem; margin: 0.25rem 0 1rem;
+  border: 1px solid #9bb3a5; border-radius: 8px; min-height: 44px;
+}
+.login { max-width: 22rem; margin: 0 auto; padding: 2rem 1rem; }
+.login h1 { color: var(--green); text-align: center; }
+.login form { display: flex; flex-direction: column; }
+.error { color: var(--danger); }
+.shell { min-height: 100dvh; display: flex; flex-direction: column; }
+.shell header {
+  display: flex; gap: 0.75rem; align-items: center; padding: 0.75rem 1rem;
+  background: var(--green); color: #fff;
+}
+.shell header span { margin-inline-start: auto; }
+.shell header button.link { color: #fff; padding: 0; min-height: 0; }
+.shell main { flex: 1; padding: 1rem; }
+.shell nav {
+  display: flex; gap: 0.5rem; padding: 0.5rem; background: var(--green-light);
+  position: sticky; bottom: 0;
+}
+.shell nav button { flex: 1; background: #fff; color: var(--green); border: 1px solid var(--green); }
+.shell nav button[aria-current='true'] { background: var(--green); color: #fff; }

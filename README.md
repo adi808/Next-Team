@@ -5,7 +5,13 @@ Football team management for kids' clubs. React + TypeScript (Vite, PWA), Supaba
 ## Status
 
 Stage C1 (foundations): database schema, RLS policies, RPCs, phone + SMS login, role shell.
-These files were written but **not executed** (no Postgres or npm access in the authoring environment). First run:
+
+Verified here: `npm run typecheck` and `npm run build` pass, and the three migrations apply cleanly on Postgres 16
+(against a stub `auth` schema) with a per-role scenario test (club creation, invites, coach limits, player cannot post,
+parent sees messages only after coach approval, outsider sees nothing).
+**Not verified:** real Supabase (`supabase start`), real SMS delivery, and the UI in a browser.
+
+First run:
 
 ```bash
 npm install
@@ -16,7 +22,10 @@ npm run dev
 ```
 
 SMS login needs a provider configured in `supabase/config.toml` (`[auth.sms]`, e.g. Twilio).
-For local development use `[auth.sms.test_otp]` with a test number and fixed code.
+For local development `[auth.sms.test_otp]` maps test number `+972500000000` to code `123456`.
+
+Decisions made while implementing: only a system admin creates clubs (optionally naming the first club admin by phone);
+phones are stored as E.164 and a leading `0` is read as Israel (`+972`).
 
 ## Open points to confirm
 1. Who starts a parent-child link: either side, by the other's phone number; the child's team coach approves (implemented that way).
