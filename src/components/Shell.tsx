@@ -39,7 +39,7 @@ export default function Shell() {
           title={modes.length > 1 ? 'החלפת מצב' : undefined}>
           {MODE_LABELS[m]}{modes.length > 1 ? ' ▾' : ''}
         </button>
-        <span className="who">{profile?.full_name || profile?.phone}</span>
+        <span className="who"><bdi>{profile?.full_name || profile?.phone}</bdi></span>
         <button className="link" onClick={signOut}>יציאה</button>
       </header>
       <main><Outlet /></main>

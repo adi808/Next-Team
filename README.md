@@ -25,11 +25,13 @@ Built: everything in the business spec except features marked "proposed" there.
 
 ### Verified
 * `supabase/tests/scenario.sql`: 90 role-by-role checks on Postgres 16 (against a stub `auth` schema). Run it with `supabase/tests/stub_auth.sql` first, then the migrations, then the scenario.
+* `tests/api-integration.cjs`: 29 checks over HTTP through a real PostgREST 12 with signed JWTs per role: table and function exposure, grants, RLS, RPCs with named parameters, error responses.
+* `tests/ui-e2e.cjs`: 44 checks with the built UI in a real browser against that PostgREST and database, one session per role (coach, parent, player, club admin, system admin, outsider), including saving an attendance answer and posting a message.
+* `tests/ui-smoke.cjs`: the same screens against a mocked API (this found and fixed a reload loop).
 * `npm run typecheck` and `npm run build` pass.
-* `tests/ui-smoke.js`: the coach and parent screens render with no runtime errors against a mocked API (this found and fixed a reload loop).
 
 ### Not verified
-Real Supabase (`supabase start`), real SMS delivery, photo upload to Storage, and the screens against live data. RLS was tested on plain Postgres, not through PostgREST.
+Supabase's own services: phone login with a real SMS (GoTrue), photo upload to Storage, and the Supabase gateway (the tests use a minimal stand-in). `supabase start` could not run in the build environment (image downloads were blocked), so run the "First run" steps below once on a machine with Docker.
 
 First run:
 
