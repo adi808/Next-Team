@@ -424,6 +424,21 @@ export class DemoServer {
     },
   };
 
+  // Direct row writes the app makes (club and team edit/delete), mapped to the same permission checks.
+  private write(table: string, method: string, params: URLSearchParams, body: Row) {
+    const id = (params.get('id') ?? '').replace(/^eq\./, '');
+    const ops: Record<string, () => void> = {
+      'PATCH clubs': () => this.rpcs.update_club.call(this, { p_club: id, p_name: body.name }),
+      'DELETE clubs': () => this.rpcs.delete_club.call(this, { p_club: id }),
+      'PATCH teams': () => this.rpcs.update_team.call(this, { p_team: id, p_name: body.name, p_sport: body.sport_id }),
+      'DELETE teams': () => this.rpcs.delete_team.call(this, { p_team: id }),
+    };
+    const op = ops[`${method} ${table}`];
+    if (!op) this.deny();
+    op();
+    return [{ id }];
+  }
+
   // ------------------------------------------------------------ the fetch the Supabase client uses
   fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url);
@@ -436,6 +451,10 @@ export class DemoServer {
       }
       if (url.pathname.startsWith('/rest/v1/')) {
         const table = url.pathname.split('/').pop() as string;
+        const method = (init?.method ?? 'GET').toUpperCase();
+        if (method === 'PATCH' || method === 'DELETE') {
+          return json(200, this.write(table, method, url.searchParams, init?.body ? JSON.parse(String(init.body)) : {}));
+        }
         const accept = new Headers(init?.headers).get('Accept') ?? '';
         const r = this.query(table, url.searchParams, accept.includes('pgrst.object'));
         return json(r.status, r.body);

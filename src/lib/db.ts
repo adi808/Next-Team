@@ -25,6 +25,12 @@ export async function q<T>(p: PromiseLike<{ data: unknown; error: PgError | null
   return data as T;
 }
 
+// Updates or deletes one row by id; RLS hides rows it refuses, so an empty result means no permission.
+export async function mutateOne(p: PromiseLike<{ data: unknown; error: PgError | null }>): Promise<void> {
+  const rows = await q<unknown[] | null>(p);
+  if (!rows?.length) throw { code: '42501', message: 'not allowed' } satisfies PgError;
+}
+
 export function rpc<T = unknown>(name: string, args?: Record<string, unknown>): Promise<T> {
   return q<T>(supabase.rpc(name, args));
 }

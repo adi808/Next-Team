@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
-import { q, rpc, useAction, useLoad } from '../../lib/db';
+import { mutateOne, q, rpc, useAction, useLoad } from '../../lib/db';
 import { normEmail } from '../../lib/email';
 import { Card, Empty, ErrorText, Field, Loading, Tabs } from '../../components/ui';
 import { DefCreator, DefList } from '../../components/Attributes';
@@ -48,28 +48,28 @@ export default function ClubPage() {
 
   async function saveClub() {
     await act.run(async () => {
-      await rpc('update_club', { p_club: clubId, p_name: editClub });
+      await mutateOne(supabase.from('clubs').update({ name: editClub?.trim() }).eq('id', clubId).select('id'));
       setEditClub(null); reload();
     });
   }
   async function deleteClub() {
     if (!data || !window.confirm(`למחוק את המועדון "${data.club.name}"? יימחקו גם כל הקבוצות, השחקנים, האירועים וההודעות שלו. אי אפשר לבטל.`)) return;
     await act.run(async () => {
-      await rpc('delete_club', { p_club: clubId });
+      await mutateOne(supabase.from('clubs').delete().eq('id', clubId).select('id'));
       navigate('../clubs');
     });
   }
   async function saveTeam() {
     if (!editTeam) return;
     await act.run(async () => {
-      await rpc('update_team', { p_team: editTeam.id, p_name: editTeam.name, p_sport: editTeam.sport });
+      await mutateOne(supabase.from('teams').update({ name: editTeam.name.trim(), sport_id: editTeam.sport }).eq('id', editTeam.id).select('id'));
       setEditTeam(null); reload();
     });
   }
   async function deleteTeam(t: Team) {
     if (!window.confirm(`למחוק את הקבוצה "${t.name}"? יימחקו גם האירועים, המשימות, הסקרים וההודעות שלה. השחקנים נשארים במועדון.`)) return;
     await act.run(async () => {
-      await rpc('delete_team', { p_team: t.id });
+      await mutateOne(supabase.from('teams').delete().eq('id', t.id).select('id'));
       reload();
     });
   }
