@@ -1,0 +1,357 @@
+-- Role-by-role scenario for the whole system. Run on a fresh database after the migrations:
+--   psql -f stub_auth.sql ; psql -f ../migrations/*.sql ; psql -f scenario.sql
+-- Every check prints PASS or FAIL; the last line summarizes.
+\set ON_ERROR_STOP on
+\set QUIET on
+set client_min_messages = notice;
+
+create schema t;
+create table t.ctx (k text primary key, v uuid);
+create table t.res (label text, ok boolean);
+grant usage on schema t to authenticated;
+grant all on all tables in schema t to authenticated;
+
+create function t.id(n text) returns uuid language sql stable as $$ select v from t.ctx where k = n $$;
+create function t.as_user(n text) returns void language plpgsql as $$
+begin perform set_config('request.uid', coalesce(t.id(n)::text, ''), false); end $$;
+create function t.check(label text, ok boolean) returns void language plpgsql as $$
+begin
+  insert into t.res values (label, coalesce(ok, false));
+  raise notice '% %', case when coalesce(ok, false) then 'PASS' else 'FAIL' end, label;
+end $$;
+create function t.denied(label text, q text) returns void language plpgsql as $$
+begin
+  begin execute q; perform t.check(label || ' (should be denied)', false);
+  exception when others then perform t.check(label || ' -> denied', true); end;
+end $$;
+create function t.reg(n text, p_phone text) returns void language plpgsql as $$
+begin insert into t.ctx select n, id from profiles where profiles.phone = norm_phone(p_phone); end $$;
+create function t.lk(d text, s text) returns uuid language sql stable as
+  $$ select id from lookups where domain = d and slug = s order by sport_id nulls first limit 1 $$;
+create function t.lkn(d text, s text) returns uuid language sql stable as
+  $$ select id from lookups where domain = d and name_he = s limit 1 $$;
+grant execute on all functions in schema t to authenticated;
+
+-- ---------------------------------------------------------------- users
+insert into auth.users (phone) values ('972501000001'), ('972501000003'), ('972501000004'), ('972501000008');
+select t.reg('S', '+972501000001'), t.reg('C', '+972501000003'), t.reg('C2', '+972501000004'), t.reg('O', '+972501000008');
+update profiles set is_system_admin = true where id = t.id('S');
+
+set role authenticated;
+select t.as_user('S');
+select t.check('system admin creates a club and names its admin by phone',
+  (select create_club('מועדון א', '050-100 0002')) is not null);
+insert into t.ctx select 'club', id from clubs limit 1;
+select t.denied('non system admin cannot create a club', $$select create_club('x')$$) from (select t.as_user('C')) _;
+
+reset role;
+insert into auth.users (phone) values ('972501000002');             -- the club admin signs up
+select t.reg('A', '+972501000002');
+select t.check('club admin invite is claimed at signup',
+  exists (select 1 from memberships where user_id = t.id('A') and role = 'club_admin'));
+
+set role authenticated;
+select t.as_user('A');
+insert into t.ctx select 'T1', create_team(t.id('club'), 'ילדים א', (select id from sports where slug = 'football'));
+insert into t.ctx select 'T2', create_team(t.id('club'), 'נוער כדורסל', (select id from sports where slug = 'basketball'));
+select invite_by_phone('050-1000003', t.id('club'), t.id('T1'), 'coach');
+select invite_by_phone('050-1000004', t.id('club'), t.id('T2'), 'coach');
+select t.check('coaches are attached to their teams',
+  (select count(*) from memberships where role = 'coach') = 2);
+
+-- ---------------------------------------------------------------- players
+select t.as_user('C');
+insert into t.ctx select 'K1', add_player(t.id('T1'), 'דני כהן', '2014-05-01', null, '050-1000005');
+insert into t.ctx select 'K2', add_player(t.id('T1'), 'רוני לוי', '2008-03-02', '050-1000006', '050-1000007');
+select t.denied('coach of another team cannot add a player to T1',
+  $$select add_player(t.id('T1'), 'x', '2010-01-01')$$) from (select t.as_user('C2')) _;
+select t.denied('birth date is mandatory', $$select add_player(t.id('T1'), 'x', null)$$) from (select t.as_user('C')) _;
+
+reset role;
+insert into auth.users (phone) values ('972501000005'), ('972501000006'), ('972501000007'), ('972501000009');
+select t.reg('P1', '+972501000005'), t.reg('U2', '+972501000006'), t.reg('P2', '+972501000007'), t.reg('P3', '+972501000009');
+select t.check('parent invite becomes an approved link at signup',
+  exists (select 1 from guardianships where parent_id = t.id('P1') and player_id = t.id('K1') and status = 'approved'));
+select t.check('player invite links the account to the player',
+  (select user_id from players where id = t.id('K2')) = t.id('U2'));
+
+set role authenticated;
+select t.as_user('P1');
+select t.check('parent sees own child with birth date',
+  (select birth_date from v_players where id = t.id('K1')) = date '2014-05-01');
+select t.check('parent sees a teammate by name but without birth date',
+  (select full_name is not null and birth_date is null from v_players where id = t.id('K2')));
+select t.check('parent sees teammate photo only with consent (none yet)',
+  (select photo_path from v_players where id = t.id('K2')) is null);
+select t.check('parent can read the base table? no (revoked)', not has_table_privilege('authenticated', 'players', 'select'));
+select update_player(t.id('K1'), null, null, 'photo-k1.jpg');
+select t.as_user('P2');
+select t.check('teammate does not see the photo before consent',
+  (select photo_path from v_players where id = t.id('K1')) is null);
+select t.denied('another parent cannot set photo consent', $$select set_photo_consent(t.id('K1'), true)$$);
+select t.as_user('P1');
+select set_photo_consent(t.id('K1'), true);
+select t.as_user('P2');
+select t.check('teammate sees the photo after the parent consented',
+  (select photo_path from v_players where id = t.id('K1')) = 'photo-k1.jpg');
+select t.as_user('O');
+select t.check('outsider sees no players', (select count(*) from v_players) = 0);
+select t.check('outsider sees no profiles but own', (select count(*) from profiles) = 1);
+select t.as_user('P2');
+select t.check('parent sees the coach name (same team)', exists (select 1 from profiles where id = t.id('C')));
+select t.check('parent does not see unrelated profiles', not exists (select 1 from profiles where id = t.id('O')));
+
+-- ---------------------------------------------------------------- events + attendance
+select t.as_user('C');
+insert into t.ctx select 'E_train', create_event(t.id('T1'), t.lk('event_type', 'training'), 'אימון שני', now() + interval '2 days', null, 'מגרש 3');
+insert into t.ctx select 'E_match', create_event(t.id('T1'), t.lk('event_type', 'match'), 'משחק ליגה', now() + interval '5 days', null, 'אצטדיון', '', 'הפועל');
+select t.denied('coach of another team cannot create an event for T1',
+  $$select create_event(t.id('T1'), t.lk('event_type','training'), 'x', now())$$) from (select t.as_user('C2')) _;
+select t.denied('event type must come from the catalog',
+  $$select create_event(t.id('T1'), t.lk('absence_reason','illness'), 'x', now())$$) from (select t.as_user('C')) _;
+select t.denied('a parent cannot create events',
+  $$select create_event(t.id('T1'), t.lk('event_type','training'), 'x', now())$$) from (select t.as_user('P1')) _;
+
+select t.as_user('P1');
+select respond_event(t.id('E_train'), t.id('K1'), 'attending');
+select t.denied('not attending needs a reason', $$select respond_event(t.id('E_train'), t.id('K1'), 'not_attending')$$);
+select respond_event(t.id('E_train'), t.id('K1'), 'not_attending', t.lk('absence_reason', 'illness'), 'חום');
+select t.check('last answer wins (changed to not attending)',
+  (select status from event_responses where event_id = t.id('E_train') and player_id = t.id('K1')) = 'not_attending');
+select respond_event(t.id('E_train'), t.id('K1'), 'attending');
+select t.check('answer can be changed back at any time and clears the reason',
+  (select status = 'attending' and reason_id is null from event_responses where player_id = t.id('K1') and event_id = t.id('E_train')));
+select t.denied('parent cannot answer for another child', $$select respond_event(t.id('E_train'), t.id('K2'), 'attending')$$);
+select respond_event(t.id('E_train'), t.id('K1'), 'not_attending', t.lk('absence_reason', 'vacation'), 'חופשה משפחתית');
+
+select t.as_user('U2');
+select t.denied('player cannot answer while the team does not allow it', $$select respond_event(t.id('E_train'), t.id('K2'), 'attending')$$);
+select t.as_user('C');
+select set_attribute((select id from attribute_defs where scope='team' and key='players_can_respond'), t.id('T1'), 'true'::jsonb);
+select set_attribute((select id from attribute_defs where scope='team' and key='min_response_age'), t.id('T1'), '20'::jsonb);
+select t.as_user('U2');
+select t.denied('player below the team minimum age cannot answer (age 18 < 20)', $$select respond_event(t.id('E_train'), t.id('K2'), 'attending')$$);
+select t.as_user('C');
+select set_attribute((select id from attribute_defs where scope='team' and key='min_response_age'), t.id('T1'), '12'::jsonb);
+select t.as_user('U2');
+select respond_event(t.id('E_train'), t.id('K2'), 'attending');
+select t.check('player may answer once the team allows it and age is enough',
+  exists (select 1 from event_responses where player_id = t.id('K2') and event_id = t.id('E_train')));
+
+select t.as_user('C');
+select t.check('coach sees every answer with the reason and note',
+  (select count(*) from event_responses where event_id = t.id('E_train')) = 2
+  and (select note from event_responses where player_id = t.id('K1') and event_id = t.id('E_train')) = 'חופשה משפחתית');
+select t.as_user('A');
+select t.check('club admin sees the answers too', (select count(*) from event_responses) = 2);
+select t.as_user('P2');
+select t.check('other parents do not see answers about someone else''s child',
+  (select count(*) from event_responses where player_id = t.id('K1')) = 0);
+select t.as_user('O');
+select t.check('outsider sees no events', (select count(*) from events) = 0);
+select t.as_user('C2');
+select t.check('coach of another team sees no T1 events or answers',
+  (select count(*) from events) = 0 and (select count(*) from event_responses) = 0);
+
+-- ---------------------------------------------------------------- match statistics
+select t.as_user('C');
+select record_stat(t.id('E_match'), t.id('K1'), t.lk('stat_type', 'goal'), 12);
+select record_stat(t.id('E_match'), t.id('K1'), t.lk('stat_type', 'yellow_card'), 40);
+select record_stat(t.id('E_match'), t.id('K2'), t.lk('stat_type', 'assist'), 12);
+select t.denied('statistics only on a match event', $$select record_stat(t.id('E_train'), t.id('K1'), t.lk('stat_type','goal'))$$);
+select update_event(t.id('E_match'), p_our_score => 1, p_their_score => 0);
+select t.as_user('P2');
+select t.check('team members see the statistics and the result',
+  (select count(*) from event_stats where event_id = t.id('E_match')) = 3
+  and (select our_score from events where id = t.id('E_match')) = 1);
+select t.denied('a parent cannot record statistics', $$select record_stat(t.id('E_match'), t.id('K2'), t.lk('stat_type','goal'))$$);
+select t.as_user('O');
+select t.check('outsider sees no statistics', (select count(*) from event_stats) = 0);
+
+-- ---------------------------------------------------------------- dynamic attributes
+select t.as_user('C');
+insert into t.ctx select 'D_ball', create_attribute_def('player', 'ball_control', 'שליטה בכדור', 'scale', '{"min":1,"max":10}',
+  array['system_admin','club_admin','coach','parent','player'], array['coach'], null, t.id('T1'));
+select set_attribute(t.id('D_ball'), t.id('K1'), '7'::jsonb);
+select set_attribute(t.id('D_ball'), t.id('K1'), '8'::jsonb);
+select t.denied('rating above the scale is rejected', $$select set_attribute(t.id('D_ball'), t.id('K1'), '11'::jsonb)$$);
+select t.denied('rating must be a whole number', $$select set_attribute(t.id('D_ball'), t.id('K1'), '7.5'::jsonb)$$);
+select t.as_user('C2');
+select t.denied('coach of another team cannot define or set parameters on T1 players',
+  $$select create_attribute_def('player','x','x','text','{}',array['coach'],array['coach'],null,t.id('T1'))$$);
+select t.as_user('P1');
+select t.check('parent sees the current rating and the history of own child',
+  (select (value)::int from attribute_current where def_id = t.id('D_ball') and entity_id = t.id('K1')) = 8
+  and (select count(*) from attribute_values where def_id = t.id('D_ball') and entity_id = t.id('K1')) = 2);
+select t.denied('a parent cannot edit ratings', $$select set_attribute(t.id('D_ball'), t.id('K1'), '10'::jsonb)$$);
+select t.as_user('P2');
+select t.check('another parent sees nothing of this child''s ratings',
+  (select count(*) from attribute_values where entity_id = t.id('K1')) = 0);
+select t.as_user('C');
+select set_attribute(t.id('D_ball'), t.id('K2'), '5'::jsonb);
+select t.as_user('U2');
+select t.check('a player sees own rating', (select count(*) from attribute_values where entity_id = t.id('K2') and def_id = t.id('D_ball')) = 1);
+
+-- medical information
+select t.as_user('P1');
+select set_attribute((select id from attribute_defs where key = 'medical_allergy'), t.id('K1'), '"בוטנים"'::jsonb);
+select t.as_user('P2');
+select set_attribute((select id from attribute_defs where key = 'medical_condition'), t.id('K2'), '"אסתמה"'::jsonb);
+select t.as_user('C');
+select t.check('coach sees medical info of own players', (select count(*) from attribute_values av
+  join attribute_defs d on d.id = av.def_id where d.key like 'medical%') = 2);
+select t.as_user('U2');
+select t.check('a player does not see own medical info (not in the visibility list)',
+  (select count(*) from attribute_values av join attribute_defs d on d.id = av.def_id where d.key like 'medical%') = 0);
+select t.as_user('A');
+select t.check('club admin sees medical info', (select count(*) from attribute_values av
+  join attribute_defs d on d.id = av.def_id where d.key like 'medical%') = 2);
+select t.as_user('S');
+select t.check('system admin sees medical info and ratings', (select count(*) from attribute_values av join attribute_defs d on d.id = av.def_id where d.scope = 'player') = 5);
+select t.as_user('C2');
+select t.check('coach of another team sees none of the player values', (select count(*) from attribute_values av join attribute_defs d on d.id = av.def_id where d.scope = 'player') = 0);
+select t.as_user('P2');
+select t.check('parent sees only own child''s medical info', (select count(*) from attribute_values av
+  join attribute_defs d on d.id = av.def_id where d.key like 'medical%') = 1);
+
+-- team and event settings, dependent lists
+select t.as_user('C');
+select set_attribute((select id from attribute_defs where scope='team' and key='default_match_format'), t.id('T1'), to_jsonb(t.lk('match_format','football_11')::text));
+select t.denied('a team setting must come from its list',
+  $$select set_attribute((select id from attribute_defs where scope='team' and key='default_match_format'), t.id('T1'), to_jsonb(t.lk('event_type','match')::text))$$);
+select set_attribute((select id from attribute_defs where scope='event' and key='match_format'), t.id('E_match'), to_jsonb(t.lk('match_format','football_11')::text));
+select set_attribute((select id from attribute_defs where scope='event' and key='formation'), t.id('E_match'), to_jsonb(t.lkn('formation','4-3-3')::text));
+select t.check('event stores a format and a formation chosen from lists',
+  (select count(*) from attribute_current where entity_id = t.id('E_match')) = 2);
+select t.check('formation list depends on the format (4-3-3 belongs to 11-a-side)',
+  (select parent_id from lookups where id = t.lkn('formation','4-3-3')) = t.lk('match_format','football_11'));
+select t.as_user('P1');
+select t.check('parents see event settings', (select count(*) from attribute_current where entity_id = t.id('E_match')) = 2);
+select t.as_user('C');
+select t.check('team_param returns the saved value', team_param(t.id('T1'), 'min_response_age') = '12'::jsonb);
+select t.check('team_param falls back to the default', team_param(t.id('T2'), 'min_response_age') is null);   -- C is not in T2
+select t.as_user('C2');
+select t.check('team_param falls back to the default for a member', team_param(t.id('T2'), 'min_response_age') = '12'::jsonb);
+
+-- ---------------------------------------------------------------- tasks
+select t.as_user('C');
+insert into t.ctx select 'TASK', create_task(t.id('T1'), '100 הרמות כדור', 'עד יום שישי', now() + interval '3 days', null, true, true);
+select t.as_user('P1');
+select t.check('parent of a child without an account sees both the child task and the parent task',
+  (select count(*) from task_assignments) = 2);
+select t.as_user('P2');
+select t.check('parent of a child with an account sees only the parent task', (select count(*) from task_assignments where kind = 'parent') = 1
+  and (select count(*) from task_assignments) = 1);
+select t.as_user('U2');
+select t.check('player sees only own task', (select count(*) from task_assignments) = 1);
+select t.as_user('O');
+select t.check('outsider sees no tasks', (select count(*) from tasks) = 0);
+select t.as_user('P2');
+select complete_assignment((select id from task_assignments where kind = 'parent'), true);
+select t.as_user('U2');
+select complete_assignment((select id from task_assignments), true);
+select t.as_user('P2');
+select t.denied('parent cannot tick the task of a child who has an account',
+  $$select complete_assignment((select id from task_assignments where kind='player' and player_id = t.id('K2')), true)$$);
+select t.as_user('C');
+select t.check('coach sees all four items and who finished', (select count(*) from task_assignments) = 4
+  and (select count(*) from task_assignments where done_at is not null) = 2);
+select t.as_user('C');
+insert into t.ctx select 'TASK2', create_task(t.id('T1'), 'מתיחות', '', null, array[t.id('K1')], true, false);
+select t.as_user('U2');
+select t.check('a task for one player is invisible to the others', (select count(*) from tasks where id = t.id('TASK2')) = 0);
+
+-- ---------------------------------------------------------------- surveys
+select t.as_user('C');
+insert into t.ctx select 'SV', create_survey(t.id('T1'), 'מי מגיע לטורניר?', 'סוף החודש', null,
+  '[{"text":"האם תגיעו?","kind":"single","options":["כן","לא"]},{"text":"הערות","kind":"text"}]'::jsonb);
+select t.denied('a survey needs two options for a choice question',
+  $$select create_survey(t.id('T1'), 'x', '', null, '[{"text":"q","kind":"single","options":["a"]}]'::jsonb)$$);
+select t.as_user('P1');
+select submit_survey(t.id('SV'), jsonb_build_array(
+  jsonb_build_object('question_id', (select id from survey_questions where kind='single'), 'option_ids', jsonb_build_array((select id from survey_options where label='כן'))),
+  jsonb_build_object('question_id', (select id from survey_questions where kind='text'), 'text', 'נגיע')));
+select submit_survey(t.id('SV'), jsonb_build_array(
+  jsonb_build_object('question_id', (select id from survey_questions where kind='single'), 'option_ids', jsonb_build_array((select id from survey_options where label='לא')))));
+select t.check('answering again replaces the earlier answers',
+  (select count(*) from survey_answers) = 1 and (select label from survey_options where id = (select option_id from survey_answers)) = 'לא');
+select t.as_user('P2');
+select submit_survey(t.id('SV'), jsonb_build_array(
+  jsonb_build_object('question_id', (select id from survey_questions where kind='single'), 'option_ids', jsonb_build_array((select id from survey_options where label='כן')))));
+select t.check('a respondent sees only their own answers', (select count(*) from survey_answers) = 1);
+select t.as_user('C');
+select t.check('coach sees all answers', (select count(*) from survey_answers) = 2);
+select t.as_user('O');
+select t.denied('outsider cannot answer', $$select submit_survey(t.id('SV'), '[]'::jsonb)$$);
+select t.check('outsider sees no surveys', (select count(*) from surveys) = 0);
+
+-- ---------------------------------------------------------------- chat
+select t.as_user('P1');
+select post_message(t.id('T1'), 'מי מסיע בשבת?');
+select t.as_user('U2');
+select t.denied('a player cannot write in the team channel', $$select post_message(t.id('T1'), 'hi')$$);
+select t.as_user('A');
+select post_message(t.id('T1'), 'ברוכים הבאים');
+select t.as_user('P2');
+select t.check('parents read the team channel', (select count(*) from messages) = 2);
+select t.as_user('O');
+select t.check('outsider reads nothing', (select count(*) from messages) = 0);
+
+select t.as_user('C');
+insert into t.ctx select 'CONV', start_conversation(t.id('T1'), t.id('K1'));
+select post_direct_message(t.id('CONV'), 'כל הכבוד על האימון');
+select t.as_user('P1');
+select post_direct_message(t.id('CONV'), 'תודה מאמן');
+select t.check('the parent sees the whole personal conversation about the child', (select count(*) from direct_messages) = 2);
+select t.as_user('A');
+select t.check('club admin does NOT see personal conversations',
+  (select count(*) from conversations) = 0 and (select count(*) from direct_messages) = 0);
+select t.as_user('S');
+select t.check('system admin does not see personal conversations either', (select count(*) from direct_messages) = 0);
+select t.as_user('P2');
+select t.check('another parent does not see it', (select count(*) from direct_messages) = 0);
+select t.as_user('C2');
+select t.denied('another coach cannot start one', $$select start_conversation(t.id('T1'), t.id('K1'))$$);
+select t.as_user('C');
+insert into t.ctx select 'CONV2', start_conversation(t.id('T1'), t.id('K2'));
+select t.as_user('U2');
+select post_direct_message(t.id('CONV2'), 'שלום מאמן');
+select t.check('the player can write in their own conversation', (select count(*) from direct_messages) = 1);
+select t.as_user('P1');
+select t.denied('a parent cannot write in a conversation about a different child', $$select post_direct_message(t.id('CONV2'), 'x')$$);
+
+-- ---------------------------------------------------------------- guardianship request flow
+select t.as_user('U2');
+select request_guardianship('050-1000009', false);                       -- the child asks P3 to be linked
+select t.as_user('P3');
+select t.check('a pending request grants no access yet', (select count(*) from v_players) = 0);
+select t.denied('the requesting parent cannot approve', $$select respond_guardianship((select id from guardianships where parent_id = t.id('P3')), true)$$);
+select t.as_user('C2');
+select t.denied('a coach of another team cannot approve', $$select respond_guardianship((select id from guardianships where parent_id = t.id('P3')), true)$$);
+select t.as_user('C');
+select t.check('the coach sees the requesting parent name', exists (select 1 from profiles where id = t.id('P3')));
+select respond_guardianship((select id from guardianships where parent_id = t.id('P3')), true);
+select t.as_user('P3');
+select t.check('after approval the parent sees the child and the team', (select count(*) from v_players) >= 2
+  and (select count(*) from events) = 2);
+
+-- ---------------------------------------------------------------- catalogs
+select t.as_user('A');
+select upsert_lookup(null, 'absence_reason', 'exam', 'מבחן', null, null, null, t.id('club'), 7);
+select t.check('club admin adds a value to a list for their club',
+  exists (select 1 from lookups where domain = 'absence_reason' and slug = 'exam'));
+select t.denied('club admin cannot edit a global list value',
+  $$select upsert_lookup((select id from lookups where slug='illness'), 'absence_reason', 'illness', 'x', null, null, null, t.id('club'), 1)$$);
+select t.as_user('C');
+select t.denied('a coach cannot manage lists', $$select upsert_lookup(null, 'absence_reason', 'x', 'x', null, null, null, t.id('club'), 1)$$);
+select t.as_user('O');
+select t.check('lookups outside own club are hidden, global ones visible',
+  not exists (select 1 from lookups where slug = 'exam') and exists (select 1 from lookups where slug = 'illness'));
+
+-- ---------------------------------------------------------------- summary
+reset role;
+select case when count(*) filter (where not ok) = 0
+            then 'ALL ' || count(*) || ' CHECKS PASSED'
+            else count(*) filter (where not ok) || ' OF ' || count(*) || ' CHECKS FAILED' end as summary
+from t.res;
+select label as failed from t.res where not ok;
