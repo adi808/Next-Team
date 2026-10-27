@@ -1,16 +1,19 @@
 import { useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
-import { q, rpc, useAction, useLoad } from '../../lib/db';
+import { mutateOne, q, rpc, useAction, useLoad } from '../../lib/db';
 import { normEmail } from '../../lib/email';
 import { Card, Empty, ErrorText, Field, Loading, Tabs } from '../../components/ui';
 import { DefCreator, DefList } from '../../components/Attributes';
 import { useSports } from '../../components/Lookups';
+import { useAuth } from '../../auth/AuthProvider';
 import type { Club, Team } from '../../lib/types';
 
 export default function ClubPage() {
   const { clubId = '' } = useParams();
   const sports = useSports();
+  const { profile } = useAuth();
+  const navigate = useNavigate();
   const { data, loading, error, reload } = useLoad(async () => {
     const [club, teams] = await Promise.all([
       q<Club>(supabase.from('clubs').select('id, name').eq('id', clubId).single()),
@@ -23,6 +26,8 @@ export default function ClubPage() {
   const [sportId, setSportId] = useState('');
   const [email, setEmail] = useState('');
   const [staffTeam, setStaffTeam] = useState('');
+  const [editClub, setEditClub] = useState<string | null>(null);
+  const [editTeam, setEditTeam] = useState<{ id: string; name: string; sport: string } | null>(null);
   const act = useAction();
   const sportName = (id: string) => sports.find((s) => s.id === id)?.name_he ?? '';
 
@@ -41,18 +46,79 @@ export default function ClubPage() {
     });
   }
 
+  async function saveClub() {
+    await act.run(async () => {
+      await mutateOne(supabase.from('clubs').update({ name: editClub?.trim() }).eq('id', clubId).select('id'));
+      setEditClub(null); reload();
+    });
+  }
+  async function deleteClub() {
+    if (!data || !window.confirm(`למחוק את המועדון "${data.club.name}"? יימחקו גם כל הקבוצות, השחקנים, האירועים וההודעות שלו. אי אפשר לבטל.`)) return;
+    await act.run(async () => {
+      await mutateOne(supabase.from('clubs').delete().eq('id', clubId).select('id'));
+      navigate('../clubs');
+    });
+  }
+  async function saveTeam() {
+    if (!editTeam) return;
+    await act.run(async () => {
+      await mutateOne(supabase.from('teams').update({ name: editTeam.name.trim(), sport_id: editTeam.sport }).eq('id', editTeam.id).select('id'));
+      setEditTeam(null); reload();
+    });
+  }
+  async function deleteTeam(t: Team) {
+    if (!window.confirm(`למחוק את הקבוצה "${t.name}"? יימחקו גם האירועים, המשימות, הסקרים וההודעות שלה. השחקנים נשארים במועדון.`)) return;
+    await act.run(async () => {
+      await mutateOne(supabase.from('teams').delete().eq('id', t.id).select('id'));
+      reload();
+    });
+  }
+
   if (loading || error || !data) return <Loading loading={loading} error={error} />;
   return (
     <>
-      <h2>{data.club.name}</h2>
+      {editClub === null ? (
+        <div className="title-row">
+          <h2>{data.club.name}</h2>
+          <button className="small secondary" onClick={() => setEditClub(data.club.name)}>עריכה</button>
+          {profile?.is_system_admin && <button className="small danger" disabled={act.busy} onClick={deleteClub}>מחיקת מועדון</button>}
+        </div>
+      ) : (
+        <Card title="עריכת המועדון">
+          <Field label="שם המועדון"><input value={editClub} onChange={(e) => setEditClub(e.target.value)} /></Field>
+          <ErrorText error={act.error} />
+          <div className="row">
+            <button disabled={!editClub.trim() || act.busy} onClick={saveClub}>שמירה</button>
+            <button className="secondary" onClick={() => setEditClub(null)}>ביטול</button>
+          </div>
+        </Card>
+      )}
       <Tabs tabs={[
         {
           id: 'teams', label: 'קבוצות', render: () => (
             <>
               {!data.teams.length && <Empty>אין עדיין קבוצות.</Empty>}
               <ul className="list">
-                {data.teams.map((t) => (
-                  <li key={t.id}><Link to={`../team/${t.id}`}>{t.name}</Link> <small className="muted">{sportName(t.sport_id)}</small></li>
+                {data.teams.map((t) => editTeam?.id === t.id ? (
+                  <li key={t.id} className="stack">
+                    <Field label="שם הקבוצה"><input value={editTeam.name} onChange={(e) => setEditTeam({ ...editTeam, name: e.target.value })} /></Field>
+                    <Field label="ענף">
+                      <select value={editTeam.sport} onChange={(e) => setEditTeam({ ...editTeam, sport: e.target.value })}>
+                        {sports.map((s) => <option key={s.id} value={s.id}>{s.name_he}</option>)}
+                      </select>
+                    </Field>
+                    <div className="row">
+                      <button className="small" disabled={!editTeam.name.trim() || act.busy} onClick={saveTeam}>שמירה</button>
+                      <button className="small secondary" onClick={() => setEditTeam(null)}>ביטול</button>
+                    </div>
+                  </li>
+                ) : (
+                  <li key={t.id} className="row">
+                    <Link to={`../team/${t.id}`}>{t.name}</Link> <small className="muted">{sportName(t.sport_id)}</small>
+                    <span className="grow" />
+                    <button className="small secondary" onClick={() => setEditTeam({ id: t.id, name: t.name, sport: t.sport_id })}>עריכה</button>
+                    <button className="small danger" disabled={act.busy} onClick={() => deleteTeam(t)}>מחיקה</button>
+                  </li>
                 ))}
               </ul>
               <Card title="קבוצה חדשה">

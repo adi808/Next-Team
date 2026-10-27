@@ -187,6 +187,34 @@ export class DemoServer {
       if (!this.sys && !this.adminOf(a.p_club)) this.deny();
       const id = this.id('t'); this.t.teams.push({ id, club_id: a.p_club, name: String(a.p_name).trim(), sport_id: a.p_sport }); return id;
     },
+    update_club(this: DemoServer, a: Row) {
+      if (!this.sys && !this.adminOf(a.p_club)) this.deny();
+      if (!String(a.p_name ?? '').trim()) this.bad('name is required');
+      this.find('clubs', a.p_club)!.name = String(a.p_name).trim();
+    },
+    delete_club(this: DemoServer, a: Row) {
+      if (!this.sys) this.deny('only a system admin can delete a club');
+      const teams = this.t.teams.filter((t) => t.club_id === a.p_club).map((t) => t.id);
+      teams.forEach((id) => this.rpcs.delete_team.call(this, { p_team: id }));
+      this.t.clubs = this.t.clubs.filter((c) => c.id !== a.p_club);
+      this.t.memberships = this.t.memberships.filter((m) => m.club_id !== a.p_club);
+      this.t.players = this.t.players.filter((p) => p.club_id !== a.p_club);
+    },
+    update_team(this: DemoServer, a: Row) {
+      const team = this.find('teams', a.p_team);
+      if (!team || !(this.sys || this.adminOf(team.club_id))) this.deny();
+      if (!String(a.p_name ?? '').trim()) this.bad('name is required');
+      team!.name = String(a.p_name).trim();
+      if (a.p_sport) team!.sport_id = a.p_sport;
+    },
+    delete_team(this: DemoServer, a: Row) {
+      const team = this.find('teams', a.p_team);
+      if (!team || !(this.sys || this.adminOf(team.club_id))) this.deny();
+      this.t.teams = this.t.teams.filter((t) => t.id !== a.p_team);
+      this.t.team_players = this.t.team_players.filter((x) => x.team_id !== a.p_team);
+      this.t.memberships = this.t.memberships.filter((m) => m.team_id !== a.p_team);
+      this.t.events = this.t.events.filter((e) => e.team_id !== a.p_team);
+    },
     invite_by_email(this: DemoServer, a: Row) {
       if (!this.sys && !this.adminOf(a.p_club)) this.deny('only a club admin can invite staff');
       return this.id('inv');
@@ -396,6 +424,21 @@ export class DemoServer {
     },
   };
 
+  // Direct row writes the app makes (club and team edit/delete), mapped to the same permission checks.
+  private write(table: string, method: string, params: URLSearchParams, body: Row) {
+    const id = (params.get('id') ?? '').replace(/^eq\./, '');
+    const ops: Record<string, () => void> = {
+      'PATCH clubs': () => this.rpcs.update_club.call(this, { p_club: id, p_name: body.name }),
+      'DELETE clubs': () => this.rpcs.delete_club.call(this, { p_club: id }),
+      'PATCH teams': () => this.rpcs.update_team.call(this, { p_team: id, p_name: body.name, p_sport: body.sport_id }),
+      'DELETE teams': () => this.rpcs.delete_team.call(this, { p_team: id }),
+    };
+    const op = ops[`${method} ${table}`];
+    if (!op) this.deny();
+    op();
+    return [{ id }];
+  }
+
   // ------------------------------------------------------------ the fetch the Supabase client uses
   fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url);
@@ -408,6 +451,10 @@ export class DemoServer {
       }
       if (url.pathname.startsWith('/rest/v1/')) {
         const table = url.pathname.split('/').pop() as string;
+        const method = (init?.method ?? 'GET').toUpperCase();
+        if (method === 'PATCH' || method === 'DELETE') {
+          return json(200, this.write(table, method, url.searchParams, init?.body ? JSON.parse(String(init.body)) : {}));
+        }
         const accept = new Headers(init?.headers).get('Accept') ?? '';
         const r = this.query(table, url.searchParams, accept.includes('pgrst.object'));
         return json(r.status, r.body);
