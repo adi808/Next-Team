@@ -1,6 +1,6 @@
 import type { Sport } from '../lib/types';
 
-export default function SportIcon({ sport, size = 24 }: { sport: Pick<Sport, 'icon_path' | 'name_he'>; size?: number }) {
+export function SportIcon({ sport, size = 24 }: { sport: Pick<Sport, 'icon_path' | 'name_he'>; size?: number }) {
   return (
     <svg
       viewBox="0 0 24 24"
@@ -18,3 +18,5 @@ export default function SportIcon({ sport, size = 24 }: { sport: Pick<Sport, 'ic
     </svg>
   );
 }
+
+export default SportIcon;

@@ -42,3 +42,66 @@ input {
 }
 .shell nav button { flex: 1; background: #fff; color: var(--green); border: 1px solid var(--green); }
 .shell nav button[aria-current='true'] { background: var(--green); color: #fff; }
+
+/* ---- app shell ---- */
+.shell header { flex-wrap: wrap; }
+.shell header .who { font-size: 0.85rem; opacity: 0.9; }
+.mode-chip { background: rgba(255, 255, 255, 0.18); padding: 0.25rem 0.75rem; min-height: 0; border-radius: 999px; font-size: 0.85rem; }
+.shell nav { overflow-x: auto; }
+.shell nav a {
+  flex: 1 0 auto; text-align: center; padding: 0.6rem 0.75rem; border-radius: 8px; text-decoration: none;
+  background: #fff; color: var(--green); border: 1px solid var(--green); white-space: nowrap; font-size: 0.9rem;
+}
+.shell nav a.active { background: var(--green); color: #fff; }
+.mode-card { display: flex; flex-direction: column; gap: 0.25rem; text-align: start; background: #fff; color: var(--text); border: 1px solid var(--green); }
+.mode-card strong { color: var(--green); }
+
+/* ---- content ---- */
+h2 { margin: 0.5rem 0; color: var(--green); }
+h3 { margin: 0; font-size: 1rem; }
+a { color: var(--green); }
+.card { border: 1px solid #cfdcd4; border-radius: 12px; padding: 0.75rem 1rem; margin: 0.75rem 0; background: #fff; }
+.card-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.5rem; }
+.row { display: flex; align-items: center; gap: 0.5rem; }
+.row.wrap { flex-wrap: wrap; }
+.row > .field { flex: 1; }
+.stack { display: flex; flex-direction: column; gap: 0.5rem; }
+.list { list-style: none; margin: 0.5rem 0; padding: 0; }
+.list > li { padding: 0.5rem 0; border-bottom: 1px solid #e3ece6; }
+.list.compact > li { padding: 0.25rem 0; }
+.muted { color: #5b6b62; }
+.ok { color: #1b6e3c; }
+.center { text-align: center; margin-top: 4rem; }
+.tabs { display: flex; gap: 0.4rem; overflow-x: auto; margin: 0.5rem 0; }
+.tabs button { background: #fff; color: var(--green); border: 1px solid var(--green); padding: 0.4rem 0.9rem; min-height: 0; white-space: nowrap; }
+.tabs button[aria-selected='true'] { background: var(--green); color: #fff; }
+.field { display: flex; flex-direction: column; gap: 0.15rem; margin-bottom: 0.5rem; }
+.field > span { font-size: 0.85rem; color: #3b4b42; }
+textarea, select {
+  font: inherit; width: 100%; padding: 0.6rem; border: 1px solid #9bb3a5; border-radius: 8px; background: #fff; min-height: 44px;
+}
+textarea { min-height: 5rem; }
+input[type='checkbox'], input[type='radio'] { width: auto; min-height: 0; margin: 0; }
+.check { display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0; }
+fieldset { border: 1px solid #cfdcd4; border-radius: 8px; margin: 0.5rem 0; }
+button.small { padding: 0.3rem 0.7rem; min-height: 0; font-size: 0.85rem; }
+button.secondary { background: #fff; color: var(--green); border: 1px solid var(--green); }
+.badge { display: inline-block; padding: 0.1rem 0.6rem; border-radius: 999px; background: #e3ece6; font-size: 0.8rem; }
+.badge.ok { background: #d4ecd9; color: #14532d; }
+.badge.bad { background: #fbe0dd; color: #7a1c14; }
+.badge.warn { background: #fdf0c8; }
+.avatar { display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; background: var(--green-light); color: var(--green); object-fit: cover; flex: none; }
+.profile-head { margin: 0.5rem 0; }
+.attr { padding: 0.4rem 0; border-bottom: 1px solid #e3ece6; }
+.attr-row { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.attr-row strong { min-width: 8rem; }
+.attr-row select, .attr-row input { width: auto; flex: 1; min-width: 6rem; margin: 0; }
+.history { margin: 0.25rem 0; padding-inline-start: 1.25rem; font-size: 0.85rem; }
+.question { margin: 0.75rem 0; }
+.chat { list-style: none; padding: 0; margin: 0.5rem 0; display: flex; flex-direction: column; gap: 0.5rem; }
+.chat li { background: #f2f6f3; border-radius: 10px; padding: 0.4rem 0.7rem; max-width: 85%; align-self: flex-start; }
+.chat li.mine { background: var(--green-light); align-self: flex-end; }
+.chat li p { margin: 0.15rem 0 0; }
+.composer { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.composer input { flex: 1; margin: 0; }
+.attend { border-top: 1px solid #e3ece6; padding: 0.5rem 0; display: flex; flex-direction: column; gap: 0.35rem; }
