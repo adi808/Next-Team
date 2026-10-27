@@ -20,3 +20,11 @@ export const ROLE_LABELS: Record<AppRole, string> = {
   player: 'שחקן',
   parent: 'הורה',
 };
+
+export interface Sport {
+  id: string;
+  slug: string;
+  name_he: string;
+  icon_path: string;
+  sort_order: number;
+}

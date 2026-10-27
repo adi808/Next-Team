@@ -16,7 +16,7 @@ export default function RoleShell() {
   return (
     <div className="shell">
       <header>
-        <strong>Next Kick</strong>
+        <strong>Next Team</strong>
         <span>{profile?.full_name || profile?.phone}</span>
         <button className="link" onClick={signOut}>יציאה</button>
       </header>

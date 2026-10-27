@@ -1,4 +1,4 @@
--- Next Kick C1: row level security
+-- Next Team C1: row level security
 
 -- Helpers are security definer so policies can consult memberships without recursion.
 create function is_system_admin() returns boolean

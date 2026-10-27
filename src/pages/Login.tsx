@@ -37,7 +37,7 @@ export default function Login() {
 
   return (
     <main className="login">
-      <h1>Next Kick</h1>
+      <h1>Next Team</h1>
       {!sentTo ? (
         <form onSubmit={sendCode}>
           <label htmlFor="phone">מספר טלפון</label>

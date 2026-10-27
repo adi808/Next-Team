@@ -1,4 +1,4 @@
--- Next Kick C1: RPCs (all writes to clubs/teams/memberships/invites/guardianships go through here)
+-- Next Team C1: RPCs (all writes to clubs/teams/memberships/invites/guardianships go through here)
 
 create function require_auth() returns uuid
 language plpgsql stable as $$

@@ -1,4 +1,4 @@
--- Next Kick C1: schema
+-- Next Team C1: schema
 
 create type app_role as enum ('club_admin', 'coach', 'player', 'parent');
 create type link_status as enum ('pending', 'approved', 'rejected');

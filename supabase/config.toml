@@ -1,4 +1,4 @@
-project_id = "next-kick"
+project_id = "next-team"
 
 [api]
 port = 54321
@@ -14,7 +14,7 @@ enable_signup = true
 [auth.sms]
 enable_signup = true
 enable_confirmations = true
-template = "Next Kick: קוד האימות שלך הוא {{ .Code }}"
+template = "Next Team: קוד האימות שלך הוא {{ .Code }}"
 
 # Production: configure a provider (Twilio shown). Secrets come from env.
 [auth.sms.twilio]

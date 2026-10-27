@@ -8,8 +8,8 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       manifest: {
-        name: 'Next Kick',
-        short_name: 'Next Kick',
+        name: 'Next Team',
+        short_name: 'Next Team',
         lang: 'he',
         dir: 'rtl',
         start_url: '/',
