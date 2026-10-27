@@ -1,4 +1,5 @@
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, MemoryRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { isDemo } from './lib/supabase';
 import { AuthProvider, useAuth } from './auth/AuthProvider';
 import Login from './pages/Login';
 import ModePicker from './pages/ModePicker';
@@ -47,12 +48,15 @@ function Gate() {
   );
 }
 
+// the demo runs inside a sandboxed frame, so it keeps its location in memory
+const Router = isDemo ? MemoryRouter : BrowserRouter;
+
 export default function App() {
   return (
-    <BrowserRouter>
+    <Router>
       <AuthProvider>
         <Gate />
       </AuthProvider>
-    </BrowserRouter>
+    </Router>
   );
 }

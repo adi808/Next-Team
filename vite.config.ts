@@ -3,6 +3,8 @@ import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
+  // constant, so the demo code is removed from the production bundle
+  define: { 'import.meta.env.VITE_DEMO': '"0"' },
   plugins: [
     react(),
     VitePWA({

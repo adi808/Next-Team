@@ -3,3 +3,4 @@ dist
 .env
 supabase/.temp
 supabase/.branches
+dist-demo

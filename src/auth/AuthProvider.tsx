@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { Session } from '@supabase/supabase-js';
-import { supabase } from '../lib/supabase';
+import { isDemo, supabase } from '../lib/supabase';
 import { q } from '../lib/db';
 import type { Membership, Mode, Player, Profile } from '../lib/types';
 
@@ -85,7 +85,10 @@ export function AuthProvider({ children: kids }: { children: ReactNode }) {
     if (me) modes.push('player');
     return {
       loading, session, profile, memberships, children, me, modes, adminClubIds, coachTeamIds, reload,
-      signOut: async () => { await supabase.auth.signOut(); },
+      signOut: async () => {
+        if (isDemo) { window.dispatchEvent(new Event('demo-exit')); return; }
+        await supabase.auth.signOut();
+      },
     };
   }, [loading, session, profile, memberships, children, me, reload]);
 

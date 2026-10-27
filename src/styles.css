@@ -105,3 +105,13 @@ button.secondary { background: #fff; color: var(--green); border: 1px solid var(
 .composer { display: flex; gap: 0.5rem; flex-wrap: wrap; }
 .composer input { flex: 1; margin: 0; }
 .attend { border-top: 1px solid #e3ece6; padding: 0.5rem 0; display: flex; flex-direction: column; gap: 0.35rem; }
+
+/* ---- demo build ---- */
+.demo-picker { max-width: 26rem; margin: 0 auto; padding: 1.5rem 1rem; }
+.demo-picker h1 { color: var(--green); margin-bottom: 0.25rem; }
+.demo-lead { margin-top: 0; }
+.demo-note { font-size: 0.85rem; }
+.demo-bar {
+  position: sticky; top: 0; z-index: 20; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;
+  flex-wrap: wrap; padding: 0.4rem 1rem; background: #fdf0c8; color: #3b2f00; font-size: 0.85rem; border-bottom: 1px solid #e6cf7a;
+}

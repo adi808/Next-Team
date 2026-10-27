@@ -23,6 +23,9 @@ Built: everything in the business spec except features marked "proposed" there.
 * `attribute_defs` + `attribute_values` - one mechanism for ratings, medical info, team and event settings and anything added later. Types: text, number, scale, boolean, date, select, lookup. Each definition says who sees it and who edits it; every save is a new row, so history is kept.
 * `sports` - table with an icon per sport.
 
+### Demo
+`npm run build:demo` writes `dist-demo/next-team-demo.html`: one self-contained page with the real UI and an in-browser sample backend (`src/demo/`), with a person picker. It is excluded from the production bundle. `node tests/demo-e2e.cjs` drives it (33 checks).
+
 ### Verified
 * `supabase/tests/scenario.sql`: 90 role-by-role checks on Postgres 16 (against a stub `auth` schema). Run it with `supabase/tests/stub_auth.sql` first, then the migrations, then the scenario.
 * `tests/api-integration.cjs`: 29 checks over HTTP through a real PostgREST 12 with signed JWTs per role: table and function exposure, grants, RLS, RPCs with named parameters, error responses.
