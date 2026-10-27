@@ -24,8 +24,8 @@ begin
   begin execute q; perform t.check(label || ' (should be denied)', false);
   exception when others then perform t.check(label || ' -> denied', true); end;
 end $$;
-create function t.reg(n text, p_phone text) returns void language plpgsql as $$
-begin insert into t.ctx select n, id from profiles where profiles.phone = norm_phone(p_phone); end $$;
+create function t.reg(n text, p_email text) returns void language plpgsql as $$
+begin insert into t.ctx select n, id from profiles where profiles.email = norm_email(p_email); end $$;
 create function t.lk(d text, s text) returns uuid language sql stable as
   $$ select id from lookups where domain = d and slug = s order by sport_id nulls first limit 1 $$;
 create function t.lkn(d text, s text) returns uuid language sql stable as
@@ -33,20 +33,23 @@ create function t.lkn(d text, s text) returns uuid language sql stable as
 grant execute on all functions in schema t to authenticated;
 
 -- ---------------------------------------------------------------- users
-insert into auth.users (phone) values ('972501000001'), ('972501000003'), ('972501000004'), ('972501000008');
-select t.reg('S', '+972501000001'), t.reg('C', '+972501000003'), t.reg('C2', '+972501000004'), t.reg('O', '+972501000008');
+insert into auth.users (email) values ('u01@test.io'), ('u03@test.io'), ('u04@test.io'), ('u08@test.io');
+select t.reg('S', 'u01@test.io'), t.reg('C', 'u03@test.io'), t.reg('C2', 'u04@test.io'), t.reg('O', 'u08@test.io');
 update profiles set is_system_admin = true where id = t.id('S');
 
 set role authenticated;
 select t.as_user('S');
-select t.check('system admin creates a club and names its admin by phone',
-  (select create_club('מועדון א', '050-100 0002')) is not null);
+select t.check('system admin creates a club and names its admin by email',
+  (select create_club('מועדון א', ' U02@Test.IO ')) is not null);
 insert into t.ctx select 'club', id from clubs limit 1;
 select t.denied('non system admin cannot create a club', $$select create_club('x')$$) from (select t.as_user('C')) _;
 
 reset role;
-insert into auth.users (phone) values ('972501000002');             -- the club admin signs up
-select t.reg('A', '+972501000002');
+insert into auth.users (email) values ('u02@test.io');             -- the club admin signs up
+select t.reg('A', 'u02@test.io');
+insert into auth.users (email, raw_user_meta_data) values ('g@test.io', '{"full_name": "גוגל משתמש"}');
+select t.check('a Google sign-in fills the profile name and email',
+  exists (select 1 from profiles where email = 'g@test.io' and full_name = 'גוגל משתמש'));
 select t.check('club admin invite is claimed at signup',
   exists (select 1 from memberships where user_id = t.id('A') and role = 'club_admin'));
 
@@ -54,22 +57,24 @@ set role authenticated;
 select t.as_user('A');
 insert into t.ctx select 'T1', create_team(t.id('club'), 'ילדים א', (select id from sports where slug = 'football'));
 insert into t.ctx select 'T2', create_team(t.id('club'), 'נוער כדורסל', (select id from sports where slug = 'basketball'));
-select invite_by_phone('050-1000003', t.id('club'), t.id('T1'), 'coach');
-select invite_by_phone('050-1000004', t.id('club'), t.id('T2'), 'coach');
+select invite_by_email('u03@test.io', t.id('club'), t.id('T1'), 'coach');
+select invite_by_email('u04@test.io', t.id('club'), t.id('T2'), 'coach');
 select t.check('coaches are attached to their teams',
   (select count(*) from memberships where role = 'coach') = 2);
+select t.denied('an invalid email is rejected',
+  $$select invite_by_email('not-an-email', t.id('club'), t.id('T1'), 'coach')$$);
 
 -- ---------------------------------------------------------------- players
 select t.as_user('C');
-insert into t.ctx select 'K1', add_player(t.id('T1'), 'דני כהן', '2014-05-01', null, '050-1000005');
-insert into t.ctx select 'K2', add_player(t.id('T1'), 'רוני לוי', '2008-03-02', '050-1000006', '050-1000007');
+insert into t.ctx select 'K1', add_player(t.id('T1'), 'דני כהן', '2014-05-01', null, 'u05@test.io');
+insert into t.ctx select 'K2', add_player(t.id('T1'), 'רוני לוי', '2008-03-02', 'u06@test.io', 'u07@test.io');
 select t.denied('coach of another team cannot add a player to T1',
   $$select add_player(t.id('T1'), 'x', '2010-01-01')$$) from (select t.as_user('C2')) _;
 select t.denied('birth date is mandatory', $$select add_player(t.id('T1'), 'x', null)$$) from (select t.as_user('C')) _;
 
 reset role;
-insert into auth.users (phone) values ('972501000005'), ('972501000006'), ('972501000007'), ('972501000009');
-select t.reg('P1', '+972501000005'), t.reg('U2', '+972501000006'), t.reg('P2', '+972501000007'), t.reg('P3', '+972501000009');
+insert into auth.users (email) values ('u05@test.io'), ('u06@test.io'), ('u07@test.io'), ('u09@test.io');
+select t.reg('P1', 'u05@test.io'), t.reg('U2', 'u06@test.io'), t.reg('P2', 'u07@test.io'), t.reg('P3', 'u09@test.io');
 select t.check('parent invite becomes an approved link at signup',
   exists (select 1 from guardianships where parent_id = t.id('P1') and player_id = t.id('K1') and status = 'approved'));
 select t.check('player invite links the account to the player',
@@ -322,7 +327,7 @@ select t.denied('a parent cannot write in a conversation about a different child
 
 -- ---------------------------------------------------------------- guardianship request flow
 select t.as_user('U2');
-select request_guardianship('050-1000009', false);                       -- the child asks P3 to be linked
+select request_guardianship('u09@test.io', false);                       -- the child asks P3 to be linked
 select t.as_user('P3');
 select t.check('a pending request grants no access yet', (select count(*) from v_players) = 0);
 select t.denied('the requesting parent cannot approve', $$select respond_guardianship((select id from guardianships where parent_id = t.id('P3')), true)$$);

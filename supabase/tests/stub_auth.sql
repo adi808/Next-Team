@@ -2,7 +2,7 @@
 create role authenticated nologin;
 create role anon nologin;
 create schema auth;
-create table auth.users (id uuid primary key default gen_random_uuid(), phone text);
+create table auth.users (id uuid primary key default gen_random_uuid(), phone text, email text, raw_user_meta_data jsonb not null default '{}');
 create function auth.uid() returns uuid language sql stable as $$
   select (coalesce(nullif(current_setting('request.uid', true), ''),
                    nullif(current_setting('request.jwt.claim.sub', true), ''),

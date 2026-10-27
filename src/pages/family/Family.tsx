@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { q, rpc, useAction, useLoad, fmtDate, ageOf } from '../../lib/db';
 import { teamAllowsPlayerAnswers } from '../../lib/team';
-import { toE164 } from '../../lib/phone';
+import { normEmail } from '../../lib/email';
 import { useAuth } from '../../auth/AuthProvider';
 import { Badge, Card, Empty, ErrorText, Field, Loading } from '../../components/ui';
 import { AttendanceWidget } from '../../components/Attendance';
@@ -33,17 +33,17 @@ function useKids() {
 export function FamilyHome() {
   const { reload } = useAuth();
   const { kids, asParent, links, teams, loading, error } = useKids();
-  const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
   const [sent, setSent] = useState(false);
   const act = useAction();
   useEffect(() => { reload(); }, [reload]);
 
   async function request() {
-    const e164 = toE164(phone);
-    if (!e164) return act.setError('מספר טלפון לא תקין');
+    const addr = normEmail(email);
+    if (!addr) return act.setError('כתובת מייל לא תקינה');
     await act.run(async () => {
-      await rpc('request_guardianship', { p_other_phone: e164, p_as_parent: asParent });
-      setPhone(''); setSent(true);
+      await rpc('request_guardianship', { p_other_email: addr, p_as_parent: asParent });
+      setEmail(''); setSent(true);
     });
   }
 
@@ -65,13 +65,13 @@ export function FamilyHome() {
       </ul>
       <Card title={asParent ? 'קישור ילד נוסף' : 'קישור להורה'}>
         <p className="muted">
-          {asParent ? 'אם לילד יש כניסה משלו, הזינו את הטלפון שלו. ' : 'הזינו את הטלפון של ההורה. '}
+          {asParent ? 'אם לילד יש כניסה משלו, הזינו את המייל שלו. ' : 'הזינו את המייל של ההורה. '}
           הבקשה תמתין לאישור המאמן של הקבוצה.
         </p>
-        <Field label="טלפון"><input type="tel" dir="ltr" value={phone} onChange={(e) => setPhone(e.target.value)} /></Field>
+        <Field label="מייל"><input type="email" dir="ltr" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@example.com" /></Field>
         <ErrorText error={act.error} />
         {sent && <p className="ok">הבקשה נשלחה וממתינה לאישור המאמן.</p>}
-        <button disabled={!phone.trim() || act.busy} onClick={request}>שליחת בקשה</button>
+        <button disabled={!email.trim() || act.busy} onClick={request}>שליחת בקשה</button>
       </Card>
     </>
   );

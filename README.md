@@ -8,9 +8,9 @@ Built: everything in the business spec except features marked "proposed" there.
 
 | Area | What it does |
 |---|---|
-| Login | phone + SMS code, role/mode picker (a user who is parent and club admin picks a mode, and can switch) |
-| Clubs / teams | system admin creates clubs; club admin creates teams (with a sport) and invites staff by phone |
-| Players | first-class: name, birth date (mandatory), photo (parent consent per child). A child may have no phone: the parent manages the profile |
+| Login | Google or an emailed code (free, no SMS), role/mode picker (a user who is parent and club admin picks a mode, and can switch) |
+| Clubs / teams | system admin creates clubs; club admin creates teams (with a sport) and invites staff by email |
+| Players | first-class: name, birth date (mandatory), photo (parent consent per child). A child may have no email: the parent manages the profile |
 | Events | type from a table (training / match / team building ...), attendance answers with a reason from a table and a note, last answer wins, no time limit |
 | Match | opponent, result, format and formation (defaults from the team), goals / assists / cards (types per sport, in a table) |
 | Parameters | generic, dynamic, with history and per-role visibility: ratings 1-10, medical info, team settings (minimum age to answer, ...) |
@@ -34,7 +34,7 @@ Built: everything in the business spec except features marked "proposed" there.
 * `npm run typecheck` and `npm run build` pass.
 
 ### Not verified
-Supabase's own services: phone login with a real SMS (GoTrue), photo upload to Storage, and the Supabase gateway (the tests use a minimal stand-in). `supabase start` could not run in the build environment (image downloads were blocked), so run the "First run" steps below once on a machine with Docker.
+Supabase's own services: Google / email login (GoTrue), photo upload to Storage, and the Supabase gateway (the tests use a minimal stand-in). `supabase start` could not run in the build environment (image downloads were blocked), so run the "First run" steps below once on a machine with Docker.
 
 First run:
 
@@ -46,12 +46,12 @@ cp .env.example .env        # fill in the local anon key printed by `supabase st
 npm run dev
 ```
 
-SMS login needs a provider configured in `supabase/config.toml` (`[auth.sms]`, e.g. Twilio).
-For local development `[auth.sms.test_otp]` maps test number `+972500000000` to code `123456`.
+Login is Google or an emailed code (identity is the email address; see DEPLOY.md for the Google and SMTP setup).
+Locally, `supabase start` serves the emails in Inbucket (http://127.0.0.1:54324).
 Set a system admin by hand: `update profiles set is_system_admin = true where id = '<uuid>';`
 
 ## Decisions
-1. Parent-child link: either side may ask by the other's phone (only when the child has an account); the coach of the child's team approves. A coach or club admin who adds a parent links them at once.
+1. Parent-child link: either side may ask by the other's email (only when the child has an account); the coach of the child's team approves. A coach or club admin who adds a parent links them at once.
 2. A coach adds players and parents to their own team; a club admin may invite staff (coaches, club admins); only a system admin creates clubs.
 3. Team channel: staff and parents write, players read. Personal chat: coach <-> player, parents see all of it, club admin and system admin do not.
 4. Medical info: parent, coach, club admin, system admin. Ratings: also the player. Each parent / player sees only their own child.

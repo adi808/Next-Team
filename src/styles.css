@@ -71,6 +71,14 @@ label { font-weight: 500; color: var(--text-2); }
 }
 .login form { display: flex; flex-direction: column; }
 .login form button.link { margin-top: 0.5rem; }
+.login button.google {
+  width: 100%; display: flex; align-items: center; justify-content: center; gap: 0.6rem;
+  background: var(--surface); color: var(--text); border-color: var(--border-strong);
+}
+.login button.google:hover:not(:disabled) { background: var(--bg); border-color: var(--muted); }
+.login .divider { display: flex; align-items: center; gap: 0.75rem; margin: 1.25rem 0 1rem; color: var(--muted); font-size: 0.85rem; }
+.login .divider::before, .login .divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+.login .hint { font-size: 0.85rem; text-align: center; margin: 0.75rem 0 0; }
 
 /* ---- app shell ---- */
 .shell { min-height: 100dvh; display: flex; flex-direction: column; }
@@ -181,5 +189,6 @@ legend { font-weight: 600; font-size: 0.9rem; padding: 0 0.35rem; }
 .demo-note { font-size: 0.85rem; }
 .demo-bar {
   position: sticky; top: 0; z-index: 20; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;
-  flex-wrap: wrap; padding: 0.4rem 1rem; background: #fef9c3; color: #713f12; font-size: 0.85rem; border-bottom: 1px solid #fde68a;
+  flex-wrap: wrap; padding: 0.45rem 1rem; background: var(--primary-soft); color: var(--primary-hover); font-size: 0.85rem; font-weight: 500;
+  border-bottom: 1px solid #dbe6fe;
 }

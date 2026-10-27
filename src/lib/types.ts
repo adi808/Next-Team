@@ -22,6 +22,7 @@ export const ENTITY_ROLE_LABELS: Record<EntityRole, string> = {
 export interface Profile {
   id: string;
   phone: string | null;
+  email: string | null;
   full_name: string;
   is_system_admin: boolean;
 }

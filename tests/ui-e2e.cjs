@@ -16,8 +16,8 @@ function sign(sub) {
   const h = b64({ alg: 'HS256', typ: 'JWT' }), p = b64({ sub, role: 'authenticated', aud: 'authenticated', exp: Math.floor(Date.now() / 1000) + 3600 });
   return `${h}.${p}.${crypto.createHmac('sha256', SECRET).update(`${h}.${p}`).digest('base64url')}`;
 }
-const ids = Object.fromEntries(psql('select phone, id from profiles').split('\n').map((l) => l.split('|')));
-const PHONES = { S: '+972501000001', A: '+972501000002', C: '+972501000003', P1: '+972501000005', U2: '+972501000006', O: '+972501000008' };
+const ids = Object.fromEntries(psql('select email, id from profiles').split('\n').map((l) => l.split('|')));
+const EMAILS = { S: 'u01@test.io', A: 'u02@test.io', C: 'u03@test.io', P1: 'u05@test.io', U2: 'u06@test.io', O: 'u08@test.io' };
 const K1 = psql("select id from players where full_name = 'דני כהן'"), T1 = psql("select id from teams where name = 'ילדים א'");
 const E_MATCH = psql("select id from events where title = 'משחק ליגה'"), E_TRAIN = psql("select id from events where title = 'אימון שני'");
 
@@ -41,8 +41,8 @@ const out = (ok, label, extra) => { if (!ok) fails++; console.log(`${ok ? 'PASS'
 
 async function persona(browser, who, steps) {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 800 } });
-  const exp = Math.floor(Date.now() / 1000) + 3600, id = ids[PHONES[who]], token = sign(id);
-  const session = { access_token: token, refresh_token: 'r', expires_in: 3600, expires_at: exp, token_type: 'bearer', user: { id, aud: 'authenticated', phone: PHONES[who], app_metadata: {}, user_metadata: {}, created_at: '2026-01-01' } };
+  const exp = Math.floor(Date.now() / 1000) + 3600, id = ids[EMAILS[who]], token = sign(id);
+  const session = { access_token: token, refresh_token: 'r', expires_in: 3600, expires_at: exp, token_type: 'bearer', user: { id, aud: 'authenticated', email: EMAILS[who], app_metadata: {}, user_metadata: {}, created_at: '2026-01-01' } };
   await ctx.addInitScript(([s]) => localStorage.setItem('sb-127-auth-token', JSON.stringify(s)), [session]);
   const p = await ctx.newPage(); const errors = [];
   p.on('pageerror', (e) => errors.push('PAGEERROR ' + e));
