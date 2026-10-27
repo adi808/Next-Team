@@ -5,14 +5,8 @@
 ## 1. Supabase
 1. ב־supabase.com: New project. שמרו את סיסמת מסד הנתונים.
 2. Project Settings ← API: העתיקו את **Project URL** ואת **anon public key**.
-3. העלאת הסכמה מהמחשב (בתיקיית הפרויקט):
-   ```bash
-   npm install
-   npx supabase login
-   npx supabase link --project-ref <מזהה הפרויקט>
-   npx supabase db push
-   ```
-   הפקודה מריצה את כל הקבצים ב־`supabase/migrations` (כולל הרשימות ההתחלתיות והגדרת אחסון התמונות).
+3. העלאת הסכמה (בלי התקנות): בתפריט הצד ← **SQL Editor** ← New query. הדביקו את כל התוכן של הקובץ `supabase/all_migrations.sql` ולחצו **Run**. מצופה "Success. No rows returned". הקובץ יוצר את כל הטבלאות, ההרשאות, הרשימות ההתחלתיות והגדרת אחסון התמונות. מריצים פעם אחת בלבד, בפרויקט חדש.
+   (חלופה למפתחים: `npx supabase link` ואחריו `npx supabase db push`.)
 4. התחברות בטלפון: Authentication ← Providers ← Phone ← Enable.
    * **לבדיקה ראשונה בלי SMS:** באותו מסך, "Test Phone Numbers and OTPs": הוסיפו מספר וקוד, למשל `972500000000=123456`.
    * **לשימוש אמיתי:** חברו ספק SMS (Twilio וכד') באותו מסך.
