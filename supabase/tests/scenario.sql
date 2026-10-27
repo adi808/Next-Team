@@ -353,6 +353,26 @@ select t.as_user('O');
 select t.check('lookups outside own club are hidden, global ones visible',
   not exists (select 1 from lookups where slug = 'exam') and exists (select 1 from lookups where slug = 'illness'));
 
+-- ---------------------------------------------------------------- edit / delete clubs and teams
+set role authenticated;
+select t.as_user('C');
+select t.denied('a coach cannot rename the club', $$select update_club(t.id('club'), 'x')$$);
+select t.denied('a coach cannot delete a team', $$select delete_team(t.id('T1'))$$);
+select t.as_user('A');
+select update_club(t.id('club'), 'מועדון א מחודש');
+select update_team(t.id('T2'), 'נוער כדורסל ב', null);
+select t.check('club admin renames the club and a team',
+  (select name from clubs where id = t.id('club')) = 'מועדון א מחודש'
+  and (select name from teams where id = t.id('T2')) = 'נוער כדורסל ב');
+select t.denied('an empty team name is rejected', $$select update_team(t.id('T2'), '  ', null)$$);
+select t.denied('a club admin cannot delete the club', $$select delete_club(t.id('club'))$$);
+select delete_team(t.id('T2'));
+select t.check('club admin deletes a team', not exists (select 1 from teams where id = t.id('T2')));
+select t.as_user('S');
+select delete_club(t.id('club'));
+select t.check('system admin deletes the club with everything in it',
+  not exists (select 1 from clubs where id = t.id('club')) and not exists (select 1 from teams where club_id = t.id('club')));
+
 -- ---------------------------------------------------------------- summary
 reset role;
 select case when count(*) filter (where not ok) = 0

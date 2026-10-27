@@ -187,6 +187,34 @@ export class DemoServer {
       if (!this.sys && !this.adminOf(a.p_club)) this.deny();
       const id = this.id('t'); this.t.teams.push({ id, club_id: a.p_club, name: String(a.p_name).trim(), sport_id: a.p_sport }); return id;
     },
+    update_club(this: DemoServer, a: Row) {
+      if (!this.sys && !this.adminOf(a.p_club)) this.deny();
+      if (!String(a.p_name ?? '').trim()) this.bad('name is required');
+      this.find('clubs', a.p_club)!.name = String(a.p_name).trim();
+    },
+    delete_club(this: DemoServer, a: Row) {
+      if (!this.sys) this.deny('only a system admin can delete a club');
+      const teams = this.t.teams.filter((t) => t.club_id === a.p_club).map((t) => t.id);
+      teams.forEach((id) => this.rpcs.delete_team.call(this, { p_team: id }));
+      this.t.clubs = this.t.clubs.filter((c) => c.id !== a.p_club);
+      this.t.memberships = this.t.memberships.filter((m) => m.club_id !== a.p_club);
+      this.t.players = this.t.players.filter((p) => p.club_id !== a.p_club);
+    },
+    update_team(this: DemoServer, a: Row) {
+      const team = this.find('teams', a.p_team);
+      if (!team || !(this.sys || this.adminOf(team.club_id))) this.deny();
+      if (!String(a.p_name ?? '').trim()) this.bad('name is required');
+      team!.name = String(a.p_name).trim();
+      if (a.p_sport) team!.sport_id = a.p_sport;
+    },
+    delete_team(this: DemoServer, a: Row) {
+      const team = this.find('teams', a.p_team);
+      if (!team || !(this.sys || this.adminOf(team.club_id))) this.deny();
+      this.t.teams = this.t.teams.filter((t) => t.id !== a.p_team);
+      this.t.team_players = this.t.team_players.filter((x) => x.team_id !== a.p_team);
+      this.t.memberships = this.t.memberships.filter((m) => m.team_id !== a.p_team);
+      this.t.events = this.t.events.filter((e) => e.team_id !== a.p_team);
+    },
     invite_by_email(this: DemoServer, a: Row) {
       if (!this.sys && !this.adminOf(a.p_club)) this.deny('only a club admin can invite staff');
       return this.id('inv');

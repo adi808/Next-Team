@@ -46,6 +46,11 @@ button.link:hover:not(:disabled) { background: var(--primary-soft); }
 button.secondary { background: var(--surface); color: var(--text-2); border-color: var(--border-strong); }
 button.secondary:hover:not(:disabled) { background: var(--bg); border-color: var(--muted); }
 button.small { padding: 0.35rem 0.8rem; min-height: 0; font-size: 0.85rem; border-radius: 10px; }
+button.danger { background: var(--surface); color: var(--danger); border-color: #fecaca; }
+button.danger:hover:not(:disabled) { background: #fef2f2; border-color: var(--danger); }
+.title-row { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.title-row h2 { margin-inline-end: auto; }
+.grow { flex: 1; }
 input, textarea, select {
   font: inherit; width: 100%; padding: 0.7rem 0.85rem; color: var(--text);
   border: 1px solid var(--border-strong); border-radius: var(--radius); background: var(--surface); min-height: 44px;
