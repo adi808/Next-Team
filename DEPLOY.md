@@ -13,6 +13,9 @@
 5. Authentication ← URL Configuration: הכניסו את כתובת האתר (אחרי שלב 2) ב־Site URL.
 
 ## 2. Cloudflare Pages
+**דרך א (אוטומטית, דרך GitHub Actions):** ב־GitHub ← Settings ← Secrets and variables ← Actions ← Secrets, הוסיפו `CLOUDFLARE_API_TOKEN` (טוקן עם הרשאת Account ← Cloudflare Pages ← Edit) ו־`CLOUDFLARE_ACCOUNT_ID`. כל דחיפה ל־`main` מעלה את האתר לפרויקט `next-team`; כתובת הפרויקט ומפתח ה־anon כתובים ב־`.github/workflows/deploy.yml`.
+
+**דרך ב (חיבור Git ב־Cloudflare):**
 1. Workers & Pages ← Create ← Pages ← Connect to Git ← הריפו `adi808/Next-Team`, ענף `main`.
 2. Build command: `npm run build`. Build output directory: `dist`.
 3. Environment variables:
