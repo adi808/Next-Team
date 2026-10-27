@@ -8,7 +8,7 @@ const UID = '11111111-1111-1111-1111-111111111111', TEAM = '22222222-2222-2222-2
   F11 = '99999999-9999-9999-9999-999999999991';
 const mode = process.argv[2] || 'coach';
 const fixtures = {
-  profiles: [{ id: UID, phone: '+972501000003', full_name: 'מאמן בדיקה', is_system_admin: false }],
+  profiles: [{ id: UID, email: 'coach@test.io', phone: null, full_name: 'מאמן בדיקה', is_system_admin: false }],
   memberships: mode === 'coach' ? [{ id: 'm1', club_id: CLUB, team_id: TEAM, role: 'coach' }] : [],
   guardianships: mode === 'parent' ? [{ player_id: P1, parent_id: UID, status: 'approved' }] : [],
   v_players: [{ id: P1, club_id: CLUB, full_name: 'דני כהן', birth_date: '2014-05-01', photo_path: null, photo_consent: false, has_account: false, is_me: false }],
@@ -42,7 +42,7 @@ const fixtures = {
   const exp = Math.floor(Date.now() / 1000) + 86400;
   const b64 = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
   const token = `${b64({ alg: 'HS256', typ: 'JWT' })}.${b64({ sub: UID, exp, role: 'authenticated', aud: 'authenticated' })}.sig`;
-  const session = { access_token: token, refresh_token: 'r', expires_in: 86400, expires_at: exp, token_type: 'bearer', user: { id: UID, aud: 'authenticated', phone: '+972501000003', app_metadata: {}, user_metadata: {}, created_at: '2026-01-01' } };
+  const session = { access_token: token, refresh_token: 'r', expires_in: 86400, expires_at: exp, token_type: 'bearer', user: { id: UID, aud: 'authenticated', email: 'coach@test.io', app_metadata: {}, user_metadata: {}, created_at: '2026-01-01' } };
   await ctx.addInitScript(([s]) => { localStorage.setItem('sb-127-auth-token', JSON.stringify(s)); }, [session]);
   const p = await ctx.newPage(); const errors = [];
   p.on('pageerror', (e) => errors.push('PAGEERROR ' + e));

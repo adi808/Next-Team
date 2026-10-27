@@ -187,7 +187,7 @@ export class DemoServer {
       if (!this.sys && !this.adminOf(a.p_club)) this.deny();
       const id = this.id('t'); this.t.teams.push({ id, club_id: a.p_club, name: String(a.p_name).trim(), sport_id: a.p_sport }); return id;
     },
-    invite_by_phone(this: DemoServer, a: Row) {
+    invite_by_email(this: DemoServer, a: Row) {
       if (!this.sys && !this.adminOf(a.p_club)) this.deny('only a club admin can invite staff');
       return this.id('inv');
     },
@@ -199,8 +199,8 @@ export class DemoServer {
       const id = this.id('k');
       this.t.players.push({ id, club_id: team.club_id, full_name: String(a.p_full_name).trim(), birth_date: a.p_birth_date, photo_path: null, photo_consent: false, user_id: null });
       this.t.team_players.push({ team_id: team.id, player_id: id });
-      if (a.p_parent_phone) this.rpcs.invite_parent.call(this, { p_player: id, p_phone: a.p_parent_phone });
-      if (a.p_phone) this.rpcs.link_player_phone.call(this, { p_player: id, p_phone: a.p_phone });
+      if (a.p_parent_email) this.rpcs.invite_parent.call(this, { p_player: id, p_email: a.p_parent_email });
+      if (a.p_email) this.rpcs.link_player_email.call(this, { p_player: id, p_email: a.p_email });
       return id;
     },
     add_player_to_team(this: DemoServer, a: Row) { this.t.team_players.push({ team_id: a.p_team, player_id: a.p_player }); },
@@ -221,17 +221,18 @@ export class DemoServer {
     },
     invite_parent(this: DemoServer, a: Row) {
       if (!this.managePlayer(a.p_player)) this.deny();
-      const id = this.id('u_inv'); this.t.profiles.push({ id, phone: a.p_phone, full_name: 'הורה (הוזמן)', is_system_admin: false });
+      const id = this.id('u_inv'); this.t.profiles.push({ id, email: a.p_email, phone: null, full_name: 'הורה (הוזמן)', is_system_admin: false });
       this.t.guardianships.push({ id: this.id('g'), parent_id: id, player_id: a.p_player, status: 'approved' });
     },
-    link_player_phone(this: DemoServer, a: Row) {
+    link_player_email(this: DemoServer, a: Row) {
       if (!(this.managePlayer(a.p_player) || this.parentOf(a.p_player))) this.deny();
-      const id = this.id('u_pl'); this.t.profiles.push({ id, phone: a.p_phone, full_name: 'שחקן (הוזמן)', is_system_admin: false });
+      const id = this.id('u_pl'); this.t.profiles.push({ id, email: a.p_email, phone: null, full_name: 'שחקן (הוזמן)', is_system_admin: false });
       this.find('players', a.p_player)!.user_id = id;
     },
     request_guardianship(this: DemoServer, a: Row) {
-      const other = this.t.profiles.find((p) => p.phone === a.p_other_phone);
-      if (!other) throw new PgError('P0002', 'no user with this phone');
+      const email = String(a.p_other_email ?? '').trim().toLowerCase();
+      const other = this.t.profiles.find((p) => p.email === email);
+      if (!other) throw new PgError('P0002', 'no user with this email');
       const player = a.p_as_parent ? this.t.players.find((p) => p.user_id === other.id) : this.t.players.find((p) => p.user_id === this.uid);
       if (!player) throw new PgError('P0002', 'the player side has no player profile');
       const id = this.id('g');

@@ -11,8 +11,8 @@ const sign = (sub) => {
   const h = b64({ alg: 'HS256', typ: 'JWT' }), p = b64({ sub, role: 'authenticated', aud: 'authenticated', exp: Math.floor(Date.now() / 1000) + 3600 });
   return `${h}.${p}.${crypto.createHmac('sha256', SECRET).update(`${h}.${p}`).digest('base64url')}`;
 };
-const ids = Object.fromEntries(psql('select phone, id from profiles').split('\n').map((l) => l.split('|')));
-const U = { S: '+972501000001', A: '+972501000002', C: '+972501000003', C2: '+972501000004', P1: '+972501000005', U2: '+972501000006', P2: '+972501000007', O: '+972501000008' };
+const ids = Object.fromEntries(psql('select email, id from profiles').split('\n').map((l) => l.split('|')));
+const U = { S: 'u01@test.io', A: 'u02@test.io', C: 'u03@test.io', C2: 'u04@test.io', P1: 'u05@test.io', U2: 'u06@test.io', P2: 'u07@test.io', O: 'u08@test.io' };
 const tok = Object.fromEntries(Object.entries(U).map(([k, ph]) => [k, sign(ids[ph])]));
 async function call(who, method, path, body) {
   const headers = { 'Content-Type': 'application/json', Accept: 'application/json' };
@@ -34,7 +34,7 @@ const T1 = one("select id from teams where name = 'ילדים א'"), E_TRAIN = o
   r = await call(null, 'POST', '/rpc/create_club', { p_name: 'x' }); check('anonymous cannot call RPCs', r.status >= 400, r);
   r = await call('P1', 'GET', '/players?select=*'); check('the base players table is not readable (use v_players)', r.status === 403 || r.status === 401, r);
   r = await call('P1', 'GET', '/team_people?select=*'); check('internal view team_people is not exposed', r.status >= 400, r);
-  r = await call('P1', 'POST', '/rpc/claim_invites', { p_user: ids[U.P1], p_phone: U.P1 }); check('internal function claim_invites is not callable', r.status >= 400, r);
+  r = await call('P1', 'POST', '/rpc/claim_invites', { p_user: ids[U.P1], p_email: U.P1 }); check('internal function claim_invites is not callable', r.status >= 400, r);
 
   // coach
   r = await call('C', 'GET', '/v_players?select=id,full_name,birth_date&order=full_name'); check('coach lists players with birth dates', r.status === 200 && r.json.length === 2 && r.json.every((p) => p.birth_date), r);
@@ -65,7 +65,7 @@ const T1 = one("select id from teams where name = 'ילדים א'"), E_TRAIN = o
   // club admin / system admin / outsiders
   r = await call('A', 'GET', '/conversations'); check('club admin sees no personal conversations', r.status === 200 && r.json.length === 0, r);
   r = await call('A', 'GET', `/event_responses?event_id=eq.${E_TRAIN}`); check('club admin sees attendance answers', r.status === 200 && r.json.length >= 1, r);
-  r = await call('S', 'POST', '/rpc/create_club', { p_name: 'מועדון ב', p_admin_phone: null }); check('system admin creates a club through the API', r.status === 200, r);
+  r = await call('S', 'POST', '/rpc/create_club', { p_name: 'מועדון ב', p_admin_email: null }); check('system admin creates a club through the API', r.status === 200, r);
   r = await call('C2', 'GET', `/events?team_id=eq.${T1}`); check('coach of another team sees no events of this team', r.status === 200 && r.json.length === 0, r);
   r = await call('O', 'GET', '/v_players'); check('outsider sees no players', r.status === 200 && r.json.length === 0, r);
   r = await call('O', 'GET', '/profiles'); check('outsider sees only their own profile', r.status === 200 && r.json.length === 1, r);

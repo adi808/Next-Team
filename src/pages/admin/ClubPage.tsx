@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { q, rpc, useAction, useLoad } from '../../lib/db';
-import { toE164 } from '../../lib/phone';
+import { normEmail } from '../../lib/email';
 import { Card, Empty, ErrorText, Field, Loading, Tabs } from '../../components/ui';
 import { DefCreator, DefList } from '../../components/Attributes';
 import { useSports } from '../../components/Lookups';
@@ -21,7 +21,7 @@ export default function ClubPage() {
 
   const [teamName, setTeamName] = useState('');
   const [sportId, setSportId] = useState('');
-  const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
   const [staffTeam, setStaffTeam] = useState('');
   const act = useAction();
   const sportName = (id: string) => sports.find((s) => s.id === id)?.name_he ?? '';
@@ -33,11 +33,11 @@ export default function ClubPage() {
     });
   }
   async function inviteStaff() {
-    const e164 = toE164(phone);
-    if (!e164) return act.setError('מספר טלפון לא תקין');
+    const addr = normEmail(email);
+    if (!addr) return act.setError('כתובת מייל לא תקינה');
     await act.run(async () => {
-      await rpc('invite_by_phone', { p_phone: e164, p_club: clubId, p_team: staffTeam || null, p_role: staffTeam ? 'coach' : 'club_admin' });
-      setPhone('');
+      await rpc('invite_by_email', { p_email: addr, p_club: clubId, p_team: staffTeam || null, p_role: staffTeam ? 'coach' : 'club_admin' });
+      setEmail('');
     });
   }
 
@@ -72,8 +72,8 @@ export default function ClubPage() {
         {
           id: 'staff', label: 'צוות', render: () => (
             <Card title="הזמנת מאמן או מנהל מועדון">
-              <p className="muted">ההזמנה לפי מספר טלפון. מי שכבר רשום מצטרף מיד, ואחרת בכניסתו הראשונה.</p>
-              <Field label="טלפון"><input type="tel" dir="ltr" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="050-0000000" /></Field>
+              <p className="muted">ההזמנה לפי כתובת מייל. מי שכבר רשום מצטרף מיד, ואחרת בכניסתו הראשונה.</p>
+              <Field label="מייל"><input type="email" dir="ltr" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@example.com" /></Field>
               <Field label="תפקיד">
                 <select value={staffTeam} onChange={(e) => setStaffTeam(e.target.value)}>
                   <option value="">מנהל מועדון</option>
@@ -81,7 +81,7 @@ export default function ClubPage() {
                 </select>
               </Field>
               <ErrorText error={act.error} />
-              <button disabled={!phone.trim() || act.busy} onClick={inviteStaff}>הזמנה</button>
+              <button disabled={!email.trim() || act.busy} onClick={inviteStaff}>הזמנה</button>
             </Card>
           ),
         },

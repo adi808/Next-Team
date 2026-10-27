@@ -78,14 +78,14 @@ export function seed(): Tables {
       { id: 't2', club_id: 'c1', name: 'נוער כדורסל', sport_id: 'sp_bb' },
     ],
     profiles: [
-      { id: 'u_sys', phone: '+972501110001', full_name: 'יוסי אברהם', is_system_admin: true },
-      { id: 'u_admin', phone: '+972501110002', full_name: 'רונית מזרחי', is_system_admin: false },
-      { id: 'u_coach', phone: '+972501110003', full_name: 'אבי כץ', is_system_admin: false },
-      { id: 'u_coach2', phone: '+972501110004', full_name: 'מיכל ברק', is_system_admin: false },
-      { id: 'u_p1', phone: '+972501110005', full_name: 'שרה כהן', is_system_admin: false },
-      { id: 'u_k2', phone: '+972501110006', full_name: 'רוני לוי', is_system_admin: false },
-      { id: 'u_p2', phone: '+972501110007', full_name: 'דוד לוי', is_system_admin: false },
-      { id: 'u_p4', phone: '+972501110008', full_name: 'אילנה פרידמן', is_system_admin: false },
+      { id: 'u_sys', email: 'yossi@demo.nextteam.app', phone: null, full_name: 'יוסי אברהם', is_system_admin: true },
+      { id: 'u_admin', email: 'ronit@demo.nextteam.app', phone: null, full_name: 'רונית מזרחי', is_system_admin: false },
+      { id: 'u_coach', email: 'avi@demo.nextteam.app', phone: null, full_name: 'אבי כץ', is_system_admin: false },
+      { id: 'u_coach2', email: 'michal@demo.nextteam.app', phone: null, full_name: 'מיכל ברק', is_system_admin: false },
+      { id: 'u_p1', email: 'sara@demo.nextteam.app', phone: null, full_name: 'שרה כהן', is_system_admin: false },
+      { id: 'u_k2', email: 'roni@demo.nextteam.app', phone: null, full_name: 'רוני לוי', is_system_admin: false },
+      { id: 'u_p2', email: 'david@demo.nextteam.app', phone: null, full_name: 'דוד לוי', is_system_admin: false },
+      { id: 'u_p4', email: 'ilana@demo.nextteam.app', phone: null, full_name: 'אילנה פרידמן', is_system_admin: false },
     ],
     memberships: [
       { id: 'm1', user_id: 'u_admin', club_id: 'c1', team_id: null, role: 'club_admin' },
@@ -171,7 +171,7 @@ export function seed(): Tables {
 
 export const PERSONAS = [
   { id: 'u_coach', title: 'אבי כץ', role: 'מאמן', blurb: 'סגל, אירועים, אישורי הגעה, דירוגים, משימות וסקרים' },
-  { id: 'u_p1', title: 'שרה כהן', role: 'הורה של דני', blurb: 'אישור הגעה, משימות, סקרים והודעות. דני בלי טלפון משלו' },
+  { id: 'u_p1', title: 'שרה כהן', role: 'הורה של דני', blurb: 'אישור הגעה, משימות, סקרים והודעות. דני בלי מייל משלו' },
   { id: 'u_k2', title: 'רוני לוי', role: 'שחקן', blurb: 'הפרופיל והמשימות שלי, אישור הגעה כשהקבוצה מאפשרת' },
   { id: 'u_admin', title: 'רונית מזרחי', role: 'מנהלת מועדון וגם הורה', blurb: 'בורר מצב בכניסה: ניהול המועדון או הורה של נועה' },
   { id: 'u_sys', title: 'יוסי אברהם', role: 'מנהל מערכת', blurb: 'מועדונים ורשימות המערכת' },

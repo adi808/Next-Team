@@ -13,10 +13,10 @@ export function useNames(ids: string[]) {
     const missing = key.split(',').filter((i) => i && !names.has(i));
     if (!missing.length) return;
     let cancelled = false;
-    q<{ id: string; full_name: string; phone: string | null }[]>(
-      supabase.from('profiles').select('id, full_name, phone').in('id', missing),
+    q<{ id: string; full_name: string; email: string | null; phone: string | null }[]>(
+      supabase.from('profiles').select('id, full_name, email, phone').in('id', missing),
     ).then((rows) => {
-      rows.forEach((r) => names.set(r.id, r.full_name || r.phone || 'משתמש'));
+      rows.forEach((r) => names.set(r.id, r.full_name || r.email || r.phone || 'משתמש'));
       missing.forEach((i) => { if (!names.has(i)) names.set(i, 'משתמש'); });
       if (!cancelled) setTick((t) => t + 1);
     }, () => {});

@@ -21,7 +21,7 @@ export function demoSignIn(userId: string) {
   store.set(KEY, JSON.stringify({
     access_token: `${b64({ alg: 'none', typ: 'JWT' })}.${b64({ sub: userId, exp, role: 'authenticated' })}.demo`,
     refresh_token: 'demo', expires_in: exp, expires_at: exp, token_type: 'bearer',
-    user: { id: userId, aud: 'authenticated', phone: profile?.phone, app_metadata: {}, user_metadata: {}, created_at: '2026-01-01T00:00:00Z' },
+    user: { id: userId, aud: 'authenticated', email: profile?.email, phone: profile?.phone, app_metadata: {}, user_metadata: {}, created_at: '2026-01-01T00:00:00Z' },
   }));
 }
 

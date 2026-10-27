@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { q, rpc, useAction, useLoad, ageOf, fmtDay } from '../../lib/db';
-import { toE164 } from '../../lib/phone';
+import { normEmail } from '../../lib/email';
 import { useAuth } from '../../auth/AuthProvider';
 import { Badge, Card, ErrorText, Field, Loading } from '../../components/ui';
 import { AttributesPanel } from '../../components/Attributes';
@@ -26,8 +26,8 @@ export default function PlayerPage() {
   const act = useAction();
   const [name, setName] = useState<string | null>(null);
   const [birth, setBirth] = useState<string | null>(null);
-  const [accountPhone, setAccountPhone] = useState('');
-  const [parentPhone, setParentPhone] = useState('');
+  const [accountEmail, setAccountEmail] = useState('');
+  const [parentEmail, setParentEmail] = useState('');
 
   if (loading || error || !data) return <Loading loading={loading} error={error} />;
   const { player, teams, guardians, stats } = data;
@@ -113,25 +113,25 @@ export default function PlayerPage() {
         </ul>
         {manage && (
           <>
-            <Field label="הזמנת הורה לפי טלפון">
+            <Field label="הזמנת הורה לפי מייל">
               <div className="row">
-                <input type="tel" dir="ltr" value={parentPhone} onChange={(e) => setParentPhone(e.target.value)} placeholder="050-0000000" />
-                <button className="small" disabled={!toE164(parentPhone) || act.busy}
-                  onClick={() => act.run(async () => { await rpc('invite_parent', { p_player: player.id, p_phone: toE164(parentPhone) }); setParentPhone(''); reload(); })}>הוספה</button>
+                <input type="email" dir="ltr" value={parentEmail} onChange={(e) => setParentEmail(e.target.value)} placeholder="name@example.com" />
+                <button className="small" disabled={!normEmail(parentEmail) || act.busy}
+                  onClick={() => act.run(async () => { await rpc('invite_parent', { p_player: player.id, p_email: normEmail(parentEmail) }); setParentEmail(''); reload(); })}>הוספה</button>
               </div>
             </Field>
           </>
         )}
         {(manage || isParent) && !player.has_account && (
-          <Field label="כניסה עצמאית לשחקן (טלפון של השחקן)">
+          <Field label="כניסה עצמאית לשחקן (מייל של השחקן)">
             <div className="row">
-              <input type="tel" dir="ltr" value={accountPhone} onChange={(e) => setAccountPhone(e.target.value)} />
-              <button className="small" disabled={!toE164(accountPhone) || act.busy}
-                onClick={() => act.run(async () => { await rpc('link_player_phone', { p_player: player.id, p_phone: toE164(accountPhone) }); setAccountPhone(''); reload(); })}>חיבור</button>
+              <input type="email" dir="ltr" value={accountEmail} onChange={(e) => setAccountEmail(e.target.value)} />
+              <button className="small" disabled={!normEmail(accountEmail) || act.busy}
+                onClick={() => act.run(async () => { await rpc('link_player_email', { p_player: player.id, p_email: normEmail(accountEmail) }); setAccountEmail(''); reload(); })}>חיבור</button>
             </div>
           </Field>
         )}
-        {player.has_account && <small className="muted">לשחקן יש כניסה משלו. ילד בלי טלפון מנוהל על ידי ההורה.</small>}
+        {player.has_account && <small className="muted">לשחקן יש כניסה משלו. ילד בלי מייל מנוהל על ידי ההורה.</small>}
       </Card>
     </>
   );

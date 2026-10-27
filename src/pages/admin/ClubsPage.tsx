@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { q, rpc, useAction, useLoad } from '../../lib/db';
-import { toE164 } from '../../lib/phone';
+import { normEmail } from '../../lib/email';
 import { Card, Empty, ErrorText, Field, Loading } from '../../components/ui';
 import type { Club } from '../../lib/types';
 
@@ -10,15 +10,15 @@ export default function ClubsPage() {
   const { mode } = useParams();
   const { data, loading, error, reload } = useLoad(() => q<Club[]>(supabase.from('clubs').select('id, name').order('name')), []);
   const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
   const act = useAction();
 
   async function create() {
-    const admin = phone.trim() ? toE164(phone) : null;
-    if (phone.trim() && !admin) return act.setError('מספר הטלפון של מנהל המועדון לא תקין');
+    const admin = email.trim() ? normEmail(email) : null;
+    if (email.trim() && !admin) return act.setError('כתובת המייל של מנהל המועדון לא תקינה');
     await act.run(async () => {
-      await rpc('create_club', { p_name: name, p_admin_phone: admin });
-      setName(''); setPhone(''); reload();
+      await rpc('create_club', { p_name: name, p_admin_email: admin });
+      setName(''); setEmail(''); reload();
     });
   }
 
@@ -35,7 +35,7 @@ export default function ClubsPage() {
       {mode === 'sysadmin' && (
         <Card title="מועדון חדש">
           <Field label="שם המועדון"><input value={name} onChange={(e) => setName(e.target.value)} /></Field>
-          <Field label="טלפון מנהל המועדון (לא חובה)"><input type="tel" dir="ltr" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="050-0000000" /></Field>
+          <Field label="מייל מנהל המועדון (לא חובה)"><input type="email" dir="ltr" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@example.com" /></Field>
           <ErrorText error={act.error} />
           <button disabled={!name.trim() || act.busy} onClick={create}>יצירת מועדון</button>
         </Card>
