@@ -3,7 +3,6 @@ import { supabase } from '../../lib/supabase';
 import { q, useLoad } from '../../lib/db';
 import { useAuth } from '../../auth/AuthProvider';
 import { useCoachTeam } from '../../auth/coachTeam';
-import { ModeSwitch } from '../../components/Shell';
 import { Badge, Empty, Loading, PageHero, StatTiles } from '../../components/ui';
 import { useLookups } from '../../components/Lookups';
 import { KitAvatar } from '../../components/Kit';
@@ -44,7 +43,6 @@ export default function CoachHome() {
     <>
       <PageHero kicker={`מאמן${team ? ` · ${team.name}` : ''}`} title={first ? `שלום, ${first}` : 'שלום'} ball />
       <div className="overlap stack">
-        <ModeSwitch />
         {(teams.data?.length ?? 0) > 1 && (
           <div className="card team-switch">
             <label className="field">

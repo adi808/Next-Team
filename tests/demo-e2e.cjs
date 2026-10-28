@@ -89,7 +89,9 @@ const out = (ok, label, extra) => { if (!ok) fails++; console.log(`${ok ? 'PASS'
   await has('mode picker for a user with two roles', 'איך נכנסים?', 'מנהל מועדון', 'הורה');
   await p.click('button:has-text("מנהל מועדון")'); await wait(900); await has('admin sees the club', 'מכבי הצפון');
   await p.click('text=מכבי הצפון'); await wait(900); await has('club teams for the admin', 'ילדים ב׳', 'נוער כדורסל'); await shot('club');
-  await p.click('role=button[name=/מנהל מועדון/]'); await wait(500); await p.click('button:has-text("הורה")'); await wait(900); await has('switched to parent mode', 'נועה מזרחי');
+  await hasNot('no role strip on regular screens', 'החלפת תפקיד');
+  await p.click('.topbar .who'); await wait(700); await has('role switch lives on the profile page', 'החלפת תפקיד');
+  await p.click('.mode-switch button:has-text("הורה")'); await wait(900); await has('switched to parent mode', 'נועה מזרחי');
 
   // system admin
   await pick('יוסי אברהם');

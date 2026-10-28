@@ -24,7 +24,8 @@ const NAV: Record<Mode, { to: string; label: string; icon: IconName }[]> = {
 
 export const homeOf = (m: Mode) => `/m/${m}/${NAV[m][0].to}`;
 
-/** Segment for switching between the roles one account holds (coach / parent / player ...). */
+/** Switching between the roles one account holds (coach / parent / player ...); shown only on the profile page,
+ * since each screen already follows the role's permissions. */
 export function ModeSwitch() {
   const { mode } = useParams();
   const { modes } = useAuth();
@@ -42,7 +43,6 @@ export function ModeSwitch() {
 export default function Shell() {
   const { mode } = useParams();
   const { modes, profile, signOut } = useAuth();
-  const navigate = useNavigate();
   const m = mode as Mode;
   const valid = modes.includes(m);
 
@@ -55,10 +55,6 @@ export default function Shell() {
     <div className="shell">
       <header className="topbar">
         <Link className="brand" to={homeOf(m)}><span className="brand-mark">N</span>Next Team</Link>
-        <button className="mode-chip" disabled={modes.length < 2} onClick={() => navigate('/pick')}
-          title={modes.length > 1 ? 'החלפת מצב' : undefined}>
-          {MODE_LABELS[m]}{modes.length > 1 ? ' ▾' : ''}
-        </button>
         <span className="grow" />
         <Link className="who" to={`/m/${m}/me`} title="הפרופיל שלי">
           <Picture bucket="avatars" path={profile?.avatar_path} name={profile?.full_name || profile?.email || '?'} size={30} />

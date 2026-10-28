@@ -7,7 +7,6 @@ import { teamAllowsPlayerAnswers } from '../../lib/team';
 import { normEmail } from '../../lib/email';
 import { useAuth } from '../../auth/AuthProvider';
 import { Badge, Card, Empty, ErrorText, Field, Loading, PageHero } from '../../components/ui';
-import { ModeSwitch } from '../../components/Shell';
 import { AttendanceWidget } from '../../components/Attendance';
 import { Conversation, TeamChannel } from '../../components/Chat';
 import { useLookupName } from '../../components/Lookups';
@@ -100,7 +99,6 @@ export function FamilyEvents() {
   return (
     <>
       <PageHero kicker={asParent ? 'הורה' : 'שחקן'} title="אירועים קרובים" />
-      <div className="overlap"><ModeSwitch /></div>
       <Loading loading={loading || l2} error={error || e2} />
       {data && !data.events.length && <Empty>אין אירועים קרובים.</Empty>}
       {data?.events.map((e) => (
