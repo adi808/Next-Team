@@ -5,9 +5,10 @@ import { uploadImage } from '../lib/images';
 import { useAuth } from '../auth/AuthProvider';
 import { Card, ErrorText, Field, PageHero } from '../components/ui';
 import { Picture, PicturePicker } from '../components/Picture';
+import { ModeSwitch } from '../components/Shell';
 
 export default function ProfilePage() {
-  const { profile, reload } = useAuth();
+  const { profile, reload, modes } = useAuth();
   const [name, setName] = useState(profile?.full_name ?? '');
   const [saved, setSaved] = useState(false);
   const act = useAction();
@@ -31,6 +32,7 @@ export default function ProfilePage() {
   return (
     <>
       <PageHero kicker="חשבון" title="הפרופיל שלי" />
+      {modes.length > 1 && <Card title="החלפת תפקיד"><ModeSwitch /></Card>}
       <Card>
         <div className="profile-card">
           <Picture bucket="avatars" path={profile.avatar_path} name={profile.full_name || profile.email || '?'} size={96} />
