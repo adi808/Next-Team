@@ -383,6 +383,36 @@ select t.as_user('A');
 select set_club_logo(t.id('club'), 'clubs/' || t.id('club') || '/logo.png');
 select t.check('club admin sets the club logo', (select logo_path from clubs where id = t.id('club')) like 'clubs/%/logo.png');
 
+-- ---------------------------------------------------------------- kits and recurring events
+set role authenticated;
+select t.as_user('C');
+insert into t.ctx select 'KIT', save_team_kit(null, t.id('T1'), 'בית', '#1d4ed8', '#ffffff', '#1d4ed8');
+select t.check('the coach adds a kit', exists (select 1 from team_kits where id = t.id('KIT') and active));
+select t.denied('a kit colour must be #rrggbb', $$select save_team_kit(null, t.id('T1'), 'x', 'blue', '#ffffff', '#ffffff')$$);
+select save_team_kit(t.id('KIT'), t.id('T1'), 'בית', '#1d4ed8', '#ffffff', '#1d4ed8', false);
+select t.check('a kit is archived, not removed', exists (select 1 from team_kits where id = t.id('KIT') and not active));
+select save_team_kit(t.id('KIT'), t.id('T1'), 'בית', '#1d4ed8', '#ffffff', '#1d4ed8', true);
+select t.as_user('C2');
+select t.denied('a coach of another team cannot add a kit', $$select save_team_kit(null, t.id('T1'), 'x', '#000000', '#000000', '#000000')$$);
+select t.as_user('P1');
+select t.check('a parent on the team sees its kits', exists (select 1 from team_kits where id = t.id('KIT')));
+select t.as_user('C');
+-- Sun, Mon, Wed from Sunday 2026-11-01 to Saturday 2026-11-14: 6 trainings at 17:30 Israel time.
+select t.check('a recurring series creates one event per chosen weekday',
+  create_event_series(t.id('T1'), t.lk('event_type', 'training'), 'אימון', array[0, 1, 3], '17:30', 90,
+    '2026-11-01', '2026-11-14', 'מגרש 3', '', t.id('KIT')) = 6);
+select t.check('series events are on the chosen days at the local time, with the kit',
+  (select count(*) from events where series_id is not null
+     and extract(dow from starts_at at time zone 'Asia/Jerusalem') in (0, 1, 3)
+     and to_char(starts_at at time zone 'Asia/Jerusalem', 'HH24:MI') = '17:30'
+     and ends_at = starts_at + interval '90 minutes' and kit_id = t.id('KIT')) = 6);
+select t.denied('a series needs at least one weekday', $$select create_event_series(t.id('T1'), t.lk('event_type', 'training'), 'x', '{}', '17:00', 60, '2026-11-01', '2026-11-30')$$);
+select t.denied('a series is capped at a year', $$select create_event_series(t.id('T1'), t.lk('event_type', 'training'), 'x', array[1], '17:00', 60, '2026-11-01', '2028-11-30')$$);
+select set_event_kit((select id from events where series_id is not null limit 1), null);
+select t.check('the coach clears an event kit', exists (select 1 from events where series_id is not null and kit_id is null));
+select t.as_user('P1');
+select t.denied('a parent cannot create a series', $$select create_event_series(t.id('T1'), t.lk('event_type', 'training'), 'x', array[1], '17:00', 60, '2026-11-01', '2026-11-30')$$);
+
 -- ---------------------------------------------------------------- edit / delete clubs and teams (RLS, no RPC)
 set role authenticated;
 select t.as_user('C');

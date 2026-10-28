@@ -108,6 +108,18 @@ export interface EventRow {
   opponent: string | null;
   our_score: number | null;
   their_score: number | null;
+  kit_id: string | null;
+  series_id: string | null;
+}
+export interface TeamKit {
+  id: string;
+  team_id: string;
+  name: string;
+  shirt: string;
+  shorts: string;
+  socks: string;
+  sort_order: number;
+  active: boolean;
 }
 export interface EventResponse {
   event_id: string;

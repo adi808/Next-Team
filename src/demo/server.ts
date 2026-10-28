@@ -89,7 +89,7 @@ export class DemoServer {
       case 'clubs': return t.clubs.filter((c) => this.clubMember(c.id));
       case 'teams': return t.teams.filter((x) => this.clubMember(x.club_id));
       case 'team_players': return t.team_players.filter((x) => this.member(x.team_id));
-      case 'events': case 'surveys': case 'messages': return t[table].filter((r) => this.member(r.team_id));
+      case 'events': case 'surveys': case 'messages': case 'team_kits': return t[table].filter((r) => this.member(r.team_id));
       case 'event_responses': return t.event_responses.filter((r) => this.manageTeam(this.find('events', r.event_id)?.team_id) || this.parentOf(r.player_id) || this.selfPlayer(r.player_id));
       case 'event_stats': return t.event_stats.filter((r) => this.member(this.find('events', r.event_id)?.team_id));
       case 'attribute_values': return t.attribute_values.filter((v) => {
@@ -289,6 +289,42 @@ export class DemoServer {
       const id = this.id('e');
       this.t.events.push({ id, team_id: a.p_team, type_id: a.p_type, title: a.p_title ?? '', starts_at: a.p_starts, ends_at: a.p_ends ?? null, location: a.p_location ?? '', notes: a.p_notes ?? '', opponent: a.p_opponent ?? null, our_score: null, their_score: null });
       return id;
+    },
+    save_team_kit(this: DemoServer, a: Row) {
+      if (!this.manageTeam(a.p_team)) this.deny();
+      if (![a.p_shirt, a.p_shorts, a.p_socks].every((c) => /^#[0-9a-fA-F]{6}$/.test(String(c)))) this.bad('colour must be #rrggbb');
+      const fields = { name: String(a.p_name).trim(), shirt: a.p_shirt, shorts: a.p_shorts, socks: a.p_socks };
+      if (!a.p_id) {
+        const id = this.id('kit');
+        this.t.team_kits.push({ id, team_id: a.p_team, ...fields, sort_order: this.t.team_kits.length, active: true });
+        return id;
+      }
+      const k = this.find('team_kits', a.p_id);
+      if (!k || k.team_id !== a.p_team) throw new PgError('P0002', 'kit not found');
+      Object.assign(k, fields, { active: a.p_active ?? true });
+      return k.id;
+    },
+    set_event_kit(this: DemoServer, a: Row) {
+      const e = this.find('events', a.p_event);
+      if (!e || !this.manageTeam(e.team_id)) this.deny();
+      e!.kit_id = a.p_kit ?? null;
+    },
+    create_event_series(this: DemoServer, a: Row) {
+      if (!this.manageTeam(a.p_team)) this.deny('only the coach or club admin can create events');
+      const days: number[] = a.p_days ?? [];
+      if (!days.length) this.bad('choose at least one weekday');
+      const [h, m] = String(a.p_start).split(':').map(Number);
+      const series = this.id('s');
+      let n = 0;
+      for (let d = new Date(`${a.p_from}T00:00`); d <= new Date(`${a.p_until}T00:00`); d.setDate(d.getDate() + 1)) {
+        if (!days.includes(d.getDay())) continue;
+        if (++n > 100) this.bad('too many events (at most 100 at once)');
+        const start = new Date(d); start.setHours(h, m, 0, 0);
+        const end = a.p_duration_min ? new Date(start.getTime() + a.p_duration_min * 60_000).toISOString() : null;
+        this.t.events.push({ id: this.id('e'), team_id: a.p_team, type_id: a.p_type, title: a.p_title ?? '', starts_at: start.toISOString(), ends_at: end,
+          location: a.p_location ?? '', notes: a.p_notes ?? '', opponent: null, our_score: null, their_score: null, kit_id: a.p_kit ?? null, series_id: series });
+      }
+      return n;
     },
     update_event(this: DemoServer, a: Row) {
       const e = this.find('events', a.p_event);

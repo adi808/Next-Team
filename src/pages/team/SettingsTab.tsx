@@ -5,6 +5,7 @@ import { Card } from '../../components/ui';
 import type { EntityRole } from '../../lib/types';
 import type { TeamTabProps } from './TeamPage';
 import { useState } from 'react';
+import { KitsCard } from './KitsCard';
 
 export default function SettingsTab({ team }: TeamTabProps) {
   const { coachTeamIds, adminClubIds, profile } = useAuth();
@@ -17,6 +18,7 @@ export default function SettingsTab({ team }: TeamTabProps) {
   return (
     <>
       <AttributesPanel key={tick} scope="team" entityId={team.id} myRoles={roles.filter((r) => r === acting)} clubId={team.club_id} teamIds={[team.id]} sportIds={[team.sport_id]} title="הגדרות הקבוצה" />
+      <KitsCard teamId={team.id} />
       <Card title="פרמטרים לשחקני הקבוצה">
         <p className="muted">למשל דירוג מקצועי 1 עד 10. כל שמירה מוסיפה ערך חדש וההיסטוריה נשמרת, כדי לראות התקדמות לאורך זמן.</p>
         <DefList scope="player" teamId={team.id} onChanged={() => setTick((t) => t + 1)} />
