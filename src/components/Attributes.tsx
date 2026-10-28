@@ -10,6 +10,7 @@ function useFormat() {
   const lookups = [
     ...useLookups('match_format', { includeInactive: true }),
     ...useLookups('formation', { includeInactive: true }),
+    ...useLookups('position', { includeInactive: true }),
   ];
   return (def: AttrDef, v: unknown): string => {
     if (v === null || v === undefined) return '';
@@ -78,7 +79,9 @@ export interface AttributesScope {
 }
 
 /** Dynamic parameters of a player / team / event, each with its full history. */
-export function AttributesPanel({ scope, entityId, myRoles, clubId, teamIds, sportIds, title, hideKeys }: AttributesScope & { title?: string; hideKeys?: string[] }) {
+export function AttributesPanel({ scope, entityId, myRoles, clubId, teamIds, sportIds, title, hideKeys, onlyTypes, skipTypes, onSaved }: AttributesScope & {
+  title?: string; hideKeys?: string[]; onlyTypes?: AttrType[]; skipTypes?: AttrType[]; onSaved?: () => void;
+}) {
   const format = useFormat();
   const { data, error, loading, reload } = useLoad(async () => {
     const [defs, values] = await Promise.all([
@@ -95,6 +98,8 @@ export function AttributesPanel({ scope, entityId, myRoles, clubId, teamIds, spo
   const defs = (data?.defs ?? []).filter(
     (d) =>
       !hideKeys?.includes(d.key) &&
+      (!onlyTypes || onlyTypes.includes(d.data_type)) &&
+      !skipTypes?.includes(d.data_type) &&
       (!d.club_id || d.club_id === clubId) &&
       (!d.team_id || teamIds.includes(d.team_id)) &&
       (!d.sport_id || sportIds.includes(d.sport_id)) &&
@@ -108,7 +113,7 @@ export function AttributesPanel({ scope, entityId, myRoles, clubId, teamIds, spo
     await act.run(async () => {
       await rpc('set_attribute', { p_def: def.id, p_entity: entityId, p_value: v === undefined ? null : v });
       setDrafts((d) => { const n = { ...d }; delete n[def.id]; return n; });
-      reload();
+      reload(); onSaved?.();
     });
   }
 

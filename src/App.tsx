@@ -8,7 +8,9 @@ import ClubsPage from './pages/admin/ClubsPage';
 import ClubPage from './pages/admin/ClubPage';
 import ListsPage from './pages/admin/ListsPage';
 import TeamsPage from './pages/team/TeamsPage';
-import TeamPage from './pages/team/TeamPage';
+import TeamPage, { CoachTeamTab } from './pages/team/TeamPage';
+import CoachHome from './pages/team/CoachHome';
+import EventPrepPage from './pages/event/EventPrepPage';
 import PlayerPage from './pages/player/PlayerPage';
 import EventPage from './pages/event/EventPage';
 import ProfilePage from './pages/ProfilePage';
@@ -34,11 +36,14 @@ function Gate() {
         <Route path="clubs" element={<ClubsPage />} />
         <Route path="club/:clubId" element={<ClubPage />} />
         <Route path="lists" element={<ListsPage />} />
+        <Route path="coach" element={<CoachHome />} />
+        <Route path="t/:tab" element={<CoachTeamTab />} />
         <Route path="teams" element={<TeamsPage />} />
         <Route path="team/:teamId" element={<TeamPage />} />
         <Route path="player/:playerId" element={<PlayerPage />} />
         <Route path="me" element={<ProfilePage />} />
         <Route path="event/:eventId" element={<EventPage />} />
+        <Route path="event/:eventId/prep" element={<EventPrepPage />} />
         <Route path="home" element={<FamilyHome />} />
         <Route path="events" element={<FamilyEvents />} />
         <Route path="tasks" element={<FamilyTasks />} />

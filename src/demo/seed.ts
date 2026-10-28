@@ -26,6 +26,9 @@ export function seed(): Tables {
     lk('st_yellow', 'stat_type', 'כרטיס צהוב', 3, { sport_id: 'sp_fb' }), lk('st_red', 'stat_type', 'כרטיס אדום', 4, { sport_id: 'sp_fb' }),
     lk('bs_1', 'stat_type', 'זריקה חופשית', 1, { sport_id: 'sp_bb' }), lk('bs_2', 'stat_type', 'סל 2 נקודות', 2, { sport_id: 'sp_bb' }),
     lk('bs_3', 'stat_type', 'סל 3 נקודות', 3, { sport_id: 'sp_bb' }), lk('bs_reb', 'stat_type', 'ריבאונד', 4, { sport_id: 'sp_bb' }),
+    lk('pos_gk', 'position', 'שוער', 1, { sport_id: 'sp_fb', meta: { goalkeeper: true } }), lk('pos_df', 'position', 'הגנה', 2, { sport_id: 'sp_fb' }),
+    lk('pos_mf', 'position', 'קישור', 3, { sport_id: 'sp_fb' }), lk('pos_fw', 'position', 'התקפה', 4, { sport_id: 'sp_fb' }),
+    lk('pos_pg', 'position', 'רכז', 1, { sport_id: 'sp_bb' }), lk('pos_c', 'position', 'סנטר', 2, { sport_id: 'sp_bb' }),
   ];
   [['4-3-3', 'fm11'], ['4-4-2', 'fm11'], ['3-5-2', 'fm11'], ['4-2-3-1', 'fm11'], ['3-3-2', 'fm9'], ['3-2-3', 'fm9'], ['2-3-1', 'fm7'], ['3-2-1', 'fm7'], ['2-2', 'fm5'], ['1-2-1', 'fm5']]
     .forEach(([name, parent], i) => lookups.push(lk(`f_${name}`, 'formation', name, i + 1, { parent_id: parent, sport_id: 'sp_fb' })));
@@ -35,6 +38,7 @@ export function seed(): Tables {
   });
   const STAFF = ['system_admin', 'club_admin', 'coach'];
   const attribute_defs: Row[] = [
+    def('d_pos', 'player', 'position', 'עמדה', 'lookup', { domain: 'position' }, ALL, STAFF, { sort_order: 0 }),
     def('d_allergy', 'player', 'medical_allergy', 'אלרגיה', 'text', {}, [...STAFF, 'parent'], ['coach', 'parent'], { sort_order: 10 }),
     def('d_cond', 'player', 'medical_condition', 'בעיה רפואית', 'text', {}, [...STAFF, 'parent'], ['coach', 'parent'], { sort_order: 11 }),
     def('d_minage', 'team', 'min_response_age', 'גיל מינימלי שבו שחקן עונה בעצמו', 'number', { min: 0, max: 21, default: 12 }, ALL, STAFF, { sort_order: 1 }),
@@ -55,6 +59,8 @@ export function seed(): Tables {
     val('d_speed', 'k1', 6, 80), val('d_speed', 'k1', 7, 7), val('d_team', 'k1', 7, 80), val('d_team', 'k1', 8, 7),
     val('d_ball', 'k2', 8, 90), val('d_ball', 'k2', 9, 10), val('d_speed', 'k2', 7, 10), val('d_team', 'k2', 9, 10),
     val('d_ball', 'k3', 6, 30), val('d_speed', 'k3', 8, 30),
+    val('d_pos', 'k1', 'pos_mf', 60), val('d_pos', 'k2', 'pos_fw', 60), val('d_pos', 'k3', 'pos_gk', 60),
+    val('d_pos', 'k4', 'pos_df', 60), val('d_pos', 'k5', 'pos_df', 60), val('d_pos', 'k6', 'pos_mf', 60),
     val('d_allergy', 'k1', 'בוטנים', 100, 'u_p1'), val('d_cond', 'k2', 'אסתמה קלה, ממליצים על משאף בתיק', 60, 'u_p2'),
     val('d_canresp', 't1', true, 30), val('d_minage', 't1', 12, 30), val('d_dfmt', 't1', 'fm11', 30), val('d_dform', 't1', 'f_4-3-3', 30),
     val('d_efmt', 'e_match', 'fm11', 5), val('d_eform', 'e_match', 'f_4-3-3', 5), val('d_efmt', 'e_past', 'fm11', 9), val('d_eform', 'e_past', 'f_4-4-2', 9),
@@ -120,6 +126,8 @@ export function seed(): Tables {
       { event_id: 'e_train', player_id: 'k3', status: 'attending', reason_id: null, note: '', responded_at: ago(1) },
       { event_id: 'e_match', player_id: 'k1', status: 'attending', reason_id: null, note: '', responded_at: ago(0) },
       { event_id: 'e_match', player_id: 'k2', status: 'attending', reason_id: null, note: '', responded_at: ago(0) },
+      { event_id: 'e_match', player_id: 'k3', status: 'attending', reason_id: null, note: '', responded_at: ago(0) },
+      { event_id: 'e_match', player_id: 'k6', status: 'not_attending', reason_id: 'r_fam', note: '', responded_at: ago(0) },
     ],
     event_stats: [
       { id: 'es1', event_id: 'e_past', player_id: 'k2', stat_type_id: 'st_goal', minute: 12, note: '' },
@@ -129,6 +137,11 @@ export function seed(): Tables {
     ],
     attribute_defs,
     attribute_values,
+    player_goals: [
+      { id: 'pg1', player_id: 'k1', title: 'לשפר בעיטה ברגל שמאל', target_date: at(30, 12).slice(0, 10), done_at: null, archived: false, created_by: 'u_coach', created_at: ago(20) },
+      { id: 'pg2', player_id: 'k1', title: '50 הרמות כדור ברצף', target_date: null, done_at: ago(5), archived: false, created_by: 'u_coach', created_at: ago(40) },
+      { id: 'pg3', player_id: 'k2', title: 'להוביל את החימום באימון', target_date: null, done_at: null, archived: false, created_by: 'u_coach', created_at: ago(10) },
+    ],
     tasks: [
       { id: 'tk1', team_id: 't1', title: 'מתיחות 10 דקות כל יום', description: 'לפני השינה, ולסמן כאן שבוצע', due_at: at(6, 20), created_at: ago(3) },
       { id: 'tk2', team_id: 't1', title: '100 הרמות כדור', description: 'עד האימון הבא', due_at: at(1, 17), created_at: ago(2) },

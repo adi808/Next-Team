@@ -3,7 +3,8 @@ import { Link, useParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { q, rpc, useAction, useLoad } from '../../lib/db';
 import { normEmail } from '../../lib/email';
-import { Card, Empty, ErrorText, Field, Loading } from '../../components/ui';
+import { Card, Empty, ErrorText, Field, Loading, PageHero } from '../../components/ui';
+import { ModeSwitch } from '../../components/Shell';
 import type { Club } from '../../lib/types';
 import { Picture } from '../../components/Picture';
 
@@ -25,7 +26,8 @@ export default function ClubsPage() {
 
   return (
     <>
-      <h2>{mode === 'sysadmin' ? 'מועדונים' : 'המועדון שלי'}</h2>
+      <PageHero kicker={mode === 'sysadmin' ? 'מנהל מערכת' : 'מנהל מועדון'} title={mode === 'sysadmin' ? 'מועדונים' : 'המועדון שלי'} />
+      <div className="overlap"><ModeSwitch /></div>
       <Loading loading={loading} error={error} />
       {data && !data.length && <Empty>אין עדיין מועדונים.</Empty>}
       <ul className="list">

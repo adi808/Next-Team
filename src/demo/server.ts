@@ -89,6 +89,7 @@ export class DemoServer {
       case 'clubs': return t.clubs.filter((c) => this.clubMember(c.id));
       case 'teams': return t.teams.filter((x) => this.clubMember(x.club_id));
       case 'team_players': return t.team_players.filter((x) => this.member(x.team_id));
+      case 'player_goals': return t.player_goals.filter((g) => this.managePlayer(g.player_id) || this.parentOf(g.player_id) || this.selfPlayer(g.player_id));
       case 'events': case 'surveys': case 'messages': case 'team_kits': return t[table].filter((r) => this.member(r.team_id));
       case 'event_responses': return t.event_responses.filter((r) => this.manageTeam(this.find('events', r.event_id)?.team_id) || this.parentOf(r.player_id) || this.selfPlayer(r.player_id));
       case 'event_stats': return t.event_stats.filter((r) => this.member(this.find('events', r.event_id)?.team_id));
@@ -289,6 +290,20 @@ export class DemoServer {
       const id = this.id('e');
       this.t.events.push({ id, team_id: a.p_team, type_id: a.p_type, title: a.p_title ?? '', starts_at: a.p_starts, ends_at: a.p_ends ?? null, location: a.p_location ?? '', notes: a.p_notes ?? '', opponent: a.p_opponent ?? null, our_score: null, their_score: null });
       return id;
+    },
+    save_player_goal(this: DemoServer, a: Row) {
+      if (!this.managePlayer(a.p_player)) this.deny();
+      const title = String(a.p_title ?? '').trim();
+      if (!title) this.bad('title is required');
+      if (!a.p_id) {
+        const id = this.id('pg');
+        this.t.player_goals.push({ id, player_id: a.p_player, title, target_date: a.p_target ?? null, done_at: null, archived: false, created_by: this.uid, created_at: new Date().toISOString() });
+        return id;
+      }
+      const g = this.find('player_goals', a.p_id);
+      if (!g || g.player_id !== a.p_player) throw new PgError('P0002', 'goal not found');
+      Object.assign(g, { title, target_date: a.p_target ?? null, archived: !!a.p_archived, done_at: a.p_done ? g.done_at ?? new Date().toISOString() : null });
+      return g.id;
     },
     save_team_kit(this: DemoServer, a: Row) {
       if (!this.manageTeam(a.p_team)) this.deny();

@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { mutateOne, q, rpc, useAction, useLoad } from '../../lib/db';
 import { normEmail } from '../../lib/email';
-import { Card, Empty, ErrorText, Field, Loading, Tabs } from '../../components/ui';
+import { Card, Empty, ErrorText, Field, Loading, PageHero, Tabs } from '../../components/ui';
 import { DefCreator, DefList } from '../../components/Attributes';
 import { useSports } from '../../components/Lookups';
 import { useAuth } from '../../auth/AuthProvider';
@@ -88,10 +88,11 @@ export default function ClubPage() {
   if (loading || error || !data) return <Loading loading={loading} error={error} />;
   return (
     <>
+      <PageHero kicker="מועדון" title={data.club.name} />
       {editClub === null ? (
-        <div className="title-row">
+        <div className="card overlap title-row">
           <Picture bucket="club-media" path={data.club.logo_path} name={data.club.name} size={56} square />
-          <h2>{data.club.name}</h2>
+          <strong className="grow">{data.club.name}</strong>
           <PicturePicker label={data.club.logo_path ? 'החלפת לוגו' : 'הוספת לוגו'} busy={act.busy} onPick={setLogo} />
           <button className="small secondary" onClick={() => setEditClub(data.club.name)}>עריכה</button>
           {acting === 'system_admin' && profile?.is_system_admin && <button className="small danger" disabled={act.busy} onClick={deleteClub}>מחיקת מועדון</button>}

@@ -29,8 +29,13 @@ const out = (ok, label, extra) => { if (!ok) fails++; console.log(`${ok ? 'PASS'
 
   // coach
   await p.click('button:has-text("אבי כץ")'); await wait(1500);
-  await has('coach lands on teams', 'הקבוצות שלי', 'ילדים ב׳'); await hasNot('coach does not see the other coach team', 'נוער כדורסל');
-  await p.click('text=ילדים ב׳'); await wait(1200);
+  await has('coach lands on home with the next event', 'שלום, אבי', 'האירוע הבא', 'אימון קבוצתי', 'מגיעים', 'טרם השיבו', 'הכנה לאירוע'); await shot('coach-home');
+  await hasNot('coach does not see the other coach team', 'נוער כדורסל');
+  await p.click('text=הכנה לאירוע'); await wait(1000);
+  await has('event prep: positions and team score', 'הכנה לאירוע', 'פילוח לפי תפקידים', 'שוערים', 'שחקני שדה', 'ציון משוקלל'); await shot('prep');
+  await p.click('button:has-text("רשימת השחקנים")'); await wait(400);
+  await has('prep list shows coming players', 'דני כהן', 'נועה מזרחי');
+  await p.click('.bottom-nav >> text=אירועים'); await wait(1200);
   await has('team page opens on events', 'גיבוש סוף עונה');
   await p.click('.tabs button:has-text("סגל")'); await wait(600);
   await has('squad with all six players and the pending request', 'דני כהן', 'רוני לוי', 'נועה מזרחי', 'גיל פרידמן', 'תומר שמש', 'יובל אורן', 'בקשות קישור', 'אילנה פרידמן'); await shot('squad');
@@ -41,15 +46,23 @@ const out = (ok, label, extra) => { if (!ok) fails++; console.log(`${ok ? 'PASS'
   await p.click('button:has-text("אישור")'); await wait(700);
   await hasNot('approving the request clears it', 'בקשות קישור');
   await p.click('text=דני כהן'); await wait(1000);
-  await has('player page: ratings with history, medical info', 'שליטה בכדור', 'היסטוריה', 'אלרגיה', 'בוטנים'); await shot('player');
+  await has('player page: profile tabs and medical info', 'פרופיל שחקן', 'פרטים', 'הערכה', 'יעדים', 'אלרגיה', 'בוטנים', 'עמדה', 'קישור');
+  await p.click('role=tab[name="הערכה"]'); await wait(700);
+  await has('player rating: latest average and bars', 'הערכה מקצועית אחרונה', '7.7/10', 'שליטה בכדור', '8/10'); await shot('player');
+  await p.click('role=tab[name="יעדים"]'); await wait(700);
+  await has('player goals', 'לשפר בעיטה ברגל שמאל', '50 הרמות כדור ברצף');
+  await p.fill('input[placeholder^="יעד חדש"]', 'לעבוד על מסירות ארוכות'); await p.click('.goal-form button'); await wait(700);
+  await has('goal added', 'לעבוד על מסירות ארוכות');
+  await p.locator('.goals li', { hasText: 'לעבוד על מסירות ארוכות' }).getByRole('button', { name: 'הושג' }).click(); await wait(700);
+  await has('goal marked done', 'יעדים שהושגו'); await shot('goals');
   // match page
-  await p.click('role=navigation >> text=הקבוצות שלי'); await wait(700); await p.click('text=ילדים ב׳'); await wait(800); await p.click('role=tab[name="אירועים"]'); await wait(600);
+  await p.click('.bottom-nav >> text=אירועים'); await wait(1000);
   await p.click('text=משחק ליגה נגד בית״ר'); await wait(900);
   await has('past match: result, goals, cards, formation', '2:1', 'שער', 'כרטיס צהוב', '4-4-2'); await shot('match');
 
   // parent
   await pick('שרה כהן');
-  await has('parent lands on the children page', 'הילדים שלי', 'דני כהן'); await hasNot('parent sees only their child', 'רוני לוי', 'נועה מזרחי');
+  await has('parent lands on events', 'אירועים קרובים', 'דני כהן'); await hasNot('parent sees only their child', 'רוני לוי', 'נועה מזרחי');
   await p.click('role=navigation >> text=אירועים'); await wait(800);
   await has('parent events with attendance buttons', 'גיבוש סוף עונה', 'טרם נענה'); await shot('parent-events');
   await card('גיבוש סוף עונה').getByRole('button', { name: 'מגיע', exact: true }).click(); await wait(700);
@@ -62,12 +75,12 @@ const out = (ok, label, extra) => { if (!ok) fails++; console.log(`${ok ? 'PASS'
   await p.click('role=navigation >> text=משימות'); await wait(700); await has('parent tasks (hers and her child\'s)', 'מתיחות 10 דקות כל יום', '100 הרמות כדור');
 
   // the coach sees what the parent did
-  await pick('אבי כץ'); await p.click('text=ילדים ב׳'); await wait(800); await p.click('role=tab[name="אירועים"]'); await wait(500); await p.click('text=גיבוש סוף עונה'); await wait(900);
+  await pick('אבי כץ'); await p.click('.bottom-nav >> text=אירועים'); await wait(1000); await p.click('text=גיבוש סוף עונה'); await wait(900);
   await has('coach sees the parent\'s answer', 'דני כהן', 'מגיעים 1');
 
   // player
   await pick('רוני לוי');
-  await has('player lands on the profile', 'הפרופיל שלי', 'רוני לוי');
+  await has('player lands on events', 'אירועים קרובים', 'רוני לוי');
   await p.click('role=navigation >> text=אירועים'); await wait(800); await has('player events with attendance buttons (team allows it)', 'אימון קבוצתי', 'לימודים');
   await p.click('role=navigation >> text=משימות'); await wait(700); await has('player tasks', '100 הרמות כדור'); await hasNot('player does not see parent tasks', 'משימה להורה');
 
