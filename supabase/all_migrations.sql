@@ -2560,3 +2560,8 @@ grant execute on function
   set_event_lineup(uuid, uuid[]), set_guardian_relation(uuid, uuid, uuid), player_guardians(uuid),
   set_staff_role(uuid, uuid), team_staff(uuid)
 to authenticated;
+
+-- ===== 0021_team_manager_staff_type.sql =====
+-- Next Team: "team manager" as a staff type. Like every staff type it is a label on a team staff
+-- membership (role coach), so a team manager has the coach's permissions on that team.
+insert into lookups (domain, slug, name_he, sort_order) values ('staff_role', 'team_manager', 'מנהל קבוצה', 0);
