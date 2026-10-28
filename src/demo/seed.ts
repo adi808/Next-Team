@@ -33,6 +33,9 @@ export function seed(): Tables {
     lk('eq_water', 'equipment', 'בקבוק מים', 1), lk('eq_boots', 'equipment', 'נעלי כדורגל', 2), lk('eq_shin', 'equipment', 'מגני שוקיים', 3),
     lk('eq_shoes', 'equipment', 'נעלי ספורט', 4), lk('eq_ball', 'equipment', 'כדור', 5), lk('eq_towel', 'equipment', 'מגבת', 6),
     lk('eq_snack', 'equipment', 'כריך / פרי', 7), lk('eq_gloves', 'equipment', 'כפפות שוער', 8),
+    lk('rel_mother', 'guardian_relation', 'אמא', 1), lk('rel_father', 'guardian_relation', 'אבא', 2), lk('rel_guardian', 'guardian_relation', 'אפוטרופוס', 3),
+    lk('sr_head', 'staff_role', 'מאמן ראשי', 1), lk('sr_assist', 'staff_role', 'עוזר מאמן', 2), lk('sr_fitness', 'staff_role', 'מנהל כושר', 3),
+    lk('sr_secretary', 'staff_role', 'מזכירה', 4), lk('sr_medic', 'staff_role', 'חובש', 5),
   ];
   [['4-3-3', 'fm11'], ['4-4-2', 'fm11'], ['3-5-2', 'fm11'], ['4-2-3-1', 'fm11'], ['3-3-2', 'fm9'], ['3-2-3', 'fm9'], ['2-3-1', 'fm7'], ['3-2-1', 'fm7'], ['2-2', 'fm5'], ['1-2-1', 'fm5']]
     .forEach(([name, parent], i) => lookups.push(lk(`f_${name}`, 'formation', name, i + 1, { parent_id: parent, sport_id: 'sp_fb' })));
@@ -51,6 +54,7 @@ export function seed(): Tables {
     def('d_minage', 'team', 'min_response_age', 'גיל מינימלי שבו שחקן עונה בעצמו', 'number', { min: 0, max: 21, default: 12 }, ALL, STAFF, { sort_order: 1 }),
     def('d_canresp', 'team', 'players_can_respond', 'פרופיל שחקן רשאי לאשר הגעה', 'boolean', { default: false }, ALL, STAFF, { sort_order: 2 }),
     def('d_dfmt', 'team', 'default_match_format', 'מספר שחקנים במגרש (ברירת מחדל)', 'lookup', { domain: 'match_format' }, ALL, STAFF, { sort_order: 3 }),
+    def('d_league', 'team', 'league_url', 'קישור לדף הקבוצה באתר ההתאחדות (טבלת ליגה)', 'text', {}, ALL, STAFF, { sort_order: 5 }),
     def('d_dform', 'team', 'default_formation', 'מערך (ברירת מחדל)', 'lookup', { domain: 'formation', depends_on: 'default_match_format' }, ALL, STAFF, { sort_order: 4 }),
     def('d_efmt', 'event', 'match_format', 'מספר שחקנים במגרש', 'lookup', { domain: 'match_format', default_from_team: 'default_match_format' }, ALL, STAFF, { sort_order: 1 }),
     def('d_eform', 'event', 'formation', 'מערך', 'lookup', { domain: 'formation', depends_on: 'match_format', default_from_team: 'default_formation' }, ALL, STAFF, { sort_order: 2 }),
@@ -73,6 +77,7 @@ export function seed(): Tables {
     val('d_pos', 'k4', 'pos_df', 60), val('d_pos', 'k5', 'pos_df', 60), val('d_pos', 'k6', 'pos_mf', 60),
     val('d_allergy', 'k1', 'בוטנים', 100, 'u_p1'), val('d_cond', 'k2', 'אסתמה קלה, ממליצים על משאף בתיק', 60, 'u_p2'),
     val('d_canresp', 't1', true, 30), val('d_minage', 't1', 12, 30), val('d_dfmt', 't1', 'fm11', 30), val('d_dform', 't1', 'f_4-3-3', 30),
+    val('d_league', 't1', 'https://www.football.org.il/team-details/?team_id=8776&season_id=28', 30),
     val('d_efmt', 'e_match', 'fm11', 5), val('d_eform', 'e_match', 'f_4-3-3', 5), val('d_efmt', 'e_past', 'fm11', 9), val('d_eform', 'e_past', 'f_4-4-2', 9),
   ];
 
@@ -109,8 +114,8 @@ export function seed(): Tables {
     ],
     memberships: [
       { id: 'm1', user_id: 'u_admin', club_id: 'c1', team_id: null, role: 'club_admin' },
-      { id: 'm2', user_id: 'u_coach', club_id: 'c1', team_id: 't1', role: 'coach' },
-      { id: 'm3', user_id: 'u_coach2', club_id: 'c1', team_id: 't2', role: 'coach' },
+      { id: 'm2', user_id: 'u_coach', club_id: 'c1', team_id: 't1', role: 'coach', staff_role_id: 'sr_head' },
+      { id: 'm3', user_id: 'u_coach2', club_id: 'c1', team_id: 't2', role: 'coach', staff_role_id: 'sr_head' },
     ],
     players: [
       player('k1', 'דני כהן', '2014-05-01'), player('k2', 'רוני לוי', '2011-03-02', 'u_k2'), player('k3', 'נועה מזרחי', '2013-09-12'),
@@ -118,8 +123,8 @@ export function seed(): Tables {
     ],
     team_players: ['k1', 'k2', 'k3', 'k4', 'k5', 'k6'].map((player_id) => ({ team_id: 't1', player_id })),
     guardianships: [
-      { id: 'g1', parent_id: 'u_p1', player_id: 'k1', status: 'approved' },
-      { id: 'g2', parent_id: 'u_p2', player_id: 'k2', status: 'approved' },
+      { id: 'g1', parent_id: 'u_p1', player_id: 'k1', status: 'approved', relation_id: 'rel_mother' },
+      { id: 'g2', parent_id: 'u_p2', player_id: 'k2', status: 'approved', relation_id: 'rel_father' },
       { id: 'g3', parent_id: 'u_admin', player_id: 'k3', status: 'approved' },
       { id: 'g4', parent_id: 'u_p4', player_id: 'k4', status: 'pending' },
     ],
@@ -139,6 +144,7 @@ export function seed(): Tables {
       { event_id: 'e_match', player_id: 'k3', status: 'attending', reason_id: null, note: '', responded_at: ago(0) },
       { event_id: 'e_match', player_id: 'k6', status: 'not_attending', reason_id: 'r_fam', note: '', responded_at: ago(0) },
     ],
+    event_lineups: [],
     event_stats: [
       { id: 'es1', event_id: 'e_past', player_id: 'k2', stat_type_id: 'st_goal', minute: 12, note: '' },
       { id: 'es2', event_id: 'e_past', player_id: 'k1', stat_type_id: 'st_assist', minute: 12, note: '' },

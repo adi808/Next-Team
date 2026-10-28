@@ -32,3 +32,9 @@
    update profiles set is_system_admin = true where email = 'you@example.com';
    ```
 3. רעננו את האתר: מופיע מצב "מנהל מערכת". צרו מועדון (עם המייל של מנהל המועדון), והמשיכו משם.
+
+## League tab (Edge Function)
+The team's "league" tab reads football.org.il through the `league` Edge Function (the site cannot be read from the browser).
+Deploy it once, and again after changing it: `npx supabase functions deploy league --project-ref <project-ref>`
+(JWT verification stays on: only signed-in users can call it, and it only fetches football.org.il addresses).
+Then a coach pastes the team's page address (for example `https://www.football.org.il/team-details/?team_id=8776&season_id=28`) in the league tab or under team settings.

@@ -10,7 +10,11 @@ import { useAuth } from '../../auth/AuthProvider';
 import { useActingRole } from '../../auth/acting';
 import { Picture, PicturePicker } from '../../components/Picture';
 import { uploadImage } from '../../lib/images';
+import { PersonAvatar, useNames } from '../../components/People';
+import { StaffRoleSelect } from '../../components/Staff';
 import type { Club, Team } from '../../lib/types';
+
+interface StaffMembership { id: string; user_id: string; team_id: string | null; role: 'club_admin' | 'coach'; staff_role_id: string | null }
 
 export default function ClubPage() {
   const { clubId = '' } = useParams();
@@ -19,11 +23,12 @@ export default function ClubPage() {
   const navigate = useNavigate();
   const acting = useActingRole();
   const { data, loading, error, reload } = useLoad(async () => {
-    const [club, teams] = await Promise.all([
+    const [club, teams, staff] = await Promise.all([
       q<Club>(supabase.from('clubs').select('id, name, logo_path').eq('id', clubId).single()),
       q<Team[]>(supabase.from('teams').select('id, club_id, name, sport_id, photo_path').eq('club_id', clubId).order('name')),
+      q<StaffMembership[]>(supabase.from('memberships').select('id, user_id, team_id, role, staff_role_id').eq('club_id', clubId).order('created_at')),
     ]);
-    return { club, teams };
+    return { club, teams, staff };
   }, [clubId]);
 
   const [teamName, setTeamName] = useState('');
@@ -33,6 +38,7 @@ export default function ClubPage() {
   const [editClub, setEditClub] = useState<string | null>(null);
   const [editTeam, setEditTeam] = useState<{ id: string; name: string; sport: string } | null>(null);
   const act = useAction();
+  const names = useNames(data?.staff.map((m) => m.user_id) ?? []);
   const sportName = (id: string) => sports.find((s) => s.id === id)?.name_he ?? '';
 
   async function createTeam() {
@@ -152,6 +158,21 @@ export default function ClubPage() {
         },
         {
           id: 'staff', label: 'צוות', render: () => (
+            <>
+            <Card title="אנשי הצוות במועדון">
+              {!data.staff.length && <Empty>אין עדיין אנשי צוות.</Empty>}
+              <ul className="list compact">
+                {data.staff.map((m) => (
+                  <li key={m.id} className="row wrap">
+                    <PersonAvatar id={m.user_id} />
+                    <span>{names(m.user_id)}</span>
+                    <small className="muted">{m.role === 'club_admin' ? 'מנהל מועדון' : `צוות ${data.teams.find((t) => t.id === m.team_id)?.name ?? ''}`}</small>
+                    <span className="grow" />
+                    <StaffRoleSelect membershipId={m.id} value={m.staff_role_id} onSaved={reload} />
+                  </li>
+                ))}
+              </ul>
+            </Card>
             <Card title="הזמנת מאמן או מנהל מועדון">
               <p className="muted">ההזמנה לפי כתובת מייל. מי שכבר רשום מצטרף מיד, ואחרת בכניסתו הראשונה.</p>
               <Field label="מייל"><input type="email" dir="ltr" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@example.com" /></Field>
@@ -163,7 +184,9 @@ export default function ClubPage() {
               </Field>
               <ErrorText error={act.error} />
               <button disabled={!email.trim() || act.busy} onClick={inviteStaff}>הזמנה</button>
+              <small className="muted">אחרי ההצטרפות בוחרים כאן או בלשונית הסגל של הקבוצה את סוג התפקיד (מאמן ראשי, עוזר מאמן, מנהל כושר, מזכירה, חובש).</small>
             </Card>
+            </>
           ),
         },
         {

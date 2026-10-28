@@ -17,6 +17,10 @@ Built: everything in the business spec except features marked "proposed" there.
 | Tasks | coach assigns to the squad or to individual players, and to parents; everyone sees only their own |
 | Surveys | single / multiple choice / free text, one answer set per person (replaceable) |
 | Chat | team channel (staff and parents write, players read) and personal coach-player chat (parents see all of it, club admin does not) |
+| Home dashboards | coach, parent and player see the nearest event and, below it, the nearest event of another type (e.g. training, then a match) |
+| Lineup | on a football match the staff see a pitch sketch: players placed by the formation and their position, with photo and shirt number; tap to swap, save (`event_lineups`) |
+| Staff and parents | staff type per membership (list `staff_role`: head coach, assistant, fitness, secretary, medic), shown to the whole team; a parent's relation to the child (list `guardian_relation`: mom, dad, guardian) |
+| League | team parameter `league_url` (the team's page on football.org.il); the team's "league" tab shows the league table and fixtures, read by the `league` Edge Function (`supabase/functions/league`) |
 
 ### Generic by design
 * `lookups` - every "choose from a list" value (event types, absence reasons, match formats, formations, stat types). New values and new lists need no code (`upsert_lookup`, Lists screen). Dependent lists use `parent_id`; sport- and club-specific values use `sport_id` / `club_id`.
@@ -24,10 +28,10 @@ Built: everything in the business spec except features marked "proposed" there.
 * `sports` - table with an icon per sport.
 
 ### Demo
-`npm run build:demo` writes `dist-demo/next-team-demo.html`: one self-contained page with the real UI and an in-browser sample backend (`src/demo/`), with a person picker. It is excluded from the production bundle. `node tests/demo-e2e.cjs` drives it (33 checks).
+`npm run build:demo` writes `dist-demo/next-team-demo.html`: one self-contained page with the real UI and an in-browser sample backend (`src/demo/`), with a person picker. It is excluded from the production bundle. `node tests/demo-e2e.cjs` drives it (65 checks).
 
 ### Verified
-* `supabase/tests/scenario.sql`: 90 role-by-role checks on Postgres 16 (against a stub `auth` schema). Run it with `supabase/tests/stub_auth.sql` first, then the migrations, then the scenario.
+* `supabase/tests/scenario.sql`: 149 role-by-role checks on Postgres 16 (against a stub `auth` schema). Run it with `supabase/tests/stub_auth.sql` first, then the migrations, then the scenario.
 * `tests/api-integration.cjs`: 29 checks over HTTP through a real PostgREST 12 with signed JWTs per role: table and function exposure, grants, RLS, RPCs with named parameters, error responses.
 * `tests/ui-e2e.cjs`: 44 checks with the built UI in a real browser against that PostgREST and database, one session per role (coach, parent, player, club admin, system admin, outsider), including saving an attendance answer and posting a message.
 * `tests/ui-smoke.cjs`: the same screens against a mocked API (this found and fixed a reload loop).
