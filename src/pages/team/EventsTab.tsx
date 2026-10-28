@@ -119,11 +119,13 @@ export default function EventsTab({ team, canManage }: TeamTabProps) {
           )}
           <Field label="מיקום"><input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="למשל: מגרש העירוני, הרצליה" /></Field>
           {!repeat && isMatch(typeId) && <Field label="יריבה"><input value={opponent} onChange={(e) => setOpponent(e.target.value)} /></Field>}
-          {!!kits.data?.some((k) => k.active) && (
+          {kits.data?.some((k) => k.active) ? (
             <div className="row">
-              <Field label="תלבושת"><KitSelect kits={kits.data} value={kitId} onChange={setKitId} /></Field>
+              <Field label="סט צבעים (תלבושת)"><KitSelect kits={kits.data} value={kitId} onChange={setKitId} /></Field>
               {kitOf(kitId) && <KitAvatar kit={kitOf(kitId)!} size={56} />}
             </div>
+          ) : kits.data && (
+            <p className="hint-box">🎽 כדי לבחור סט צבעים לאירוע, מגדירים קודם סטים (למשל "בית" ו"חוץ") בלשונית <strong>הגדרות</strong> של הקבוצה.</p>
           )}
           <Field label="מה להביא (אפשר לבחור כמה)"><EquipmentPicker value={equipment} onChange={setEquipment} /></Field>
           <ErrorText error={act.error} />
