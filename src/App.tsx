@@ -11,6 +11,7 @@ import TeamsPage from './pages/team/TeamsPage';
 import TeamPage from './pages/team/TeamPage';
 import PlayerPage from './pages/player/PlayerPage';
 import EventPage from './pages/event/EventPage';
+import ProfilePage from './pages/ProfilePage';
 import { FamilyChat, FamilyEvents, FamilyHome, FamilySurveys, FamilyTasks } from './pages/family/Family';
 
 function Gate() {
@@ -36,6 +37,7 @@ function Gate() {
         <Route path="teams" element={<TeamsPage />} />
         <Route path="team/:teamId" element={<TeamPage />} />
         <Route path="player/:playerId" element={<PlayerPage />} />
+        <Route path="me" element={<ProfilePage />} />
         <Route path="event/:eventId" element={<EventPage />} />
         <Route path="home" element={<FamilyHome />} />
         <Route path="events" element={<FamilyEvents />} />

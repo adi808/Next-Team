@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { q, rpc, useAction, useLoad, fmtDate } from '../../lib/db';
 import { teamAllowsPlayerAnswers } from '../../lib/team';
 import { useAuth } from '../../auth/AuthProvider';
+import { useActingRole } from '../../auth/acting';
 import { Badge, Card, Empty, ErrorText, Field, Loading } from '../../components/ui';
 import { AttributesPanel } from '../../components/Attributes';
 import { AttendanceWidget } from '../../components/Attendance';
@@ -20,7 +21,7 @@ export default function EventPage() {
   const types = useLookups('event_type', { includeInactive: true });
   const { data, loading, error, reload } = useLoad(async () => {
     const event = await q<EventRow>(supabase.from('events').select('*').eq('id', eventId).single());
-    const team = await q<Team>(supabase.from('teams').select('id, club_id, name, sport_id').eq('id', event.team_id).single());
+    const team = await q<Team>(supabase.from('teams').select('id, club_id, name, sport_id, photo_path').eq('id', event.team_id).single());
     const links = await q<{ player_id: string }[]>(supabase.from('team_players').select('player_id').eq('team_id', team.id));
     const ids = links.map((l) => l.player_id);
     const players = ids.length ? await q<Player[]>(supabase.from('v_players').select('*').in('id', ids).order('full_name')) : [];
@@ -29,6 +30,7 @@ export default function EventPage() {
     return { event, team, players, responses, stats };
   }, [eventId]);
   const act = useAction();
+  const acting = useActingRole();
   const [edit, setEdit] = useState(false);
   const [f, setF] = useState({ title: '', starts: '', location: '', notes: '', opponent: '', our: '', their: '' });
   const [statPlayer, setStatPlayer] = useState('');
@@ -38,8 +40,9 @@ export default function EventPage() {
   if (loading || error || !data) return <Loading loading={loading} error={error} />;
   const { event, team, players, responses, stats } = data;
   const isMatch = !!types.find((t) => t.id === event.type_id)?.meta?.is_match;
-  const canManage = !!auth.profile?.is_system_admin || auth.coachTeamIds.includes(team.id) || auth.adminClubIds.includes(team.club_id);
-  const myKids = players.filter((p) => auth.children.some((c) => c.id === p.id) || auth.me?.id === p.id);
+  const canManage = (acting === 'system_admin' && !!auth.profile?.is_system_admin) || (acting === 'coach' && auth.coachTeamIds.includes(team.id))
+    || (acting === 'club_admin' && auth.adminClubIds.includes(team.club_id));
+  const myKids = players.filter((p) => (acting === 'parent' && auth.children.some((c) => c.id === p.id)) || (acting === 'player' && auth.me?.id === p.id));
   const resp = (pid: string) => responses.find((r) => r.player_id === pid);
   const roles: EntityRole[] = [];
   if (auth.profile?.is_system_admin) roles.push('system_admin');
@@ -47,6 +50,7 @@ export default function EventPage() {
   if (auth.coachTeamIds.includes(team.id)) roles.push('coach');
   if (players.some((p) => auth.children.some((c) => c.id === p.id))) roles.push('parent');
   if (auth.me && players.some((p) => p.id === auth.me?.id)) roles.push('player');
+  const myRoles = roles.filter((r) => r === acting);
   const attending = responses.filter((r) => r.status === 'attending').length;
   const absent = responses.filter((r) => r.status === 'not_attending').length;
 
@@ -101,7 +105,7 @@ export default function EventPage() {
       </Card>
 
       {isMatch && (
-        <AttributesPanel scope="event" entityId={event.id} myRoles={roles} clubId={team.club_id} teamIds={[team.id]} sportIds={[team.sport_id]} title="שיטת משחק" />
+        <AttributesPanel scope="event" entityId={event.id} myRoles={myRoles} clubId={team.club_id} teamIds={[team.id]} sportIds={[team.sport_id]} title="שיטת משחק" />
       )}
 
       <Card title="אישורי הגעה">

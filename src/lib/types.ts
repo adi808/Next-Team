@@ -25,6 +25,7 @@ export interface Profile {
   email: string | null;
   full_name: string;
   is_system_admin: boolean;
+  avatar_path: string | null;
 }
 
 export interface Membership {
@@ -42,8 +43,8 @@ export interface Sport {
   sort_order: number;
 }
 
-export interface Club { id: string; name: string }
-export interface Team { id: string; club_id: string; name: string; sport_id: string }
+export interface Club { id: string; name: string; logo_path: string | null }
+export interface Team { id: string; club_id: string; name: string; sport_id: string; photo_path: string | null }
 
 export interface Player {
   id: string;

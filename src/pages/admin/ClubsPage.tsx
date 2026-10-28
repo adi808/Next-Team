@@ -5,10 +5,11 @@ import { q, rpc, useAction, useLoad } from '../../lib/db';
 import { normEmail } from '../../lib/email';
 import { Card, Empty, ErrorText, Field, Loading } from '../../components/ui';
 import type { Club } from '../../lib/types';
+import { Picture } from '../../components/Picture';
 
 export default function ClubsPage() {
   const { mode } = useParams();
-  const { data, loading, error, reload } = useLoad(() => q<Club[]>(supabase.from('clubs').select('id, name').order('name')), []);
+  const { data, loading, error, reload } = useLoad(() => q<Club[]>(supabase.from('clubs').select('id, name, logo_path').order('name')), []);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const act = useAction();
@@ -29,7 +30,7 @@ export default function ClubsPage() {
       {data && !data.length && <Empty>אין עדיין מועדונים.</Empty>}
       <ul className="list">
         {data?.map((c) => (
-          <li key={c.id}><Link to={`../club/${c.id}`}>{c.name}</Link></li>
+          <li key={c.id} className="row"><Picture bucket="club-media" path={c.logo_path} name={c.name} size={40} square /><Link to={`../club/${c.id}`}>{c.name}</Link></li>
         ))}
       </ul>
       {mode === 'sysadmin' && (

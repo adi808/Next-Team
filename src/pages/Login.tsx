@@ -2,6 +2,49 @@ import { useState, type FormEvent } from 'react';
 import { supabase } from '../lib/supabase';
 import { normEmail } from '../lib/email';
 
+// Decorative header: a football pitch drawn in light lines over the brand gradient, with a ball in flight.
+function LoginHero() {
+  return (
+    <div className="login-hero">
+      <svg className="login-hero-art" viewBox="0 0 400 260" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+        <defs>
+          <linearGradient id="lh-bg" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stopColor="#1e3a8a" /><stop offset="0.55" stopColor="#2563eb" /><stop offset="1" stopColor="#60a5fa" />
+          </linearGradient>
+          <radialGradient id="lh-glow" cx="0.8" cy="0.15" r="0.6">
+            <stop offset="0" stopColor="#ffffff" stopOpacity="0.35" /><stop offset="1" stopColor="#ffffff" stopOpacity="0" />
+          </radialGradient>
+        </defs>
+        <rect width="400" height="260" fill="url(#lh-bg)" />
+        <rect width="400" height="260" fill="url(#lh-glow)" />
+        <g fill="none" stroke="#fff" strokeOpacity="0.16" strokeWidth="2">
+          <rect x="24" y="30" width="352" height="220" rx="6" />
+          <line x1="200" y1="30" x2="200" y2="250" />
+          <circle cx="200" cy="140" r="38" />
+          <rect x="24" y="90" width="56" height="100" />
+          <rect x="320" y="90" width="56" height="100" />
+          <rect x="24" y="115" width="22" height="50" />
+          <rect x="354" y="115" width="22" height="50" />
+        </g>
+        <circle cx="200" cy="140" r="3" fill="#fff" fillOpacity="0.3" />
+        <path d="M70 215 Q 170 40 300 92" fill="none" stroke="#fff" strokeOpacity="0.45" strokeWidth="2.5" strokeDasharray="2 9" strokeLinecap="round" />
+        <g transform="translate(312 88)">
+          <circle r="17" fill="#fff" />
+          <path d="M0-6.5l6.2 4.5-2.4 7.3h-7.6l-2.4-7.3z" fill="#1e3a8a" />
+          <path d="M0-6.5V-17M6.2-2l9.6-3.2M3.8 5.3l6 8.3M-3.8 5.3l-6 8.3M-6.2-2l-9.6-3.2" stroke="#1e3a8a" strokeWidth="1.6" />
+        </g>
+        <circle cx="52" cy="40" r="60" fill="#fff" fillOpacity="0.05" />
+        <circle cx="380" cy="250" r="90" fill="#fff" fillOpacity="0.05" />
+      </svg>
+      <div className="login-hero-text">
+        <span className="login-mark">N</span>
+        <strong>Next Team</strong>
+        <span>הקבוצה שלך, במקום אחד</span>
+      </div>
+    </div>
+  );
+}
+
 export default function Login() {
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
@@ -49,8 +92,10 @@ export default function Login() {
   }
 
   return (
+    <div className="login-page">
+    <LoginHero />
     <main className="login">
-      <h1>Next Team</h1>
+      <h1>כניסה</h1>
       {!sentTo ? (
         <>
           <button type="button" className="google" disabled={busy} onClick={google}>
@@ -99,5 +144,6 @@ export default function Login() {
       )}
       {error && <p role="alert" className="error">{error}</p>}
     </main>
+    </div>
   );
 }

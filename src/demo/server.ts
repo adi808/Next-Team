@@ -187,6 +187,15 @@ export class DemoServer {
       if (!this.sys && !this.adminOf(a.p_club)) this.deny();
       const id = this.id('t'); this.t.teams.push({ id, club_id: a.p_club, name: String(a.p_name).trim(), sport_id: a.p_sport }); return id;
     },
+    set_club_logo(this: DemoServer, a: Row) {
+      if (!this.sys && !this.adminOf(a.p_club)) this.deny();
+      this.find('clubs', a.p_club)!.logo_path = a.p_path;
+    },
+    set_team_photo(this: DemoServer, a: Row) {
+      if (!this.manageTeam(a.p_team)) this.deny();
+      this.find('teams', a.p_team)!.photo_path = a.p_path;
+    },
+    set_my_avatar(this: DemoServer, a: Row) { this.find('profiles', this.uid)!.avatar_path = a.p_path; },
     update_club(this: DemoServer, a: Row) {
       if (!this.sys && !this.adminOf(a.p_club)) this.deny();
       if (!String(a.p_name ?? '').trim()) this.bad('name is required');
@@ -433,6 +442,10 @@ export class DemoServer {
       'DELETE clubs': () => this.rpcs.delete_club.call(this, { p_club: id }),
       'PATCH teams': () => this.rpcs.update_team.call(this, { p_team: id, p_name: body.name, p_sport: body.sport_id }),
       'DELETE teams': () => this.rpcs.delete_team.call(this, { p_team: id }),
+      'PATCH profiles': () => {
+        if (id !== this.uid) this.deny();
+        this.find('profiles', id)!.full_name = String(body.full_name ?? '').trim();
+      },
     };
     const op = ops[`${method} ${table}`];
     if (!op) this.deny();

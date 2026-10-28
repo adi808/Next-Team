@@ -368,6 +368,21 @@ select t.as_user('O');
 select t.check('lookups outside own club are hidden, global ones visible',
   not exists (select 1 from lookups where slug = 'exam') and exists (select 1 from lookups where slug = 'illness'));
 
+-- ---------------------------------------------------------------- pictures for clubs, teams and accounts
+set role authenticated;
+select t.as_user('C');
+select set_team_photo(t.id('T1'), 'teams/' || t.id('T1') || '/1.jpg');
+select t.check('the coach sets the team picture', (select photo_path from teams where id = t.id('T1')) like 'teams/%/1.jpg');
+select t.denied('a team picture must sit in that team''s folder', $$select set_team_photo(t.id('T1'), 'teams/' || t.id('T2') || '/x.jpg')$$);
+select t.denied('a coach of another team cannot set its picture', $$select set_team_photo(t.id('T2'), 'teams/' || t.id('T2') || '/x.jpg')$$);
+select t.denied('a coach cannot set the club logo', $$select set_club_logo(t.id('club'), 'clubs/' || t.id('club') || '/x.png')$$);
+select set_my_avatar(t.id('C') || '/me.jpg');
+select t.check('anyone sets their own avatar', (select avatar_path from profiles where id = t.id('C')) = t.id('C') || '/me.jpg');
+select t.denied('an avatar must sit in your own folder', $$select set_my_avatar(t.id('A') || '/me.jpg')$$);
+select t.as_user('A');
+select set_club_logo(t.id('club'), 'clubs/' || t.id('club') || '/logo.png');
+select t.check('club admin sets the club logo', (select logo_path from clubs where id = t.id('club')) like 'clubs/%/logo.png');
+
 -- ---------------------------------------------------------------- edit / delete clubs and teams (RLS, no RPC)
 set role authenticated;
 select t.as_user('C');
