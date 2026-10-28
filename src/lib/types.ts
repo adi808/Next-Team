@@ -33,6 +33,7 @@ export interface Membership {
   club_id: string;
   team_id: string | null;
   role: 'club_admin' | 'coach';
+  staff_role_id: string | null;
 }
 
 export interface Sport {

@@ -4,7 +4,7 @@ import { q, useLoad } from '../../lib/db';
 import { useAuth } from '../../auth/AuthProvider';
 import { useCoachTeam } from '../../auth/coachTeam';
 import { Badge, Empty, Loading, PageHero, StatTiles } from '../../components/ui';
-import { useLookups } from '../../components/Lookups';
+import { useLookupName, useLookups } from '../../components/Lookups';
 import { KitAvatar } from '../../components/Kit';
 import { isOver, nextAndOther } from '../../lib/events';
 import type { EventResponse, EventRow, Lookup, Team, TeamKit } from '../../lib/types';
@@ -14,7 +14,8 @@ const fmt = (iso: string, o: Intl.DateTimeFormatOptions) => new Date(iso).toLoca
 
 /** The coach's start screen: the next event of the current team, who is coming, and quick actions. */
 export default function CoachHome() {
-  const { profile, coachTeamIds } = useAuth();
+  const { profile, coachTeamIds, memberships } = useAuth();
+  const staffName = useLookupName('staff_role');
   const [teamId, setTeamId] = useCoachTeam();
   const types = useLookups('event_type', { includeInactive: true });
   const teams = useLoad(
@@ -46,7 +47,7 @@ export default function CoachHome() {
 
   return (
     <>
-      <PageHero kicker={`מאמן${team ? ` · ${team.name}` : ''}`} title={first ? `שלום, ${first}` : 'שלום'} ball />
+      <PageHero kicker={`${staffName(memberships.find((m) => m.role === 'coach' && m.team_id === teamId)?.staff_role_id) || 'מאמן'}${team ? ` · ${team.name}` : ''}`} title={first ? `שלום, ${first}` : 'שלום'} ball />
       <div className="overlap stack">
         {(teams.data?.length ?? 0) > 1 && (
           <div className="card team-switch">

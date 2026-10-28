@@ -31,6 +31,7 @@ const out = (ok, label, extra) => { if (!ok) fails++; console.log(`${ok ? 'PASS'
   await p.click('button:has-text("אבי כץ")'); await wait(1500);
   await has('coach lands on home with the next event', 'שלום, אבי', 'האירוע הבא', 'אימון קבוצתי', 'מגיעים', 'טרם השיבו', 'הכנה לאירוע'); await shot('coach-home');
   await has('coach home also shows the next event of another type', 'המשחק הקרוב', 'הפועל');
+  await has('coach home shows the staff type', 'מאמן ראשי · ילדים ב׳');
   await hasNot('coach does not see the other coach team', 'נוער כדורסל');
   await p.click('text=לפרטי האירוע'); await wait(1000);
   await has('event shows what to bring', 'מה להביא', 'בקבוק מים', 'נעלי כדורגל', 'מגני שוקיים'); await shot('event');
