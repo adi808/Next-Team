@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { KitAvatar } from './Kit';
+import { useEquipmentNames } from './Equipment';
 import { isDemo } from '../lib/supabase';
 import type { EventRow, TeamKit } from '../lib/types';
 
@@ -101,6 +102,7 @@ export function EventDashboard({ event, typeLabel, isMatch, kit, attendance }: {
   attendance?: { yes: number; no: number; pending: number };
 }) {
   const now = useNow();
+  const equipment = useEquipmentNames()(event.equipment);
   const weather = useWeather(event.location, event.starts_at);
   const time = (iso: string) => day(iso, { hour: '2-digit', minute: '2-digit' });
   const when = countdown(event.starts_at, event.ends_at, now);
@@ -126,6 +128,11 @@ export function EventDashboard({ event, typeLabel, isMatch, kit, attendance }: {
         {attendance && <div className="tile"><h4>הגעה</h4><Donut {...attendance} /></div>}
         {kit && (
           <div className="tile kit-tile"><h4>תלבושת</h4><KitAvatar kit={kit} size={84} /><strong>{kit.name}</strong></div>
+        )}
+        {equipment.length > 0 && (
+          <div className="tile bring"><h4>מה להביא</h4>
+            <ul>{equipment.map((n) => <li key={n}>✓ {n}</li>)}</ul>
+          </div>
         )}
         {weather && (
           <div className="tile weather"><h4>מזג אוויר</h4><span className="weather-icon">{icon}</span>

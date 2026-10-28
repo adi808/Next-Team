@@ -29,6 +29,10 @@ export function seed(): Tables {
     lk('pos_gk', 'position', 'שוער', 1, { sport_id: 'sp_fb', meta: { goalkeeper: true } }), lk('pos_df', 'position', 'הגנה', 2, { sport_id: 'sp_fb' }),
     lk('pos_mf', 'position', 'קישור', 3, { sport_id: 'sp_fb' }), lk('pos_fw', 'position', 'התקפה', 4, { sport_id: 'sp_fb' }),
     lk('pos_pg', 'position', 'רכז', 1, { sport_id: 'sp_bb' }), lk('pos_c', 'position', 'סנטר', 2, { sport_id: 'sp_bb' }),
+    lk('kind_field', 'player_kind', 'שחקן שדה', 1, { sport_id: 'sp_fb' }), lk('kind_gk', 'player_kind', 'שוער', 2, { sport_id: 'sp_fb', meta: { goalkeeper: true } }),
+    lk('eq_water', 'equipment', 'בקבוק מים', 1), lk('eq_boots', 'equipment', 'נעלי כדורגל', 2), lk('eq_shin', 'equipment', 'מגני שוקיים', 3),
+    lk('eq_shoes', 'equipment', 'נעלי ספורט', 4), lk('eq_ball', 'equipment', 'כדור', 5), lk('eq_towel', 'equipment', 'מגבת', 6),
+    lk('eq_snack', 'equipment', 'כריך / פרי', 7), lk('eq_gloves', 'equipment', 'כפפות שוער', 8),
   ];
   [['4-3-3', 'fm11'], ['4-4-2', 'fm11'], ['3-5-2', 'fm11'], ['4-2-3-1', 'fm11'], ['3-3-2', 'fm9'], ['3-2-3', 'fm9'], ['2-3-1', 'fm7'], ['3-2-1', 'fm7'], ['2-2', 'fm5'], ['1-2-1', 'fm5']]
     .forEach(([name, parent], i) => lookups.push(lk(`f_${name}`, 'formation', name, i + 1, { parent_id: parent, sport_id: 'sp_fb' })));
@@ -38,7 +42,9 @@ export function seed(): Tables {
   });
   const STAFF = ['system_admin', 'club_admin', 'coach'];
   const attribute_defs: Row[] = [
-    def('d_pos', 'player', 'position', 'עמדה', 'lookup', { domain: 'position' }, ALL, STAFF, { sort_order: 0 }),
+    def('d_kind', 'player', 'player_kind', 'שחקן שדה / שוער', 'lookup', { domain: 'player_kind' }, ALL, STAFF, { sport_id: 'sp_fb', sort_order: -2 }),
+    def('d_pos', 'player', 'position', 'תפקיד ברירת מחדל', 'lookup', { domain: 'position' }, ALL, STAFF, { sort_order: -1 }),
+    def('d_foot', 'player', 'strong_foot', 'רגל חזקה', 'select', { options: ['ימין', 'שמאל'] }, ALL, STAFF, { sport_id: 'sp_fb', sort_order: 1 }),
     def('d_allergy', 'player', 'medical_allergy', 'אלרגיה', 'text', {}, [...STAFF, 'parent'], ['coach', 'parent'], { sort_order: 10 }),
     def('d_cond', 'player', 'medical_condition', 'בעיה רפואית', 'text', {}, [...STAFF, 'parent'], ['coach', 'parent'], { sort_order: 11 }),
     def('d_minage', 'team', 'min_response_age', 'גיל מינימלי שבו שחקן עונה בעצמו', 'number', { min: 0, max: 21, default: 12 }, ALL, STAFF, { sort_order: 1 }),
@@ -59,6 +65,8 @@ export function seed(): Tables {
     val('d_speed', 'k1', 6, 80), val('d_speed', 'k1', 7, 7), val('d_team', 'k1', 7, 80), val('d_team', 'k1', 8, 7),
     val('d_ball', 'k2', 8, 90), val('d_ball', 'k2', 9, 10), val('d_speed', 'k2', 7, 10), val('d_team', 'k2', 9, 10),
     val('d_ball', 'k3', 6, 30), val('d_speed', 'k3', 8, 30),
+    val('d_kind', 'k1', 'kind_field', 60), val('d_kind', 'k2', 'kind_field', 60), val('d_kind', 'k3', 'kind_gk', 60),
+    val('d_foot', 'k1', 'שמאל', 60), val('d_foot', 'k2', 'ימין', 60),
     val('d_pos', 'k1', 'pos_mf', 60), val('d_pos', 'k2', 'pos_fw', 60), val('d_pos', 'k3', 'pos_gk', 60),
     val('d_pos', 'k4', 'pos_df', 60), val('d_pos', 'k5', 'pos_df', 60), val('d_pos', 'k6', 'pos_mf', 60),
     val('d_allergy', 'k1', 'בוטנים', 100, 'u_p1'), val('d_cond', 'k2', 'אסתמה קלה, ממליצים על משאף בתיק', 60, 'u_p2'),
@@ -115,7 +123,7 @@ export function seed(): Tables {
     ],
     events: [
       { id: 'e_past', team_id: 't1', type_id: 'lk_match', title: 'משחק ליגה נגד בית״ר', starts_at: at(-3, 10), ends_at: null, location: 'מגרש בית״ר', notes: '', opponent: 'בית״ר', our_score: 2, their_score: 1 },
-      { id: 'e_train', team_id: 't1', type_id: 'lk_train', title: 'אימון קבוצתי', starts_at: at(1, 17, 30), ends_at: null, location: 'מגרש 3', notes: 'להגיע עם מים וקרמפונים', opponent: null, our_score: null, their_score: null, kit_id: 'kit_home' },
+      { id: 'e_train', team_id: 't1', type_id: 'lk_train', title: 'אימון קבוצתי', starts_at: at(1, 17, 30), ends_at: null, location: 'מגרש 3', notes: 'להגיע עם מים וקרמפונים', opponent: null, our_score: null, their_score: null, kit_id: 'kit_home', equipment: ['eq_water', 'eq_boots', 'eq_shin'] },
       { id: 'e_match', team_id: 't1', type_id: 'lk_match', title: 'משחק ליגה נגד הפועל', starts_at: at(4, 10), ends_at: null, location: 'אצטדיון עירוני', notes: 'התכנסות שעה לפני', opponent: 'הפועל', our_score: null, their_score: null, kit_id: 'kit_away' },
       { id: 'e_build', team_id: 't1', type_id: 'lk_build', title: 'גיבוש סוף עונה', starts_at: at(9, 16), ends_at: null, location: 'פארק הירקון', notes: '', opponent: null, our_score: null, their_score: null },
       { id: 'e_bb', team_id: 't2', type_id: 'lk_train', title: 'אימון כדורסל', starts_at: at(2, 19), ends_at: null, location: 'אולם ספורט', notes: '', opponent: null, our_score: null, their_score: null },

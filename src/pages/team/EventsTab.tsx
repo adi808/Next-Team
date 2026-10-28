@@ -6,6 +6,7 @@ import { applyEventDefaults } from '../../lib/team';
 import { Badge, Card, Empty, ErrorText, Field, Loading } from '../../components/ui';
 import { LookupSelect, useLookups } from '../../components/Lookups';
 import { KitAvatar, KitSelect, useTeamKits } from '../../components/Kit';
+import { EquipmentPicker } from '../../components/Equipment';
 import type { EventRow } from '../../lib/types';
 import type { TeamTabProps } from './TeamPage';
 
@@ -30,6 +31,7 @@ export default function EventsTab({ team, canManage }: TeamTabProps) {
   const [duration, setDuration] = useState('90');
   const [from, setFrom] = useState('');
   const [until, setUntil] = useState('');
+  const [equipment, setEquipment] = useState<string[]>([]);
   const [created, setCreated] = useState<number | null>(null);
   const act = useAction();
   const isMatch = (id: string | null) => !!types.find((t) => t.id === id)?.meta?.is_match;
@@ -48,6 +50,12 @@ export default function EventsTab({ team, canManage }: TeamTabProps) {
           p_team: team.id, p_type: typeId, p_title: title, p_days: days, p_start: time,
           p_duration_min: duration ? Number(duration) : null, p_from: from, p_until: until, p_location: location, p_kit: kitId,
         });
+        if (equipment.length && n > 0) {
+          // the series just created is the team's newest; give each of its events the items to bring
+          const [last] = await q<EventRow[]>(supabase.from('events').select('*').eq('team_id', team.id).not('series_id', 'is', null).order('created_at', { ascending: false }).limit(1));
+          const series = last ? await q<EventRow[]>(supabase.from('events').select('*').eq('series_id', last.series_id!)) : [];
+          for (const e of series) await rpc('set_event_equipment', { p_event: e.id, p_items: equipment });
+        }
         setCreated(n);
       } else {
         const id = await rpc<string>('create_event', {
@@ -55,6 +63,7 @@ export default function EventsTab({ team, canManage }: TeamTabProps) {
           p_location: location, p_opponent: isMatch(typeId) ? opponent || null : null,
         });
         if (kitId) await rpc('set_event_kit', { p_event: id, p_kit: kitId });
+        if (equipment.length) await rpc('set_event_equipment', { p_event: id, p_items: equipment });
         if (isMatch(typeId)) await applyEventDefaults(id, team.id).catch(() => {});
         setCreated(1);
       }
@@ -116,6 +125,7 @@ export default function EventsTab({ team, canManage }: TeamTabProps) {
               {kitOf(kitId) && <KitAvatar kit={kitOf(kitId)!} size={56} />}
             </div>
           )}
+          <Field label="מה להביא (אפשר לבחור כמה)"><EquipmentPicker value={equipment} onChange={setEquipment} /></Field>
           <ErrorText error={act.error} />
           {created !== null && <p className="ok">{created === 1 ? 'האירוע נוצר' : `נוצרו ${created} אירועים`}</p>}
           <button disabled={!ready || act.busy} onClick={create}>{repeat ? 'יצירת האירועים' : 'יצירת אירוע'}</button>

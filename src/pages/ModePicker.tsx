@@ -2,6 +2,8 @@ import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider';
 import { MODE_LABELS, type Mode } from '../lib/types';
 import { homeOf } from '../components/Shell';
+import { Icon, type IconName } from '../components/Icon';
+import { PageHero } from '../components/ui';
 
 const HINTS: Record<Mode, string> = {
   sysadmin: 'מועדונים, רשימות והגדרות מערכת',
@@ -10,39 +12,40 @@ const HINTS: Record<Mode, string> = {
   parent: 'הילדים שלי, אירועים ואישורי הגעה',
   player: 'הפרופיל, האירועים והמשימות שלי',
 };
+const ICONS: Record<Mode, IconName> = { sysadmin: 'shield', admin: 'list', coach: 'users', parent: 'child', player: 'check' };
 
-/** Users with several roles (for example a parent who is also a club admin) choose a mode here. */
+/** Entry screen: an account with several roles (for example coach and parent) chooses how to enter. */
 export default function ModePicker({ auto }: { auto?: boolean }) {
-  const { modes, loading } = useAuth();
+  const { modes, loading, profile, signOut } = useAuth();
   const navigate = useNavigate();
   if (loading) return <p className="center">טוען…</p>;
 
-  if (auto) {
-    let saved: string | null = null;
-    try { saved = localStorage.getItem('mode'); } catch { /* ignore */ }
-    const target = modes.find((m) => m === saved) ?? (modes.length === 1 ? modes[0] : null);
-    if (target) return <Navigate to={homeOf(target)} replace />;
-  }
+  // one role: straight in; several: always this screen
+  if (auto && modes.length === 1) return <Navigate to={homeOf(modes[0])} replace />;
 
   if (!modes.length) {
     return (
       <main className="login">
         <h1>Next Team</h1>
         <p>עדיין אין לכם שיוך למועדון או לקבוצה. בקשו ממנהל המועדון או מהמאמן להוסיף אתכם לפי כתובת המייל שאיתה נכנסתם.</p>
+        <button className="link" onClick={signOut}>יציאה</button>
       </main>
     );
   }
+  const first = (profile?.full_name || '').split(' ')[0];
   return (
-    <main className="login">
-      <h1>איך נכנסים?</h1>
-      <div className="stack">
+    <div className="picker-page">
+      <PageHero kicker={first ? `שלום, ${first}` : 'Next Team'} title="איך נכנסים היום?" ball />
+      <div className="overlap role-cards">
         {modes.map((m) => (
-          <button key={m} className="mode-card" onClick={() => navigate(homeOf(m))}>
-            <strong>{MODE_LABELS[m]}</strong>
-            <small>{HINTS[m]}</small>
+          <button key={m} className="role-card" onClick={() => navigate(homeOf(m))}>
+            <span className="role-icon"><Icon name={ICONS[m]} size={26} /></span>
+            <span><strong>{MODE_LABELS[m]}</strong><small>{HINTS[m]}</small></span>
+            <span className="chev" aria-hidden="true">‹</span>
           </button>
         ))}
       </div>
-    </main>
+      <p className="center-link"><button className="link" onClick={signOut}>יציאה</button></p>
+    </div>
   );
 }

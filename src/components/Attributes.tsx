@@ -11,6 +11,7 @@ function useFormat() {
     ...useLookups('match_format', { includeInactive: true }),
     ...useLookups('formation', { includeInactive: true }),
     ...useLookups('position', { includeInactive: true }),
+    ...useLookups('player_kind', { includeInactive: true }),
   ];
   return (def: AttrDef, v: unknown): string => {
     if (v === null || v === undefined) return '';
