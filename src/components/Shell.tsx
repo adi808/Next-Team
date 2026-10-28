@@ -1,24 +1,43 @@
 import { useEffect } from 'react';
 import { Link, Navigate, NavLink, Outlet, useNavigate, useParams } from 'react-router-dom';
 import { Picture } from './Picture';
+import { Icon, type IconName } from './Icon';
 import { useAuth } from '../auth/AuthProvider';
 import { MODE_LABELS, type Mode } from '../lib/types';
 
-const NAV: Record<Mode, { to: string; label: string }[]> = {
-  sysadmin: [{ to: 'clubs', label: 'מועדונים' }, { to: 'lists', label: 'רשימות' }],
-  admin: [{ to: 'clubs', label: 'המועדון שלי' }, { to: 'lists', label: 'רשימות' }],
-  coach: [{ to: 'teams', label: 'הקבוצות שלי' }],
+const NAV: Record<Mode, { to: string; label: string; icon: IconName }[]> = {
+  sysadmin: [{ to: 'clubs', label: 'מועדונים', icon: 'shield' }, { to: 'lists', label: 'רשימות', icon: 'list' }],
+  admin: [{ to: 'clubs', label: 'המועדון', icon: 'shield' }, { to: 'lists', label: 'רשימות', icon: 'list' }],
+  coach: [
+    { to: 'coach', label: 'בית', icon: 'home' }, { to: 't/events', label: 'אירועים', icon: 'calendar' },
+    { to: 't/squad', label: 'סגל', icon: 'users' }, { to: 't/chat', label: 'הודעות', icon: 'chat' },
+  ],
   parent: [
-    { to: 'events', label: 'אירועים' }, { to: 'home', label: 'הילדים שלי' }, { to: 'tasks', label: 'משימות' },
-    { to: 'surveys', label: 'סקרים' }, { to: 'chat', label: 'הודעות' },
+    { to: 'events', label: 'אירועים', icon: 'calendar' }, { to: 'home', label: 'הילדים', icon: 'child' }, { to: 'tasks', label: 'משימות', icon: 'check' },
+    { to: 'surveys', label: 'סקרים', icon: 'poll' }, { to: 'chat', label: 'הודעות', icon: 'chat' },
   ],
   player: [
-    { to: 'events', label: 'אירועים' }, { to: 'home', label: 'הפרופיל שלי' }, { to: 'tasks', label: 'משימות' },
-    { to: 'surveys', label: 'סקרים' }, { to: 'chat', label: 'הודעות' },
+    { to: 'events', label: 'אירועים', icon: 'calendar' }, { to: 'home', label: 'הפרופיל', icon: 'child' }, { to: 'tasks', label: 'משימות', icon: 'check' },
+    { to: 'surveys', label: 'סקרים', icon: 'poll' }, { to: 'chat', label: 'הודעות', icon: 'chat' },
   ],
 };
 
 export const homeOf = (m: Mode) => `/m/${m}/${NAV[m][0].to}`;
+
+/** Segment for switching between the roles one account holds (coach / parent / player ...). */
+export function ModeSwitch() {
+  const { mode } = useParams();
+  const { modes } = useAuth();
+  const navigate = useNavigate();
+  if (modes.length < 2) return null;
+  return (
+    <div className="segment mode-switch" role="tablist" aria-label="מצב">
+      {modes.map((m) => (
+        <button key={m} role="tab" aria-selected={m === mode} onClick={() => m !== mode && navigate(homeOf(m))}>{MODE_LABELS[m]}</button>
+      ))}
+    </div>
+  );
+}
 
 export default function Shell() {
   const { mode } = useParams();
@@ -34,26 +53,27 @@ export default function Shell() {
   if (!valid) return <Navigate to="/pick" replace />;
   return (
     <div className="shell">
-      <div className="topbar">
-      <header>
-        <strong>Next Team</strong>
+      <header className="topbar">
+        <Link className="brand" to={homeOf(m)}><span className="brand-mark">N</span>Next Team</Link>
         <button className="mode-chip" disabled={modes.length < 2} onClick={() => navigate('/pick')}
           title={modes.length > 1 ? 'החלפת מצב' : undefined}>
           {MODE_LABELS[m]}{modes.length > 1 ? ' ▾' : ''}
         </button>
+        <span className="grow" />
         <Link className="who" to={`/m/${m}/me`} title="הפרופיל שלי">
-          <Picture bucket="avatars" path={profile?.avatar_path} name={profile?.full_name || profile?.email || '?'} size={28} />
-          <bdi>{profile?.full_name || profile?.email || profile?.phone}</bdi>
+          <Picture bucket="avatars" path={profile?.avatar_path} name={profile?.full_name || profile?.email || '?'} size={30} />
         </Link>
         <button className="link" onClick={signOut}>יציאה</button>
       </header>
-      <nav aria-label="ניווט">
+      <main><Outlet /></main>
+      <nav className="bottom-nav" aria-label="ניווט">
         {NAV[m].map((n) => (
-          <NavLink key={n.to} to={`/m/${m}/${n.to}`} className={({ isActive }) => (isActive ? 'active' : '')}>{n.label}</NavLink>
+          <NavLink key={n.to} to={`/m/${m}/${n.to}`} className={({ isActive }) => (isActive ? 'active' : '')}>
+            <Icon name={n.icon} />
+            <span>{n.label}</span>
+          </NavLink>
         ))}
       </nav>
-      </div>
-      <main><Outlet /></main>
     </div>
   );
 }

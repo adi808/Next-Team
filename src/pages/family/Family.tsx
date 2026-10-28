@@ -6,7 +6,8 @@ import { q, rpc, useAction, useLoad, fmtDate, ageOf } from '../../lib/db';
 import { teamAllowsPlayerAnswers } from '../../lib/team';
 import { normEmail } from '../../lib/email';
 import { useAuth } from '../../auth/AuthProvider';
-import { Badge, Card, Empty, ErrorText, Field, Loading } from '../../components/ui';
+import { Badge, Card, Empty, ErrorText, Field, Loading, PageHero } from '../../components/ui';
+import { ModeSwitch } from '../../components/Shell';
 import { AttendanceWidget } from '../../components/Attendance';
 import { Conversation, TeamChannel } from '../../components/Chat';
 import { useLookupName } from '../../components/Lookups';
@@ -50,7 +51,7 @@ export function FamilyHome() {
 
   return (
     <>
-      <h2>{asParent ? 'הילדים שלי' : 'הפרופיל שלי'}</h2>
+      <PageHero kicker={asParent ? 'הורה' : 'שחקן'} title={asParent ? 'הילדים שלי' : 'הפרופיל שלי'} />
       <Loading loading={loading} error={error} />
       {!kids.length && !loading && <Empty>עדיין אין ילדים מקושרים.</Empty>}
       <ul className="list">
@@ -98,7 +99,8 @@ export function FamilyEvents() {
 
   return (
     <>
-      <h2>אירועים קרובים</h2>
+      <PageHero kicker={asParent ? 'הורה' : 'שחקן'} title="אירועים קרובים" />
+      <div className="overlap"><ModeSwitch /></div>
       <Loading loading={loading || l2} error={error || e2} />
       {data && !data.events.length && <Empty>אין אירועים קרובים.</Empty>}
       {data?.events.map((e) => (
@@ -162,10 +164,9 @@ export function FamilyTasks() {
   return (
     <>
       {party > 0 && <Celebrate key={party} />}
-      <div className="title-row">
-        <h2>משימות</h2>
-        {trophies > 0 && <span className="trophies" title="גביעים">🏆 {trophies}</span>}
-      </div>
+      <PageHero kicker="משימות" title="המשימות שלי">
+        {trophies > 0 && <span className="trophies hero-chip" title="גביעים">🏆 {trophies}</span>}
+      </PageHero>
       <Loading loading={loading} error={error} />
       <ErrorText error={act.error} />
       {data && !data.assignments.length && <Empty>אין משימות.</Empty>}
@@ -197,7 +198,7 @@ export function FamilySurveys() {
   }, [tids]);
   return (
     <>
-      <h2>סקרים</h2>
+      <PageHero kicker="סקרים" title="מה דעתכם?" />
       <Loading loading={loading} error={error} />
       {data && !data.surveys.length && <Empty>אין סקרים.</Empty>}
       {data?.surveys.map((s) => (
@@ -264,7 +265,7 @@ export function FamilyChat() {
   const [open, setOpen] = useState<string | null>(null);
   return (
     <>
-      <h2>הודעות</h2>
+      <PageHero kicker="הודעות" title="שיחות" />
       <Loading loading={loading || convs.loading} error={error || convs.error} />
       {teams.map((t) => (
         <Card key={t.id} title={`ערוץ ${t.name}`}>

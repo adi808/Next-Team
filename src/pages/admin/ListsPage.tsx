@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useAuth } from '../../auth/AuthProvider';
 import { useActingRole } from '../../auth/acting';
 import { rpc, useAction } from '../../lib/db';
-import { Card, ErrorText, Field } from '../../components/ui';
+import { Card, ErrorText, Field, PageHero } from '../../components/ui';
 import { clearLookupCache, useLookups, useSports } from '../../components/Lookups';
 import type { Lookup } from '../../lib/types';
 
@@ -12,6 +12,7 @@ const DOMAINS: { id: string; label: string; hint: string }[] = [
   { id: 'match_format', label: 'מספר שחקנים במגרש', hint: '11 על 11, 9 על 9…' },
   { id: 'formation', label: 'מערכים', hint: '4-3-3, 4-4-2… (שייכים למספר שחקנים)' },
   { id: 'stat_type', label: 'סוגי סטטיסטיקה', hint: 'שער, בישול, כרטיס…' },
+  { id: 'position', label: 'עמדות', hint: 'שוער, הגנה, קישור… (לכל ענף)' },
 ];
 
 /** One screen manages every list in the system (they all live in the lookups table). */
@@ -58,7 +59,7 @@ export default function ListsPage() {
 
   return (
     <>
-      <h2>רשימות</h2>
+      <PageHero kicker="הגדרות" title="רשימות" />
       <p className="muted">כל הרשימות בממשק (סוגי אירוע, סיבות, מערכים…) מנוהלות כאן. הוספת ערך לא דורשת שינוי קוד.</p>
       <div className="tabs">
         {DOMAINS.map((d) => (

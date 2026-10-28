@@ -87,6 +87,7 @@ export default function EventPage() {
       <p><Link to={`../team/${team.id}`}>← {team.name}</Link></p>
       <EventDashboard event={event} typeLabel={typeName(event.type_id)} isMatch={isMatch} kit={kit}
         attendance={canManage ? { yes: attending, no: absent, pending: players.length - responses.length } : undefined} />
+      {canManage && <Link className="button-link block" to={`../event/${event.id}/prep`}>הכנה לאירוע ←</Link>}
       {(canManage || event.notes) && <Card title="פרטים" actions={canManage && (
         <div className="row">
           <button className="small secondary" onClick={startEdit}>עריכה</button>

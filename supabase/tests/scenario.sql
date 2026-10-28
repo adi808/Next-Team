@@ -383,6 +383,24 @@ select t.as_user('A');
 select set_club_logo(t.id('club'), 'clubs/' || t.id('club') || '/logo.png');
 select t.check('club admin sets the club logo', (select logo_path from clubs where id = t.id('club')) like 'clubs/%/logo.png');
 
+-- ---------------------------------------------------------------- positions and goals
+set role authenticated;
+select t.as_user('C');
+select set_attribute((select id from attribute_defs where key = 'position'), t.id('K1'), to_jsonb(t.lk('position', 'goalkeeper')::text));
+select t.check('the coach sets a player position', exists (select 1 from attribute_current
+  where def_id = (select id from attribute_defs where key = 'position') and entity_id = t.id('K1')));
+insert into t.ctx select 'GOAL', save_player_goal(null, t.id('K1'), 'לשפר בעיטה ברגל שמאל', '2026-12-31');
+select save_player_goal(t.id('GOAL'), t.id('K1'), 'לשפר בעיטה ברגל שמאל', '2026-12-31', true);
+select t.check('the coach adds and completes a goal', exists (select 1 from player_goals where id = t.id('GOAL') and done_at is not null));
+select t.as_user('P1');
+select t.check('the parent sees the goal and the position',
+  exists (select 1 from player_goals where id = t.id('GOAL'))
+  and exists (select 1 from attribute_current where entity_id = t.id('K1') and def_id = (select id from attribute_defs where key = 'position')));
+select t.denied('a parent cannot add goals', $$select save_player_goal(null, t.id('K1'), 'x')$$);
+select t.denied('a parent cannot set the position', $$select set_attribute((select id from attribute_defs where key = 'position'), t.id('K1'), to_jsonb(t.lk('position', 'forward')::text))$$);
+select t.as_user('O');
+select t.check('an outsider does not see goals', not exists (select 1 from player_goals));
+
 -- ---------------------------------------------------------------- kits and recurring events
 set role authenticated;
 select t.as_user('C');

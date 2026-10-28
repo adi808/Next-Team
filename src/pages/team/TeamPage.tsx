@@ -1,11 +1,12 @@
-import { useParams } from 'react-router-dom';
+import { Navigate, useParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { q, rpc, useAction, useLoad } from '../../lib/db';
 import { uploadImage } from '../../lib/images';
 import { Picture, PicturePicker } from '../../components/Picture';
 import { useAuth } from '../../auth/AuthProvider';
 import { useActingRole } from '../../auth/acting';
-import { ErrorText, Loading, Tabs } from '../../components/ui';
+import { ErrorText, Loading, PageHero, Tabs } from '../../components/ui';
+import { useCoachTeam } from '../../auth/coachTeam';
 import { useSports } from '../../components/Lookups';
 import { SportIcon } from '../../components/SportIcon';
 import type { Player, Team } from '../../lib/types';
@@ -23,8 +24,17 @@ export interface TeamTabProps {
   reload: () => void;
 }
 
-export default function TeamPage() {
-  const { teamId = '' } = useParams();
+/** Coach shortcut (bottom nav): the current team, opened on a given tab. */
+export function CoachTeamTab() {
+  const { tab = 'events' } = useParams();
+  const [teamId] = useCoachTeam();
+  if (!teamId) return <Navigate to="../teams" replace />;
+  return <TeamPage key={`${teamId}/${tab}`} teamId={teamId} initialTab={tab} />;
+}
+
+export default function TeamPage(opts: { teamId?: string; initialTab?: string }) {
+  const params = useParams();
+  const teamId = opts.teamId ?? params.teamId ?? '';
   const auth = useAuth();
   const sports = useSports();
   const { data, loading, error, reload } = useLoad(async () => {
@@ -37,7 +47,7 @@ export default function TeamPage() {
   const act = useAction();
   const acting = useActingRole();
 
-  if (loading || error || !data) return <Loading loading={loading} error={error} />;
+  if (!data) return <Loading loading={loading} error={error} />; // on reload, keep showing the page (and its open tab)
   const { team, players } = data;
   const canManage = (acting === 'system_admin' && !!auth.profile?.is_system_admin) || (acting === 'coach' && auth.coachTeamIds.includes(team.id))
     || (acting === 'club_admin' && auth.adminClubIds.includes(team.club_id));
@@ -61,13 +71,17 @@ export default function TeamPage() {
   }
   return (
     <>
-      <div className="title-row">
-        <Picture bucket="club-media" path={team.photo_path} name={team.name} size={56} square />
-        <h2 className="row">{sport && <SportIcon sport={sport} size={24} />} {team.name}</h2>
+      <PageHero kicker={<span className="row">{sport && <SportIcon sport={sport} size={18} />}{sport?.name_he ?? 'קבוצה'}</span>} title={team.name} />
+      <div className="card overlap title-row">
+        <Picture bucket="club-media" path={team.photo_path} name={team.name} size={52} square />
+        <div className="grow">
+          <strong>{team.name}</strong>
+          <small className="muted" style={{ display: 'block' }}>{players.length} שחקנים</small>
+        </div>
         {canManage && <PicturePicker label={team.photo_path ? 'החלפת תמונה' : 'הוספת תמונה'} busy={act.busy} onPick={setPhoto} />}
       </div>
       <ErrorText error={act.error} />
-      <Tabs tabs={tabs} />
+      <Tabs tabs={tabs} initial={opts.initialTab} />
     </>
   );
 }

@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 import { mutateOne, rpc, useAction } from '../lib/db';
 import { uploadImage } from '../lib/images';
 import { useAuth } from '../auth/AuthProvider';
-import { Card, ErrorText, Field } from '../components/ui';
+import { Card, ErrorText, Field, PageHero } from '../components/ui';
 import { Picture, PicturePicker } from '../components/Picture';
 
 export default function ProfilePage() {
@@ -30,7 +30,7 @@ export default function ProfilePage() {
 
   return (
     <>
-      <h2>הפרופיל שלי</h2>
+      <PageHero kicker="חשבון" title="הפרופיל שלי" />
       <Card>
         <div className="profile-card">
           <Picture bucket="avatars" path={profile.avatar_path} name={profile.full_name || profile.email || '?'} size={96} />
