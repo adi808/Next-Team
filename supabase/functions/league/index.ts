@@ -56,15 +56,31 @@ Deno.serve(async (req) => {
   if (hit && Date.now() - hit.at < TTL) return json(200, hit.body);
 
   try {
-    const team = await page(url);
-    let standings = first(team.tables, isStandings);
-    const games = first(team.tables, isGames);
-    // The team page may only link to the league; then the table comes from the league page.
-    const leagueUrl = team.leagueLinks.map(allowed).find((u): u is URL => !!u) ?? null;
+    // A team is identified by team_id and season_id, whichever of its pages was pasted: the main page
+    // (team-details) carries the league table or a link to it, the games page (team-details/team-games)
+    // the fixture list. Both are read; a page that fails is skipped as long as the other one answers.
+    const teamId = url.searchParams.get('team_id');
+    const season = url.searchParams.get('season_id');
+    const pages = teamId
+      ? ['/team-details/', '/team-details/team-games/'].map((path) => {
+          const u = new URL(path, url.origin);
+          u.searchParams.set('team_id', teamId);
+          if (season) u.searchParams.set('season_id', season);
+          return u;
+        })
+      : [url];
+    const read = await Promise.allSettled(pages.map(page));
+    const ok = read.flatMap((r) => (r.status === 'fulfilled' ? [r.value] : []));
+    if (!ok.length) throw (read[0] as PromiseRejectedResult).reason;
+    const tables = ok.flatMap((p) => p.tables);
+    let standings = first(tables, isStandings);
+    const games = first(ok.map((p) => p.tables).reverse().flat(), isGames); // the games page first
+    // The team pages may only link to the league; then the table comes from the league page.
+    const leagueUrl = ok.flatMap((p) => p.leagueLinks).map(allowed).find((u): u is URL => !!u) ?? null;
     if (!standings && leagueUrl) standings = first((await page(leagueUrl)).tables, isStandings);
     const body = {
-      title: team.title, sourceUrl: key, leagueUrl: leagueUrl?.toString() ?? null,
-      teamId: url.searchParams.get('team_id'), standings, games, fetchedAt: new Date().toISOString(),
+      title: ok[0].title, sourceUrl: pages[0].toString(), leagueUrl: leagueUrl?.toString() ?? null,
+      teamId, standings, games, fetchedAt: new Date().toISOString(),
     };
     cache.set(key, { at: Date.now(), body });
     return json(200, body);
