@@ -31,6 +31,8 @@ const out = (ok, label, extra) => { if (!ok) fails++; console.log(`${ok ? 'PASS'
   await p.click('button:has-text("אבי כץ")'); await wait(1500);
   await has('coach lands on teams', 'הקבוצות שלי', 'ילדים ב׳'); await hasNot('coach does not see the other coach team', 'נוער כדורסל');
   await p.click('text=ילדים ב׳'); await wait(1200);
+  await has('team page opens on events', 'גיבוש סוף עונה');
+  await p.click('.tabs button:has-text("סגל")'); await wait(600);
   await has('squad with all six players and the pending request', 'דני כהן', 'רוני לוי', 'נועה מזרחי', 'גיל פרידמן', 'תומר שמש', 'יובל אורן', 'בקשות קישור', 'אילנה פרידמן'); await shot('squad');
   for (const [tab, needles] of [['אירועים', ['משחק ליגה נגד הפועל', 'גיבוש סוף עונה', '2:1']], ['משימות', ['מתיחות 10 דקות כל יום', 'מתוך 12']], ['סקרים', ['טורניר סוף עונה', 'אולי']], ['הודעות', ['אימון מחר', 'רוני בלי הסעה']], ['הגדרות', ['שליטה בכדור', 'מהירות', 'גיל מינימלי']]]) {
     await p.click(`role=tab[name="${tab}"]`); await wait(700); await has(`coach tab ${tab}`, ...needles);

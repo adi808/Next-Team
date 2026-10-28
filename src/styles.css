@@ -51,6 +51,14 @@ button.danger:hover:not(:disabled) { background: #fef2f2; border-color: var(--da
 .title-row { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
 .title-row h2 { margin-inline-end: auto; }
 .grow { flex: 1; }
+.picker {
+  display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.35rem 0.8rem; border-radius: 10px; cursor: pointer;
+  font-size: 0.85rem; font-weight: 600; color: var(--primary); background: var(--primary-soft); border: 1px solid #dbe6fe;
+}
+.picker:hover { background: #dbe6fe; }
+.picker.busy { opacity: 0.6; cursor: default; }
+.picker input { display: none; }
+.profile-card { display: flex; flex-direction: column; align-items: center; gap: 0.6rem; margin-bottom: 1rem; }
 input, textarea, select {
   font: inherit; width: 100%; padding: 0.7rem 0.85rem; color: var(--text);
   border: 1px solid var(--border-strong); border-radius: var(--radius); background: var(--surface); min-height: 44px;
@@ -65,15 +73,26 @@ label { font-weight: 500; color: var(--text-2); }
 .error { color: var(--danger); }
 
 /* ---- login ---- */
+.login-page { min-height: 100dvh; }
+.login-hero { position: relative; height: 40vh; min-height: 230px; max-height: 360px; overflow: hidden; color: #fff; }
+.login-hero-art { position: absolute; inset: 0; width: 100%; height: 100%; }
+.login-hero-text {
+  position: relative; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 0.35rem; padding-bottom: 3rem; text-align: center;
+}
+.login-hero-text strong { font-size: 2rem; font-weight: 700; letter-spacing: -0.02em; }
+.login-hero-text > span:last-child { font-size: 1rem; opacity: 0.9; }
+.login-mark {
+  display: flex; align-items: center; justify-content: center; width: 3.25rem; height: 3.25rem; border-radius: 16px;
+  background: rgba(255, 255, 255, 0.18); border: 1px solid rgba(255, 255, 255, 0.35); font-size: 1.6rem; font-weight: 700;
+  backdrop-filter: blur(6px);
+}
 .login {
-  max-width: 24rem; margin: 10vh auto 0; padding: 2rem 1.5rem; background: var(--surface);
-  border: 1px solid var(--border); border-radius: 20px; box-shadow: var(--shadow);
+  position: relative; max-width: 24rem; margin: -3rem auto 2rem; padding: 1.75rem 1.5rem; background: var(--surface);
+  border: 1px solid var(--border); border-radius: 20px; box-shadow: 0 10px 40px rgba(15, 23, 42, 0.12);
 }
-.login h1 { color: var(--text); text-align: center; font-size: 1.6rem; font-weight: 700; margin: 0 0 1.5rem; }
-.login h1::before {
-  content: 'N'; display: flex; align-items: center; justify-content: center; width: 3rem; height: 3rem; margin: 0 auto 0.75rem;
-  border-radius: 14px; background: linear-gradient(135deg, #3b82f6, #1d4ed8); color: #fff; font-size: 1.5rem;
-}
+@media (max-width: 26rem) { .login { margin-inline: 1rem; } }
+.login h1 { color: var(--text); text-align: center; font-size: 1.35rem; font-weight: 700; margin: 0 0 1.25rem; }
 .login form { display: flex; flex-direction: column; }
 .login form button.link { margin-top: 0.5rem; }
 .login button.google {
@@ -87,14 +106,17 @@ label { font-weight: 500; color: var(--text-2); }
 
 /* ---- app shell ---- */
 .shell { min-height: 100dvh; display: flex; flex-direction: column; }
+.shell .topbar {
+  position: sticky; top: 0; z-index: 10; background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: saturate(180%) blur(12px); border-bottom: 1px solid var(--border);
+}
 .shell header {
-  position: sticky; top: 0; z-index: 10; display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center;
-  padding: 0.7rem 1rem; background: rgba(255, 255, 255, 0.92); backdrop-filter: saturate(180%) blur(12px);
-  border-bottom: 1px solid var(--border); color: var(--text);
+  display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; padding: 0.6rem 1rem 0.35rem; color: var(--text);
 }
 .shell header > strong { font-size: 1.1rem; font-weight: 700; color: var(--primary); letter-spacing: -0.01em; }
 .shell header span { margin-inline-start: auto; }
-.shell header .who { font-size: 0.85rem; color: var(--muted); }
+.shell header .who { display: inline-flex; align-items: center; gap: 0.45rem; font-size: 0.85rem; color: var(--text-2); font-weight: 500; }
+.shell header .who:hover { text-decoration: none; color: var(--primary); }
 .shell header button.link { color: var(--muted); }
 .shell header button.link:hover { color: var(--danger); background: #fef2f2; }
 .mode-chip {
@@ -104,10 +126,8 @@ label { font-weight: 500; color: var(--text-2); }
 .mode-chip:hover:not(:disabled) { background: #dbe6fe; }
 .mode-chip:disabled { opacity: 1; }
 .shell main { flex: 1; padding: 1rem; width: 100%; max-width: 46rem; margin: 0 auto; }
-.shell nav {
-  position: sticky; bottom: 0; z-index: 10; display: flex; gap: 0.25rem; padding: 0.5rem; overflow-x: auto;
-  background: rgba(255, 255, 255, 0.95); backdrop-filter: saturate(180%) blur(12px); border-top: 1px solid var(--border);
-}
+.shell nav { display: flex; gap: 0.25rem; padding: 0.25rem 0.75rem 0.5rem; overflow-x: auto; scrollbar-width: none; }
+.shell nav::-webkit-scrollbar { display: none; }
 .shell nav a, .shell nav button {
   flex: 1 0 auto; text-align: center; padding: 0.55rem 0.9rem; border-radius: 10px; text-decoration: none; white-space: nowrap;
   font-size: 0.9rem; font-weight: 500; color: var(--muted); background: none; border: 0; min-height: 0;
@@ -162,6 +182,7 @@ legend { font-weight: 600; font-size: 0.9rem; padding: 0 0.35rem; }
 .badge.ok { background: #dcfce7; color: #166534; }
 .badge.bad { background: #fee2e2; color: #991b1b; }
 .badge.warn { background: #fef3c7; color: #92400e; }
+.avatar.square { border-radius: 12px; }
 .avatar {
   display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; background: var(--primary-soft);
   color: var(--primary); font-weight: 600; object-fit: cover; flex: none;
@@ -182,6 +203,7 @@ legend { font-weight: 600; font-size: 0.9rem; padding: 0 0.35rem; }
 .chat li.mine { background: var(--primary); border-color: var(--primary); color: #fff; align-self: flex-end; border-radius: 16px; border-start-end-radius: 4px; }
 .chat li.mine .muted { color: rgba(255, 255, 255, 0.8); }
 .chat li p { margin: 0.15rem 0 0; }
+.chat-meta { display: inline-flex; align-items: center; gap: 0.35rem; }
 .composer { display: flex; gap: 0.5rem; flex-wrap: wrap; }
 .composer input { flex: 1; margin: 0; }
 .attend { border-top: 1px solid var(--border); padding: 0.6rem 0; display: flex; flex-direction: column; gap: 0.4rem; }

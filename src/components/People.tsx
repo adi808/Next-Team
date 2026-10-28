@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
+import { Picture } from './Picture';
 import { supabase } from '../lib/supabase';
 import { q } from '../lib/db';
 import type { Player } from '../lib/types';
 
 const names = new Map<string, string>();
+const avatars = new Map<string, string | null>();
 
 /** id -> display name for accounts the caller is allowed to see (RLS decides). */
 export function useNames(ids: string[]) {
@@ -13,10 +15,10 @@ export function useNames(ids: string[]) {
     const missing = key.split(',').filter((i) => i && !names.has(i));
     if (!missing.length) return;
     let cancelled = false;
-    q<{ id: string; full_name: string; email: string | null; phone: string | null }[]>(
-      supabase.from('profiles').select('id, full_name, email, phone').in('id', missing),
+    q<{ id: string; full_name: string; email: string | null; phone: string | null; avatar_path: string | null }[]>(
+      supabase.from('profiles').select('id, full_name, email, phone, avatar_path').in('id', missing),
     ).then((rows) => {
-      rows.forEach((r) => names.set(r.id, r.full_name || r.email || r.phone || 'משתמש'));
+      rows.forEach((r) => { names.set(r.id, r.full_name || r.email || r.phone || 'משתמש'); avatars.set(r.id, r.avatar_path); });
       missing.forEach((i) => { if (!names.has(i)) names.set(i, 'משתמש'); });
       if (!cancelled) setTick((t) => t + 1);
     }, () => {});
@@ -26,22 +28,10 @@ export function useNames(ids: string[]) {
 }
 
 export function PlayerAvatar({ player, size = 40 }: { player: Pick<Player, 'full_name' | 'photo_path'>; size?: number }) {
-  const [url, setUrl] = useState<string | null>(null);
-  useEffect(() => {
-    setUrl(null);
-    if (!player.photo_path) return;
-    let cancelled = false;
-    supabase.storage.from('player-photos').createSignedUrl(player.photo_path, 3600).then(({ data }) => {
-      if (!cancelled && data) setUrl(data.signedUrl);
-    });
-    return () => { cancelled = true; };
-  }, [player.photo_path]);
-  const style = { width: size, height: size, fontSize: size / 2.4 };
-  return url ? (
-    <img className="avatar" style={style} src={url} alt={player.full_name} />
-  ) : (
-    <span className="avatar" style={style} aria-label={player.full_name}>
-      {player.full_name.trim().slice(0, 1)}
-    </span>
-  );
+  return <Picture bucket="player-photos" path={player.photo_path} name={player.full_name} size={size} />;
+}
+
+/** An account's picture next to its name; pair with useNames for the same ids so the cache is filled. */
+export function PersonAvatar({ id, size = 28 }: { id: string; size?: number }) {
+  return <Picture bucket="avatars" path={avatars.get(id)} name={names.get(id) ?? '?'} size={size} />;
 }

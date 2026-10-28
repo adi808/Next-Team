@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 import { q, rpc, useAction, useLoad, fmtDate } from '../lib/db';
 import { useAuth } from '../auth/AuthProvider';
 import { ErrorText, Loading, Empty } from './ui';
-import { useNames } from './People';
+import { PersonAvatar, useNames } from './People';
 
 interface Msg { id: string; author_id: string; body: string; created_at: string }
 
@@ -14,7 +14,7 @@ function MessageList({ messages, names }: { messages: Msg[]; names: (id: string)
     <ul className="chat">
       {messages.map((m) => (
         <li key={m.id} className={m.author_id === profile?.id ? 'mine' : ''}>
-          <small>{names(m.author_id)} · {fmtDate(m.created_at)}</small>
+          <small className="chat-meta"><PersonAvatar id={m.author_id} size={20} />{names(m.author_id)} · {fmtDate(m.created_at)}</small>
           <p>{m.body}</p>
         </li>
       ))}

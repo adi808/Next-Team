@@ -7,6 +7,9 @@ import { Card, Empty, ErrorText, Field, Loading, Tabs } from '../../components/u
 import { DefCreator, DefList } from '../../components/Attributes';
 import { useSports } from '../../components/Lookups';
 import { useAuth } from '../../auth/AuthProvider';
+import { useActingRole } from '../../auth/acting';
+import { Picture, PicturePicker } from '../../components/Picture';
+import { uploadImage } from '../../lib/images';
 import type { Club, Team } from '../../lib/types';
 
 export default function ClubPage() {
@@ -14,10 +17,11 @@ export default function ClubPage() {
   const sports = useSports();
   const { profile } = useAuth();
   const navigate = useNavigate();
+  const acting = useActingRole();
   const { data, loading, error, reload } = useLoad(async () => {
     const [club, teams] = await Promise.all([
-      q<Club>(supabase.from('clubs').select('id, name').eq('id', clubId).single()),
-      q<Team[]>(supabase.from('teams').select('id, club_id, name, sport_id').eq('club_id', clubId).order('name')),
+      q<Club>(supabase.from('clubs').select('id, name, logo_path').eq('id', clubId).single()),
+      q<Team[]>(supabase.from('teams').select('id, club_id, name, sport_id, photo_path').eq('club_id', clubId).order('name')),
     ]);
     return { club, teams };
   }, [clubId]);
@@ -46,6 +50,13 @@ export default function ClubPage() {
     });
   }
 
+  async function setLogo(file: File) {
+    await act.run(async () => {
+      const path = await uploadImage('club-media', `clubs/${clubId}`, file);
+      await rpc('set_club_logo', { p_club: clubId, p_path: path });
+      reload();
+    });
+  }
   async function saveClub() {
     await act.run(async () => {
       await mutateOne(supabase.from('clubs').update({ name: editClub?.trim() }).eq('id', clubId).select('id'));
@@ -79,9 +90,11 @@ export default function ClubPage() {
     <>
       {editClub === null ? (
         <div className="title-row">
+          <Picture bucket="club-media" path={data.club.logo_path} name={data.club.name} size={56} square />
           <h2>{data.club.name}</h2>
+          <PicturePicker label={data.club.logo_path ? 'החלפת לוגו' : 'הוספת לוגו'} busy={act.busy} onPick={setLogo} />
           <button className="small secondary" onClick={() => setEditClub(data.club.name)}>עריכה</button>
-          {profile?.is_system_admin && <button className="small danger" disabled={act.busy} onClick={deleteClub}>מחיקת מועדון</button>}
+          {acting === 'system_admin' && profile?.is_system_admin && <button className="small danger" disabled={act.busy} onClick={deleteClub}>מחיקת מועדון</button>}
         </div>
       ) : (
         <Card title="עריכת המועדון">
@@ -114,6 +127,7 @@ export default function ClubPage() {
                   </li>
                 ) : (
                   <li key={t.id} className="row">
+                    <Picture bucket="club-media" path={t.photo_path} name={t.name} size={36} square />
                     <Link to={`../team/${t.id}`}>{t.name}</Link> <small className="muted">{sportName(t.sport_id)}</small>
                     <span className="grow" />
                     <button className="small secondary" onClick={() => setEditTeam({ id: t.id, name: t.name, sport: t.sport_id })}>עריכה</button>

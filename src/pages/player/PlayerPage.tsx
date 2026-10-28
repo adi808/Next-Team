@@ -4,20 +4,22 @@ import { supabase } from '../../lib/supabase';
 import { q, rpc, useAction, useLoad, ageOf, fmtDay } from '../../lib/db';
 import { normEmail } from '../../lib/email';
 import { useAuth } from '../../auth/AuthProvider';
+import { useActingRole } from '../../auth/acting';
 import { Badge, Card, ErrorText, Field, Loading } from '../../components/ui';
 import { AttributesPanel } from '../../components/Attributes';
 import { useLookups } from '../../components/Lookups';
-import { PlayerAvatar, useNames } from '../../components/People';
+import { PersonAvatar, PlayerAvatar, useNames } from '../../components/People';
 import type { EntityRole, EventStat, Player, Team } from '../../lib/types';
 
 export default function PlayerPage() {
   const { playerId = '' } = useParams();
   const auth = useAuth();
+  const acting = useActingRole();
   const statTypes = useLookups('stat_type', { includeInactive: true });
   const { data, loading, error, reload } = useLoad(async () => {
     const player = await q<Player>(supabase.from('v_players').select('*').eq('id', playerId).single());
     const links = await q<{ team_id: string }[]>(supabase.from('team_players').select('team_id').eq('player_id', playerId));
-    const teams = links.length ? await q<Team[]>(supabase.from('teams').select('id, club_id, name, sport_id').in('id', links.map((l) => l.team_id))) : [];
+    const teams = links.length ? await q<Team[]>(supabase.from('teams').select('id, club_id, name, sport_id, photo_path').in('id', links.map((l) => l.team_id))) : [];
     const guardians = await q<{ parent_id: string }[]>(supabase.from('guardianships').select('parent_id').eq('player_id', playerId).eq('status', 'approved'));
     const stats = await q<EventStat[]>(supabase.from('event_stats').select('*').eq('player_id', playerId));
     return { player, teams, guardians, stats };
@@ -31,11 +33,11 @@ export default function PlayerPage() {
 
   if (loading || error || !data) return <Loading loading={loading} error={error} />;
   const { player, teams, guardians, stats } = data;
-  const isSys = !!auth.profile?.is_system_admin;
-  const isAdmin = auth.adminClubIds.includes(player.club_id);
-  const isCoach = teams.some((t) => auth.coachTeamIds.includes(t.id));
-  const isParent = auth.children.some((c) => c.id === player.id);
-  const isSelf = auth.me?.id === player.id;
+  const isSys = acting === 'system_admin' && !!auth.profile?.is_system_admin;
+  const isAdmin = acting === 'club_admin' && auth.adminClubIds.includes(player.club_id);
+  const isCoach = acting === 'coach' && teams.some((t) => auth.coachTeamIds.includes(t.id));
+  const isParent = acting === 'parent' && auth.children.some((c) => c.id === player.id);
+  const isSelf = acting === 'player' && auth.me?.id === player.id;
   const manage = isSys || isAdmin || isCoach;
   const roles: EntityRole[] = [];
   if (isSys) roles.push('system_admin');
@@ -108,7 +110,7 @@ export default function PlayerPage() {
 
       <Card title="הורים וגישה">
         <ul className="list compact">
-          {guardians.map((g) => <li key={g.parent_id}>{names(g.parent_id)}</li>)}
+          {guardians.map((g) => <li key={g.parent_id} className="row"><PersonAvatar id={g.parent_id} />{names(g.parent_id)}</li>)}
           {!guardians.length && <li className="muted">אין הורים מקושרים.</li>}
         </ul>
         {manage && (

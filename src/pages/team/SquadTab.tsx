@@ -4,7 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { q, rpc, useAction, useLoad, ageOf } from '../../lib/db';
 import { normEmail } from '../../lib/email';
 import { Card, Empty, ErrorText, Field } from '../../components/ui';
-import { PlayerAvatar, useNames } from '../../components/People';
+import { PersonAvatar, PlayerAvatar, useNames } from '../../components/People';
 import type { TeamTabProps } from './TeamPage';
 
 interface Pending { id: string; parent_id: string; player_id: string }
@@ -58,7 +58,7 @@ export default function SquadTab({ team, players, canManage, reload }: TeamTabPr
         <Card title="בקשות קישור הורה־ילד">
           {pending.data.map((r) => (
             <div key={r.id} className="row">
-              <span>{names(r.parent_id)} ← {playerName(r.player_id)}</span>
+              <PersonAvatar id={r.parent_id} /><span>{names(r.parent_id)} ← {playerName(r.player_id)}</span>
               <button className="small" onClick={() => act.run(async () => { await rpc('respond_guardianship', { p_id: r.id, p_approve: true }); pending.reload(); })}>אישור</button>
               <button className="small secondary" onClick={() => act.run(async () => { await rpc('respond_guardianship', { p_id: r.id, p_approve: false }); pending.reload(); })}>דחייה</button>
             </div>

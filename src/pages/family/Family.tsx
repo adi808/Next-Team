@@ -23,7 +23,7 @@ function useKids() {
     if (!kids.length) return { links: [] as { team_id: string; player_id: string }[], teams: [] as Team[] };
     const links = await q<{ team_id: string; player_id: string }[]>(supabase.from('team_players').select('team_id, player_id').in('player_id', kids.map((k) => k.id)));
     const tids = [...new Set(links.map((l) => l.team_id))];
-    const ts = tids.length ? await q<Team[]>(supabase.from('teams').select('id, club_id, name, sport_id').in('id', tids)) : [];
+    const ts = tids.length ? await q<Team[]>(supabase.from('teams').select('id, club_id, name, sport_id, photo_path').in('id', tids)) : [];
     return { links, teams: ts };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ids]);

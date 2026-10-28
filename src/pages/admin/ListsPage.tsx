@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '../../auth/AuthProvider';
+import { useActingRole } from '../../auth/acting';
 import { rpc, useAction } from '../../lib/db';
 import { Card, ErrorText, Field } from '../../components/ui';
 import { clearLookupCache, useLookups, useSports } from '../../components/Lookups';
@@ -16,6 +17,7 @@ const DOMAINS: { id: string; label: string; hint: string }[] = [
 /** One screen manages every list in the system (they all live in the lookups table). */
 export default function ListsPage() {
   const { profile, adminClubIds } = useAuth();
+  const acting = useActingRole();
   const [domain, setDomain] = useState(DOMAINS[0].id);
   const [tick, setTick] = useState(0);
   const sports = useSports();
@@ -25,7 +27,7 @@ export default function ListsPage() {
   const [sportId, setSportId] = useState('');
   const [parentId, setParentId] = useState('');
   const act = useAction();
-  const isSys = !!profile?.is_system_admin;
+  const isSys = acting === 'system_admin' && !!profile?.is_system_admin;
   const clubId = isSys ? null : adminClubIds[0] ?? null;
   const canEdit = (l: Lookup) => (isSys ? true : l.club_id !== null && l.club_id === clubId);
 
