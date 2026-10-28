@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { KitAvatar } from './Kit';
+import { StadiumArt } from './Stadium';
 import { useEquipmentNames } from './Equipment';
 import { isDemo } from '../lib/supabase';
 import type { EventRow, TeamKit } from '../lib/types';
@@ -111,6 +112,7 @@ export function EventDashboard({ event, typeLabel, isMatch, kit, attendance }: {
   return (
     <section className={`event-hero ${isMatch ? 'match' : ''}`}>
       <div className="event-hero-top">
+        {isMatch && <StadiumArt />}
         <div className="date-badge">
           <span>{day(event.starts_at, { weekday: 'short' })}</span>
           <strong>{day(event.starts_at, { day: 'numeric' })}</strong>

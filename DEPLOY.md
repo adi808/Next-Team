@@ -38,3 +38,10 @@
 פורסים אותה פעם אחת, ושוב אחרי כל שינוי בה: `npx supabase functions deploy league --project-ref <project-ref>`
 (בדיקת ה־JWT נשארת פעילה: רק משתמשים מחוברים יכולים לקרוא לה, והיא קוראת רק כתובות של football.org.il).
 אחר כך המאמן מדביק בלשונית הליגה (או בהגדרות הקבוצה) את כתובת דף הקבוצה, למשל `https://www.football.org.il/team-details/?team_id=8776&season_id=28`.
+
+## מיילים לאישור בקשות הצטרפות (Brevo, חינמי)
+1. ב־brevo.com: הרשמה, ואז Senders, Domains & Dedicated IPs ← Senders: אמתו את כתובת השולח.
+2. SMTP & API ← API Keys: צרו מפתח.
+3. ב־Supabase ← Edge Functions ← Secrets הוסיפו: `BREVO_API_KEY` (המפתח), `MAIL_FROM` (כתובת השולח המאומתת), `APP_URL` (כתובת האתר, למשל `https://next-team.pages.dev`).
+4. פעם אחת, ב־SQL Editor: `select vault.create_secret('https://<project>.supabase.co/functions/v1/send-email', 'email_hook_url');`
+בלי המפתח הבקשות עדיין מגיעות בהתראה באפליקציה וב־Push.

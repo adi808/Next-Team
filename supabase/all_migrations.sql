@@ -2565,3 +2565,877 @@ to authenticated;
 -- Next Team: "team manager" as a staff type. Like every staff type it is a label on a team staff
 -- membership (role coach), so a team manager has the coach's permissions on that team.
 insert into lookups (domain, slug, name_he, sort_order) values ('staff_role', 'team_manager', 'מנהל קבוצה', 0);
+
+-- ===== 0022_event_transport.sql =====
+-- Transport (הסעה) on events. The coach or club admin turns it on for an event; then a parent sets how many
+-- seats their child needs (the child plus anyone travelling with them, 0 for no ride), and staff set seats for
+-- themselves. Staff can also set or correct any row. Players cannot set seats themselves.
+
+alter table events add column has_transport boolean not null default false;
+
+create table event_transport (
+  id uuid primary key default gen_random_uuid(),
+  event_id uuid not null references events (id) on delete cascade,
+  player_id uuid references players (id) on delete cascade,
+  profile_id uuid references profiles (id) on delete cascade,
+  seats int not null check (seats between 0 and 20),
+  set_by uuid not null references profiles (id),
+  updated_at timestamptz not null default now(),
+  check ((player_id is null) <> (profile_id is null))
+);
+create unique index event_transport_player_uq on event_transport (event_id, player_id) where player_id is not null;
+create unique index event_transport_staff_uq on event_transport (event_id, profile_id) where profile_id is not null;
+
+-- Coach of the team or club admin of its club: the staff who may have a transport row.
+create function is_team_staff(p_team uuid, p_profile uuid) returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from memberships m
+                 where m.user_id = p_profile
+                   and ((m.team_id = p_team and m.role = 'coach')
+                     or (m.role = 'club_admin' and m.club_id = (select club_id from teams where id = p_team))))
+$$;
+
+alter table event_transport enable row level security;
+create policy transport_select on event_transport for select using (is_team_member(event_team(event_id)));
+grant select on event_transport to authenticated;
+
+create function set_event_transport(p_event uuid, p_enabled boolean) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  perform require_auth();
+  if not can_manage_team(event_team(p_event)) then
+    raise exception 'not allowed' using errcode = '42501';
+  end if;
+  update events set has_transport = coalesce(p_enabled, false) where id = p_event;
+end $$;
+
+create function set_transport_seats(p_event uuid, p_seats int, p_player uuid default null,
+  p_profile uuid default null) returns void
+language plpgsql security definer set search_path = public as $$
+declare
+  v_uid uuid := require_auth();
+  v_team uuid := event_team(p_event);
+begin
+  if v_team is null then raise exception 'event not found' using errcode = 'P0002'; end if;
+  if not (select has_transport from events where id = p_event) then
+    raise exception 'this event has no transport' using errcode = '22023';
+  end if;
+  if (p_player is null) = (p_profile is null) then
+    raise exception 'give either a player or a staff member' using errcode = '22023';
+  end if;
+  if p_seats is null or p_seats < 0 or p_seats > 20 then
+    raise exception 'seats must be between 0 and 20' using errcode = '22023';
+  end if;
+
+  if p_player is not null then
+    if not exists (select 1 from team_players where team_id = v_team and player_id = p_player) then
+      raise exception 'player is not on this team' using errcode = '22023';
+    end if;
+    if not (is_parent_of(p_player) or can_manage_team(v_team)) then
+      raise exception 'only a parent or staff can set transport for a player' using errcode = '42501';
+    end if;
+    if p_seats > 0 and exists (select 1 from event_responses
+                               where event_id = p_event and player_id = p_player and status = 'not_attending') then
+      raise exception 'player is not attending this event' using errcode = '22023';
+    end if;
+    insert into event_transport (event_id, player_id, seats, set_by)
+    values (p_event, p_player, p_seats, v_uid)
+    on conflict (event_id, player_id) where player_id is not null do update
+      set seats = excluded.seats, set_by = excluded.set_by, updated_at = now();
+  else
+    if not is_team_staff(v_team, p_profile) then
+      raise exception 'not a staff member of this team' using errcode = '22023';
+    end if;
+    if not (p_profile = v_uid or can_manage_team(v_team)) then
+      raise exception 'not allowed' using errcode = '42501';
+    end if;
+    insert into event_transport (event_id, profile_id, seats, set_by)
+    values (p_event, p_profile, p_seats, v_uid)
+    on conflict (event_id, profile_id) where profile_id is not null do update
+      set seats = excluded.seats, set_by = excluded.set_by, updated_at = now();
+  end if;
+end $$;
+
+-- Breakdown for the event: one row per player or staff member who answered, still on the team.
+-- Players marked not attending are left out (their row is cleared anyway, see the trigger below).
+-- staff_label is the staff type on the team membership (e.g. מנהל קבוצה, see 0020d/0021), if one is set.
+create function event_transport_list(p_event uuid)
+returns table (player_id uuid, profile_id uuid, name text, role text, staff_label text, seats int)
+language sql stable security definer set search_path = public as $$
+  select t.player_id, null::uuid, p.full_name, 'player', null::text, t.seats
+  from event_transport t
+  join events e on e.id = t.event_id
+  join players p on p.id = t.player_id
+  join team_players tp on tp.team_id = e.team_id and tp.player_id = t.player_id
+  where t.event_id = p_event and is_team_member(e.team_id)
+    and not exists (select 1 from event_responses r
+                    where r.event_id = t.event_id and r.player_id = t.player_id and r.status = 'not_attending')
+  union all
+  select null::uuid, t.profile_id, coalesce(nullif(pr.full_name, ''), pr.email, ''),
+         case when tm.id is not null then 'coach' else 'club_admin' end, l.name_he, t.seats
+  from event_transport t
+  join events e on e.id = t.event_id
+  join profiles pr on pr.id = t.profile_id
+  left join memberships tm on tm.user_id = t.profile_id and tm.team_id = e.team_id and tm.role = 'coach'
+  left join lookups l on l.id = tm.staff_role_id
+  where t.event_id = p_event and is_team_member(e.team_id) and is_team_staff(e.team_id, t.profile_id)
+  order by 4 desc, 3
+$$;
+
+create function event_transport_total(p_event uuid) returns int
+language sql stable security definer set search_path = public as $$
+  select coalesce(sum(seats), 0)::int from event_transport_list(p_event)
+$$;
+
+-- A player who answers "not attending" no longer needs a seat.
+create function clear_transport_on_absence() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if new.status = 'not_attending' then
+    delete from event_transport where event_id = new.event_id and player_id = new.player_id;
+  end if;
+  return new;
+end $$;
+create trigger event_responses_clear_transport after insert or update of status on event_responses
+  for each row execute function clear_transport_on_absence();
+
+revoke execute on function is_team_staff(uuid, uuid), set_event_transport(uuid, boolean),
+  set_transport_seats(uuid, int, uuid, uuid), event_transport_list(uuid), event_transport_total(uuid),
+  clear_transport_on_absence() from public, anon;
+grant execute on function set_event_transport(uuid, boolean), set_transport_seats(uuid, int, uuid, uuid),
+  event_transport_list(uuid), event_transport_total(uuid) to authenticated;
+-- Supabase also grants new functions to authenticated directly; these are internal.
+revoke execute on function is_team_staff(uuid, uuid), clear_transport_on_absence() from authenticated;
+
+-- ===== 0023_join_requests.sql =====
+-- Next Team: joining a team by link, with approval.
+-- Staff share a team's join link. Whoever opens it signs in, then asks to join as a coach or as a parent;
+-- a parent lists their children (name, birth date, optional email and phone). Club admins decide coach
+-- requests; the team's staff (coach, team manager) and club admins decide parent requests. Approving a parent
+-- creates each child as a player on the team (or links an existing one) with the parent approved.
+-- Players never register themselves: a child's email is linked to the player (link_player_email).
+-- Also: contact fields (phone on players, club details, "can drive" for parents), more parameters, and an
+-- in-app notification list that the push hook (0024) delivers to devices.
+
+-- Contact fields. Phone is never required.
+alter table players add column phone text;
+alter table clubs add column phone text, add column address text not null default '', add column website text not null default '';
+alter table profiles add column can_drive boolean not null default false;
+
+-- More parameters, table-driven like the rest (0008).
+insert into attribute_defs (scope, key, label_he, data_type, config, visible_to, editable_by, sort_order) values
+  ('player', 'emergency_contact_name', 'איש קשר לחירום', 'text', '{}',
+   array['system_admin','club_admin','coach','parent'], array['club_admin','coach','parent'], 12),
+  ('player', 'emergency_contact_phone', 'טלפון לחירום', 'text', '{}',
+   array['system_admin','club_admin','coach','parent'], array['club_admin','coach','parent'], 13),
+  ('player', 'medical_cert_expiry', 'תוקף אישור רפואי', 'date', '{}',
+   array['system_admin','club_admin','coach','parent'], array['club_admin','coach','parent'], 14),
+  ('player', 'shirt_size', 'מידת חולצה', 'select',
+   '{"options": ["6", "8", "10", "12", "14", "16", "XS", "S", "M", "L", "XL"]}',
+   array['system_admin','club_admin','coach','parent','player'], array['club_admin','coach','parent'], 15),
+  ('player', 'federation_id', 'מספר כרטיס שחקן / ת"ז להתאחדות', 'text', '{}',
+   array['system_admin','club_admin','coach'], array['club_admin','coach'], 16),
+  ('team', 'season', 'עונה', 'text', '{"placeholder": "2026/27"}',
+   array['system_admin','club_admin','coach','parent','player'], array['system_admin','club_admin','coach'], 6),
+  ('team', 'age_group', 'שנתון / קבוצת גיל', 'text', '{}',
+   array['system_admin','club_admin','coach','parent','player'], array['system_admin','club_admin','coach'], 7),
+  ('team', 'home_field_address', 'כתובת מגרש הבית', 'text', '{}',
+   array['system_admin','club_admin','coach','parent','player'], array['system_admin','club_admin','coach'], 8);
+
+-- Every parameter of a record that applies to it and that the caller may read, with its current value.
+create function entity_attributes(p_scope text, p_entity uuid)
+returns table (def_id uuid, key text, label_he text, data_type text, config jsonb, value jsonb, can_write boolean)
+language sql stable security definer set search_path = public as $$
+  select d.id, d.key, d.label_he, d.data_type, d.config,
+         (select av.value from attribute_values av where av.def_id = d.id and av.entity_id = p_entity
+           order by av.seq desc limit 1),
+         attr_can_write(d.id, p_entity)
+  from attribute_defs d
+  where d.scope = p_scope and d.active and attr_applies(d.id, p_entity) and attr_can_read(d.id, p_entity)
+  order by d.sort_order, d.label_he
+$$;
+
+-- In-app notifications; 0024 pushes each new row to the recipient's devices.
+create table notifications (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references profiles (id) on delete cascade,
+  title text not null,
+  body text not null default '',
+  url text not null default '/',
+  created_at timestamptz not null default now(),
+  read_at timestamptz
+);
+create index notifications_user_idx on notifications (user_id, created_at desc);
+alter table notifications enable row level security;
+create policy notifications_select on notifications for select using (user_id = auth.uid());
+grant select on notifications to authenticated;
+
+create function notify(p_users uuid[], p_title text, p_body text, p_url text) returns void
+language sql security definer set search_path = public as $$
+  insert into notifications (user_id, title, body, url)
+  select distinct u, p_title, coalesce(p_body, ''), coalesce(p_url, '/') from unnest(p_users) u where u is not null
+$$;
+
+create function mark_notifications_read() returns void
+language sql security definer set search_path = public as $$
+  update notifications set read_at = now() where user_id = auth.uid() and read_at is null
+$$;
+
+-- One active join link per team; making a new one retires the old.
+create table join_links (
+  id uuid primary key default gen_random_uuid(),
+  team_id uuid not null references teams (id) on delete cascade,
+  code text not null unique check (code ~ '^[A-Za-z0-9]{8,}$'),
+  active boolean not null default true,
+  created_by uuid references profiles (id),
+  created_at timestamptz not null default now()
+);
+create unique index join_links_active_uq on join_links (team_id) where active;
+alter table join_links enable row level security;
+create policy join_links_select on join_links for select using (can_manage_team(team_id));
+grant select on join_links to authenticated;
+
+create table join_requests (
+  id uuid primary key default gen_random_uuid(),
+  team_id uuid not null references teams (id) on delete cascade,
+  user_id uuid not null references profiles (id) on delete cascade,
+  role text not null check (role in ('coach', 'parent')),
+  full_name text not null check (length(btrim(full_name)) > 0),
+  phone text,
+  children jsonb not null default '[]' check (jsonb_typeof(children) = 'array'),
+  status text not null default 'pending' check (status in ('pending', 'approved', 'rejected')),
+  decided_by uuid references profiles (id),
+  decided_at timestamptz,
+  created_at timestamptz not null default now()
+);
+create unique index join_requests_pending_uq on join_requests (team_id, user_id) where status = 'pending';
+
+-- Who decides a request: club admins for coaches; the team's staff and club admins for parents.
+create function can_decide_join(p_team uuid, p_role text) returns boolean
+language sql stable security definer set search_path = public as $$
+  select case when p_role = 'coach' then is_club_admin((select club_id from teams where id = p_team))
+              else can_manage_team(p_team) end
+$$;
+
+create function join_deciders(p_team uuid, p_role text) returns uuid[]
+language sql stable security definer set search_path = public as $$
+  select coalesce(array_agg(distinct m.user_id), '{}')
+  from memberships m join teams t on t.id = p_team
+  where (m.role = 'club_admin' and m.club_id = t.club_id)
+     or (p_role = 'parent' and m.role = 'coach' and m.team_id = p_team)
+$$;
+
+alter table join_requests enable row level security;
+create policy join_requests_select on join_requests for select using (
+  user_id = auth.uid() or can_decide_join(team_id, role));
+grant select on join_requests to authenticated;
+
+create function create_join_link(p_team uuid) returns text
+language plpgsql security definer set search_path = public as $$
+declare v_uid uuid := require_auth(); v_code text;
+begin
+  if not can_manage_team(p_team) then raise exception 'not allowed' using errcode = '42501'; end if;
+  update join_links set active = false where team_id = p_team and active;
+  loop
+    v_code := substr(replace(gen_random_uuid()::text, '-', ''), 1, 10);
+    exit when not exists (select 1 from join_links where code = v_code);
+  end loop;
+  insert into join_links (team_id, code, created_by) values (p_team, v_code, v_uid);
+  return v_code;
+end $$;
+
+create function disable_join_link(p_team uuid) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  perform require_auth();
+  if not can_manage_team(p_team) then raise exception 'not allowed' using errcode = '42501'; end if;
+  update join_links set active = false where team_id = p_team and active;
+end $$;
+
+-- What a join link points to, for the person who opened it. my_status: member, coach (already staff),
+-- pending (a request is waiting) or none.
+create function join_link_info(p_code text)
+returns table (team_id uuid, team_name text, club_name text, sport_name text, my_status text)
+language plpgsql stable security definer set search_path = public as $$
+declare v_uid uuid := require_auth(); v_team uuid;
+begin
+  select l.team_id into v_team from join_links l where l.code = p_code and l.active;
+  if v_team is null then raise exception 'this link is no longer active' using errcode = 'P0002'; end if;
+  return query
+  select t.id, t.name, c.name, s.name_he,
+         case when can_manage_team(t.id) then 'coach'
+              when exists (select 1 from join_requests r where r.team_id = t.id and r.user_id = v_uid and r.status = 'pending')
+                then 'pending'
+              when is_team_member(t.id) then 'member'
+              else 'none' end
+  from teams t join clubs c on c.id = t.club_id left join sports s on s.id = t.sport_id
+  where t.id = v_team;
+end $$;
+
+-- p_children: [{"full_name", "birth_date" (YYYY-MM-DD), "email"?, "phone"?}], 1 to 6 children, parents only.
+-- A parent already on the team may send another request to add more children.
+create function submit_join_request(p_code text, p_role text, p_full_name text, p_phone text default null,
+  p_children jsonb default '[]') returns uuid
+language plpgsql security definer set search_path = public as $$
+declare
+  v_uid uuid := require_auth();
+  v_team uuid;
+  v_children jsonb := '[]';
+  v_phone text := norm_phone(p_phone);
+  c jsonb;
+  v_birth date;
+  v_id uuid;
+begin
+  select l.team_id into v_team from join_links l where l.code = p_code and l.active;
+  if v_team is null then raise exception 'this link is no longer active' using errcode = 'P0002'; end if;
+  if p_role not in ('coach', 'parent') then raise exception 'role must be coach or parent' using errcode = '22023'; end if;
+  if length(btrim(coalesce(p_full_name, ''))) = 0 then raise exception 'a name is required' using errcode = '22023'; end if;
+  if can_manage_team(v_team) then raise exception 'you are already on the team staff' using errcode = '22023'; end if;
+  if p_role = 'coach' and is_team_member(v_team) then
+    raise exception 'you are already on this team' using errcode = '22023';
+  end if;
+  if exists (select 1 from join_requests where team_id = v_team and user_id = v_uid and status = 'pending') then
+    raise exception 'a request is already waiting for approval' using errcode = '22023';
+  end if;
+  if v_phone is not null and exists (select 1 from profiles where phone = v_phone and id <> v_uid) then
+    raise exception 'this phone number belongs to another account' using errcode = '23505';
+  end if;
+
+  if p_role = 'parent' then
+    if jsonb_typeof(p_children) <> 'array' or jsonb_array_length(p_children) not between 1 and 6 then
+      raise exception 'list one to six children' using errcode = '22023';
+    end if;
+    for c in select * from jsonb_array_elements(p_children) loop
+      if length(btrim(coalesce(c ->> 'full_name', ''))) = 0 then
+        raise exception 'every child needs a name' using errcode = '22023';
+      end if;
+      begin
+        v_birth := (c ->> 'birth_date')::date;
+      exception when others then
+        raise exception 'invalid birth date' using errcode = '22023';
+      end;
+      if v_birth is null or v_birth > current_date or v_birth < current_date - interval '25 years' then
+        raise exception 'invalid birth date' using errcode = '22023';
+      end if;
+      if nullif(btrim(coalesce(c ->> 'email', '')), '') is not null and norm_email(c ->> 'email') is null then
+        raise exception 'invalid child email' using errcode = '22023';
+      end if;
+      if norm_email(c ->> 'email') = (select email from profiles where id = v_uid) then
+        raise exception 'a child needs their own email, not the parent''s' using errcode = '22023';
+      end if;
+      v_children := v_children || jsonb_build_object(
+        'full_name', btrim(c ->> 'full_name'), 'birth_date', v_birth,
+        'email', norm_email(c ->> 'email'), 'phone', norm_phone(c ->> 'phone'));
+    end loop;
+  end if;
+
+  update profiles set full_name = btrim(p_full_name), phone = coalesce(v_phone, phone) where id = v_uid;
+  insert into join_requests (team_id, user_id, role, full_name, phone, children)
+  values (v_team, v_uid, p_role, btrim(p_full_name), v_phone, v_children) returning id into v_id;
+
+  perform notify(join_deciders(v_team, p_role), 'בקשת הצטרפות חדשה',
+    btrim(p_full_name) || case when p_role = 'coach' then ' מבקש/ת להצטרף כאיש צוות ל' else ' (הורה) מבקש/ת להצטרף ל' end
+      || (select name from teams where id = v_team),
+    '/requests');
+  return v_id;
+end $$;
+
+-- p_matches: {"<child index>": "<existing player id on the team>"} to link a child who is already on the roster
+-- instead of creating a new player. p_staff_role labels an approved coach (e.g. team manager).
+create function decide_join_request(p_request uuid, p_approve boolean, p_matches jsonb default '{}',
+  p_staff_role uuid default null) returns void
+language plpgsql security definer set search_path = public as $$
+declare
+  v_uid uuid := require_auth();
+  r join_requests;
+  v_club uuid;
+  c jsonb;
+  i int := 0;
+  v_player uuid;
+begin
+  select * into r from join_requests where id = p_request for update;
+  if not found or r.status <> 'pending' then raise exception 'no pending request' using errcode = 'P0002'; end if;
+  if not can_decide_join(r.team_id, r.role) then raise exception 'not allowed' using errcode = '42501'; end if;
+  select club_id into v_club from teams where id = r.team_id;
+
+  if p_approve then
+    if r.role = 'coach' then
+      if p_staff_role is not null and not lookup_in_domain(p_staff_role, 'staff_role') then
+        raise exception 'unknown staff type' using errcode = '22023';
+      end if;
+      insert into memberships (user_id, club_id, team_id, role, staff_role_id)
+      values (r.user_id, v_club, r.team_id, 'coach', p_staff_role) on conflict do nothing;
+    else
+      for c in select * from jsonb_array_elements(r.children) loop
+        v_player := nullif(coalesce(p_matches, '{}') ->> i::text, '')::uuid;
+        if v_player is not null then
+          if not exists (select 1 from team_players where team_id = r.team_id and player_id = v_player) then
+            raise exception 'matched player is not on this team' using errcode = '22023';
+          end if;
+        else
+          insert into players (club_id, full_name, birth_date, phone, created_by)
+          values (v_club, c ->> 'full_name', (c ->> 'birth_date')::date, c ->> 'phone', v_uid)
+          returning id into v_player;
+          insert into team_players (team_id, player_id) values (r.team_id, v_player);
+        end if;
+        insert into guardianships (parent_id, player_id, requested_by, status, approved_by)
+        values (r.user_id, v_player, r.user_id, 'approved', v_uid)
+        on conflict (parent_id, player_id) do update set status = 'approved', approved_by = v_uid;
+        if c ->> 'email' is not null
+           and not exists (select 1 from players where id = v_player and user_id is not null) then
+          -- An email already used by another player must not block the approval; staff can fix it later.
+          begin
+            perform link_player_email(v_player, c ->> 'email');
+          exception when unique_violation then null;
+          end;
+        end if;
+        i := i + 1;
+      end loop;
+    end if;
+  end if;
+
+  update join_requests set status = case when p_approve then 'approved' else 'rejected' end,
+         decided_by = v_uid, decided_at = now()
+   where id = p_request;
+
+  perform notify(array[r.user_id],
+    case when p_approve then 'הבקשה שלך אושרה' else 'הבקשה שלך נדחתה' end,
+    case when p_approve then 'אפשר להיכנס לקבוצה ' else 'הבקשה להצטרף לקבוצה ' end
+      || (select name from teams where id = r.team_id) || case when p_approve then '' else ' לא אושרה' end,
+    case when p_approve then '/' else '/notifications' end);
+end $$;
+
+-- Pending requests the caller can decide, with what the decision screen needs.
+create function pending_join_requests()
+returns table (id uuid, team_id uuid, team_name text, role text, full_name text, email text, phone text,
+               avatar_path text, children jsonb, created_at timestamptz)
+language sql stable security definer set search_path = public as $$
+  select r.id, r.team_id, t.name, r.role, r.full_name, pr.email, r.phone, pr.avatar_path, r.children, r.created_at
+  from join_requests r join teams t on t.id = r.team_id join profiles pr on pr.id = r.user_id
+  where r.status = 'pending' and can_decide_join(r.team_id, r.role)
+  order by r.created_at
+$$;
+
+-- Own profile.
+create function update_my_profile(p_full_name text, p_phone text default null, p_can_drive boolean default null)
+returns void
+language plpgsql security definer set search_path = public as $$
+declare v_uid uuid := require_auth(); v_phone text := norm_phone(p_phone);
+begin
+  if v_phone is not null and exists (select 1 from profiles where phone = v_phone and id <> v_uid) then
+    raise exception 'this phone number belongs to another account' using errcode = '23505';
+  end if;
+  update profiles set full_name = coalesce(nullif(btrim(p_full_name), ''), full_name),
+         phone = v_phone, can_drive = coalesce(p_can_drive, can_drive)
+   where id = v_uid;
+end $$;
+
+-- A player's details for staff, their parents and the player: the contact fields v_players leaves out.
+create function player_details(p_player uuid)
+returns table (id uuid, full_name text, birth_date date, phone text, photo_path text, photo_consent boolean,
+               account_email text, invite_email text, can_edit boolean, is_parent boolean)
+language sql stable security definer set search_path = public as $$
+  select p.id, p.full_name, p.birth_date, p.phone, p.photo_path, p.photo_consent,
+         (select email from profiles where id = p.user_id),
+         (select i.email from invites i where i.player_id = p.id and i.role = 'player' and i.status = 'pending'
+           order by i.created_at desc limit 1),
+         can_manage_player(p.id) or is_parent_of(p.id),
+         is_parent_of(p.id)
+  from players p
+  where p.id = p_player and (can_manage_player(p.id) or is_parent_of(p.id) or is_self_player(p.id))
+$$;
+
+create function set_player_phone(p_player uuid, p_phone text) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  perform require_auth();
+  if not (can_manage_player(p_player) or is_parent_of(p_player)) then
+    raise exception 'not allowed' using errcode = '42501';
+  end if;
+  update players set phone = norm_phone(p_phone) where id = p_player;
+end $$;
+
+create function update_club_details(p_club uuid, p_phone text, p_address text, p_website text) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  perform require_auth();
+  if not is_club_admin(p_club) then raise exception 'not allowed' using errcode = '42501'; end if;
+  update clubs set phone = norm_phone(p_phone), address = coalesce(btrim(p_address), ''),
+         website = coalesce(btrim(p_website), '')
+   where id = p_club;
+end $$;
+
+revoke execute on function entity_attributes(text, uuid), notify(uuid[], text, text, text), mark_notifications_read(),
+  can_decide_join(uuid, text), join_deciders(uuid, text), create_join_link(uuid), disable_join_link(uuid),
+  join_link_info(text), submit_join_request(text, text, text, text, jsonb),
+  decide_join_request(uuid, boolean, jsonb, uuid), pending_join_requests(),
+  update_my_profile(text, text, boolean), player_details(uuid), set_player_phone(uuid, text),
+  update_club_details(uuid, text, text, text)
+from public, anon;
+grant execute on function entity_attributes(text, uuid), mark_notifications_read(), can_decide_join(uuid, text),
+  create_join_link(uuid), disable_join_link(uuid), join_link_info(text),
+  submit_join_request(text, text, text, text, jsonb), decide_join_request(uuid, boolean, jsonb, uuid),
+  pending_join_requests(), update_my_profile(text, text, boolean), player_details(uuid),
+  set_player_phone(uuid, text), update_club_details(uuid, text, text, text)
+to authenticated;
+-- Supabase also grants new functions to authenticated directly; these are internal (notify would let anyone
+-- message anyone).
+revoke execute on function notify(uuid[], text, text, text), join_deciders(uuid, text) from authenticated;
+
+-- ===== 0024_push.sql =====
+-- Next Team: free Web Push. Each device that allows notifications saves its subscription here; every new row
+-- in notifications (0023) is posted to the send-push Edge Function, which delivers it to the recipient's devices.
+-- Configuration lives in Vault: push_hook_url and push_hook_secret (read by the trigger), vapid_public_key,
+-- vapid_private_key and vapid_subject (read by the function through push_config()). Without them notifications
+-- stay in-app only.
+
+do $$
+begin
+  if exists (select 1 from pg_available_extensions where name = 'pg_net') then
+    create extension if not exists pg_net with schema extensions;
+  else
+    raise notice 'pg_net not available; push hook disabled';
+  end if;
+end $$;
+
+create table push_subscriptions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references profiles (id) on delete cascade,
+  endpoint text not null unique,
+  p256dh text not null,
+  auth text not null,
+  created_at timestamptz not null default now()
+);
+create index push_subscriptions_user_idx on push_subscriptions (user_id);
+alter table push_subscriptions enable row level security;
+create policy push_subscriptions_select on push_subscriptions for select using (user_id = auth.uid());
+grant select on push_subscriptions to authenticated;
+
+-- The Edge Function reads with the service role.
+do $$
+begin
+  if exists (select 1 from pg_roles where rolname = 'service_role') then
+    grant select on notifications to service_role;
+    grant select, delete on push_subscriptions to service_role;
+  end if;
+end $$;
+
+create function save_push_subscription(p_endpoint text, p_p256dh text, p_auth text) returns void
+language plpgsql security definer set search_path = public as $$
+declare v_uid uuid := require_auth();
+begin
+  if coalesce(p_endpoint, '') !~ '^https://' or coalesce(p_p256dh, '') = '' or coalesce(p_auth, '') = '' then
+    raise exception 'invalid subscription' using errcode = '22023';
+  end if;
+  insert into push_subscriptions (user_id, endpoint, p256dh, auth) values (v_uid, p_endpoint, p_p256dh, p_auth)
+  on conflict (endpoint) do update set user_id = v_uid, p256dh = excluded.p256dh, auth = excluded.auth;
+end $$;
+
+create function delete_push_subscription(p_endpoint text) returns void
+language sql security definer set search_path = public as $$
+  delete from push_subscriptions where endpoint = p_endpoint and user_id = auth.uid()
+$$;
+
+create function push_notification() returns trigger
+language plpgsql security definer set search_path = public as $$
+declare v_url text; v_secret text;
+begin
+  if to_regnamespace('net') is null or to_regclass('vault.decrypted_secrets') is null then return new; end if;
+  execute 'select max(decrypted_secret) filter (where name = ''push_hook_url''),
+                  max(decrypted_secret) filter (where name = ''push_hook_secret'')
+             from vault.decrypted_secrets where name in (''push_hook_url'', ''push_hook_secret'')'
+    into v_url, v_secret;
+  if v_url is null or v_secret is null then return new; end if;
+  execute 'select net.http_post(url := $1, body := $2, headers := $3)'
+    using v_url, jsonb_build_object('id', new.id),
+          jsonb_build_object('Content-Type', 'application/json', 'x-hook-secret', v_secret);
+  return new;
+exception when others then
+  raise warning 'push hook failed: %', sqlerrm;
+  return new;
+end $$;
+create trigger notifications_push after insert on notifications
+  for each row execute function push_notification();
+
+-- For the send-push function only (service role): the hook secret and the VAPID keys.
+create function push_config()
+returns table (hook_secret text, vapid_public_key text, vapid_private_key text, vapid_subject text)
+language plpgsql stable security definer set search_path = public as $$
+begin
+  if to_regclass('vault.decrypted_secrets') is null then return; end if;
+  return query execute
+    'select max(decrypted_secret) filter (where name = ''push_hook_secret''),
+            max(decrypted_secret) filter (where name = ''vapid_public_key''),
+            max(decrypted_secret) filter (where name = ''vapid_private_key''),
+            max(decrypted_secret) filter (where name = ''vapid_subject'')
+       from vault.decrypted_secrets';
+end $$;
+
+revoke execute on function save_push_subscription(text, text, text), delete_push_subscription(text),
+  push_notification(), push_config() from public, anon;
+revoke execute on function push_config(), push_notification() from authenticated;
+do $$
+begin
+  if exists (select 1 from pg_roles where rolname = 'service_role') then
+    grant execute on function push_config() to service_role;
+  end if;
+end $$;
+grant execute on function save_push_subscription(text, text, text), delete_push_subscription(text) to authenticated;
+
+-- ===== 0025_push_keys.sql =====
+-- Next Team: the Web Push key pair is made by the send-push function on its first call and kept in Vault, so the
+-- private key never leaves the project. The app reads only the public key, at run time.
+-- One-time setup per project (not a migration, the URL is project specific), run in the SQL editor:
+--   select vault.create_secret('https://<project>.supabase.co/functions/v1/send-push', 'push_hook_url');
+--   select vault.create_secret(replace(gen_random_uuid()::text || gen_random_uuid()::text, '-', ''), 'push_hook_secret');
+-- then open https://<project>.supabase.co/functions/v1/send-push once (a GET makes the keys).
+
+-- Stores the key pair unless one is already stored. Service role only.
+create function push_store_vapid(p_public text, p_private text, p_subject text) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if to_regclass('vault.decrypted_secrets') is null then return; end if;
+  if exists (select 1 from vault.secrets where name = 'vapid_public_key') then return; end if;
+  perform vault.create_secret(p_public, 'vapid_public_key', 'Web Push public key');
+  perform vault.create_secret(p_private, 'vapid_private_key', 'Web Push private key');
+  perform vault.create_secret(p_subject, 'vapid_subject', 'Web Push contact');
+end $$;
+
+create function push_public_key() returns text
+language plpgsql stable security definer set search_path = public as $$
+declare v text;
+begin
+  if to_regclass('vault.decrypted_secrets') is null then return null; end if;
+  execute 'select decrypted_secret from vault.decrypted_secrets where name = ''vapid_public_key''' into v;
+  return v;
+end $$;
+
+revoke execute on function push_store_vapid(text, text, text), push_public_key() from public, anon;
+revoke execute on function push_store_vapid(text, text, text) from authenticated;
+grant execute on function push_public_key() to authenticated;
+do $$
+begin
+  if exists (select 1 from pg_roles where rolname = 'service_role') then
+    grant execute on function push_store_vapid(text, text, text) to service_role;
+  end if;
+end $$;
+
+-- ===== 0026_join_roles_and_email.sql =====
+-- Next Team: a join request names the staff type asked for (coach or team manager), and the people who decide
+-- a join request also get it by email. Notifications marked email = true are posted to the send-email Edge
+-- Function, which sends them through Brevo. One-time setup per project (the URL is project specific), in the
+-- SQL editor:
+--   select vault.create_secret('https://<project>.supabase.co/functions/v1/send-email', 'email_hook_url');
+-- The hook reuses push_hook_secret (0025). The function needs the secrets BREVO_API_KEY, MAIL_FROM (a sender
+-- verified in Brevo) and APP_URL (the site, for the link in the email). Without them notifications stay in-app.
+
+alter table join_requests add column staff_role_id uuid references lookups (id);
+alter table notifications add column email boolean not null default false;
+
+drop function notify(uuid[], text, text, text);
+create function notify(p_users uuid[], p_title text, p_body text, p_url text, p_email boolean default false)
+returns void
+language sql security definer set search_path = public as $$
+  insert into notifications (user_id, title, body, url, email)
+  select distinct u, p_title, coalesce(p_body, ''), coalesce(p_url, '/'), coalesce(p_email, false)
+  from unnest(p_users) u where u is not null
+$$;
+
+-- p_staff_role: for a staff request, the staff type asked for (list staff_role, e.g. head coach, team manager).
+drop function submit_join_request(text, text, text, text, jsonb);
+create function submit_join_request(p_code text, p_role text, p_full_name text, p_phone text default null,
+  p_children jsonb default '[]', p_staff_role uuid default null) returns uuid
+language plpgsql security definer set search_path = public as $$
+declare
+  v_uid uuid := require_auth();
+  v_team uuid;
+  v_children jsonb := '[]';
+  v_phone text := norm_phone(p_phone);
+  c jsonb;
+  v_birth date;
+  v_id uuid;
+  v_as text;
+begin
+  select l.team_id into v_team from join_links l where l.code = p_code and l.active;
+  if v_team is null then raise exception 'this link is no longer active' using errcode = 'P0002'; end if;
+  if p_role not in ('coach', 'parent') then raise exception 'role must be coach or parent' using errcode = '22023'; end if;
+  if length(btrim(coalesce(p_full_name, ''))) = 0 then raise exception 'a name is required' using errcode = '22023'; end if;
+  if can_manage_team(v_team) then raise exception 'you are already on the team staff' using errcode = '22023'; end if;
+  if p_role = 'coach' and is_team_member(v_team) then
+    raise exception 'you are already on this team' using errcode = '22023';
+  end if;
+  if p_role = 'coach' and p_staff_role is not null and not lookup_in_domain(p_staff_role, 'staff_role') then
+    raise exception 'unknown staff type' using errcode = '22023';
+  end if;
+  if exists (select 1 from join_requests where team_id = v_team and user_id = v_uid and status = 'pending') then
+    raise exception 'a request is already waiting for approval' using errcode = '22023';
+  end if;
+  if v_phone is not null and exists (select 1 from profiles where phone = v_phone and id <> v_uid) then
+    raise exception 'this phone number belongs to another account' using errcode = '23505';
+  end if;
+
+  if p_role = 'parent' then
+    if jsonb_typeof(p_children) <> 'array' or jsonb_array_length(p_children) not between 1 and 6 then
+      raise exception 'list one to six children' using errcode = '22023';
+    end if;
+    for c in select * from jsonb_array_elements(p_children) loop
+      if length(btrim(coalesce(c ->> 'full_name', ''))) = 0 then
+        raise exception 'every child needs a name' using errcode = '22023';
+      end if;
+      begin
+        v_birth := (c ->> 'birth_date')::date;
+      exception when others then
+        raise exception 'invalid birth date' using errcode = '22023';
+      end;
+      if v_birth is null or v_birth > current_date or v_birth < current_date - interval '25 years' then
+        raise exception 'invalid birth date' using errcode = '22023';
+      end if;
+      if nullif(btrim(coalesce(c ->> 'email', '')), '') is not null and norm_email(c ->> 'email') is null then
+        raise exception 'invalid child email' using errcode = '22023';
+      end if;
+      if norm_email(c ->> 'email') = (select email from profiles where id = v_uid) then
+        raise exception 'a child needs their own email, not the parent''s' using errcode = '22023';
+      end if;
+      v_children := v_children || jsonb_build_object(
+        'full_name', btrim(c ->> 'full_name'), 'birth_date', v_birth,
+        'email', norm_email(c ->> 'email'), 'phone', norm_phone(c ->> 'phone'));
+    end loop;
+  end if;
+
+  update profiles set full_name = btrim(p_full_name), phone = coalesce(v_phone, phone) where id = v_uid;
+  insert into join_requests (team_id, user_id, role, full_name, phone, children, staff_role_id)
+  values (v_team, v_uid, p_role, btrim(p_full_name), v_phone, v_children,
+          case when p_role = 'coach' then p_staff_role end)
+  returning id into v_id;
+
+  v_as := case when p_role = 'parent' then 'הורה'
+               else coalesce((select name_he from lookups where id = p_staff_role), 'מאמן') end;
+  perform notify(join_deciders(v_team, p_role), 'בקשת הצטרפות חדשה',
+    btrim(p_full_name) || ' מבקש/ת להצטרף כ' || v_as || ' לקבוצה ' || (select name from teams where id = v_team),
+    '/requests', true);
+  return v_id;
+end $$;
+
+-- As in 0023; an approved staff member gets the staff type they asked for unless the decider picks another.
+create or replace function decide_join_request(p_request uuid, p_approve boolean, p_matches jsonb default '{}',
+  p_staff_role uuid default null) returns void
+language plpgsql security definer set search_path = public as $$
+declare
+  v_uid uuid := require_auth();
+  r join_requests;
+  v_club uuid;
+  c jsonb;
+  i int := 0;
+  v_player uuid;
+  v_staff uuid;
+begin
+  select * into r from join_requests where id = p_request for update;
+  if not found or r.status <> 'pending' then raise exception 'no pending request' using errcode = 'P0002'; end if;
+  if not can_decide_join(r.team_id, r.role) then raise exception 'not allowed' using errcode = '42501'; end if;
+  select club_id into v_club from teams where id = r.team_id;
+
+  if p_approve then
+    if r.role = 'coach' then
+      v_staff := coalesce(p_staff_role, r.staff_role_id);
+      if v_staff is not null and not lookup_in_domain(v_staff, 'staff_role') then
+        raise exception 'unknown staff type' using errcode = '22023';
+      end if;
+      insert into memberships (user_id, club_id, team_id, role, staff_role_id)
+      values (r.user_id, v_club, r.team_id, 'coach', v_staff) on conflict do nothing;
+    else
+      for c in select * from jsonb_array_elements(r.children) loop
+        v_player := nullif(coalesce(p_matches, '{}') ->> i::text, '')::uuid;
+        if v_player is not null then
+          if not exists (select 1 from team_players where team_id = r.team_id and player_id = v_player) then
+            raise exception 'matched player is not on this team' using errcode = '22023';
+          end if;
+        else
+          insert into players (club_id, full_name, birth_date, phone, created_by)
+          values (v_club, c ->> 'full_name', (c ->> 'birth_date')::date, c ->> 'phone', v_uid)
+          returning id into v_player;
+          insert into team_players (team_id, player_id) values (r.team_id, v_player);
+        end if;
+        insert into guardianships (parent_id, player_id, requested_by, status, approved_by)
+        values (r.user_id, v_player, r.user_id, 'approved', v_uid)
+        on conflict (parent_id, player_id) do update set status = 'approved', approved_by = v_uid;
+        if c ->> 'email' is not null
+           and not exists (select 1 from players where id = v_player and user_id is not null) then
+          begin
+            perform link_player_email(v_player, c ->> 'email');
+          exception when unique_violation then null;
+          end;
+        end if;
+        i := i + 1;
+      end loop;
+    end if;
+  end if;
+
+  update join_requests set status = case when p_approve then 'approved' else 'rejected' end,
+         decided_by = v_uid, decided_at = now()
+   where id = p_request;
+
+  perform notify(array[r.user_id],
+    case when p_approve then 'הבקשה שלך אושרה' else 'הבקשה שלך נדחתה' end,
+    case when p_approve then 'אפשר להיכנס לקבוצה ' else 'הבקשה להצטרף לקבוצה ' end
+      || (select name from teams where id = r.team_id) || case when p_approve then '' else ' לא אושרה' end,
+    '/', true);
+end $$;
+
+drop function pending_join_requests();
+create function pending_join_requests()
+returns table (id uuid, team_id uuid, team_name text, role text, staff_role_id uuid, full_name text, email text,
+               phone text, avatar_path text, children jsonb, created_at timestamptz)
+language sql stable security definer set search_path = public as $$
+  select r.id, r.team_id, t.name, r.role, r.staff_role_id, r.full_name, pr.email, r.phone, pr.avatar_path,
+         r.children, r.created_at
+  from join_requests r join teams t on t.id = r.team_id join profiles pr on pr.id = r.user_id
+  where r.status = 'pending' and can_decide_join(r.team_id, r.role)
+  order by r.created_at
+$$;
+
+create function email_notification() returns trigger
+language plpgsql security definer set search_path = public as $$
+declare v_url text; v_secret text;
+begin
+  if to_regnamespace('net') is null or to_regclass('vault.decrypted_secrets') is null then return new; end if;
+  execute 'select max(decrypted_secret) filter (where name = ''email_hook_url''),
+                  max(decrypted_secret) filter (where name = ''push_hook_secret'')
+             from vault.decrypted_secrets where name in (''email_hook_url'', ''push_hook_secret'')'
+    into v_url, v_secret;
+  if v_url is null or v_secret is null then return new; end if;
+  execute 'select net.http_post(url := $1, body := $2, headers := $3)'
+    using v_url, jsonb_build_object('id', new.id),
+          jsonb_build_object('Content-Type', 'application/json', 'x-hook-secret', v_secret);
+  return new;
+exception when others then
+  raise warning 'email hook failed: %', sqlerrm;
+  return new;
+end $$;
+create trigger notifications_email after insert on notifications
+  for each row when (new.email) execute function email_notification();
+
+-- For the send-email function only (service role): the notification, its recipient's address and the hook secret.
+create function notification_email(p_id uuid)
+returns table (email text, full_name text, title text, body text, url text, hook_secret text)
+language plpgsql stable security definer set search_path = public as $$
+begin
+  return query
+  select pr.email, pr.full_name, n.title, n.body, n.url, (select hook_secret from push_config())
+  from notifications n join profiles pr on pr.id = n.user_id
+  where n.id = p_id and n.email;
+end $$;
+
+revoke execute on function notify(uuid[], text, text, text, boolean),
+  submit_join_request(text, text, text, text, jsonb, uuid), pending_join_requests(), email_notification(),
+  notification_email(uuid)
+from public, anon;
+grant execute on function submit_join_request(text, text, text, text, jsonb, uuid), pending_join_requests()
+to authenticated;
+revoke execute on function notify(uuid[], text, text, text, boolean), email_notification(), notification_email(uuid)
+from authenticated;
+do $$
+begin
+  if exists (select 1 from pg_roles where rolname = 'service_role') then
+    grant execute on function notification_email(uuid) to service_role;
+  end if;
+end $$;

@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { supabase } from '../../lib/supabase';
+import { isDemo, supabase } from '../../lib/supabase';
 import { q, rpc, useAction, useLoad, ageOf } from '../../lib/db';
 import { normEmail } from '../../lib/email';
 import { Card, Empty, ErrorText, Field } from '../../components/ui';
 import { PersonAvatar, PlayerAvatar, ShirtNo, useNames, useShirtNumbers } from '../../components/People';
 import { TeamStaff } from '../../components/Staff';
+import { JoinLinkCard } from '../../components/JoinLink';
 import type { TeamTabProps } from './TeamPage';
 
 interface Pending { id: string; parent_id: string; player_id: string }
@@ -39,6 +40,7 @@ export default function SquadTab({ team, players, canManage, reload }: TeamTabPr
 
   return (
     <>
+      {canManage && !isDemo && <JoinLinkCard teamId={team.id} teamName={team.name} />}
       <TeamStaff teamId={team.id} canManage={canManage} />
       <h3 className="section-title">שחקנים ({players.length})</h3>
       {!players.length && <Empty>אין עדיין שחקנים בקבוצה.</Empty>}

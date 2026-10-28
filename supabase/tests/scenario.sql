@@ -522,6 +522,56 @@ reset role;
 select t.check('deleting the club removed its teams and players',
   not exists (select 1 from teams where club_id = t.id('club')) and not exists (select 1 from players where club_id = t.id('club')));
 
+-- ---------------------------------------------------------------- join link with a staff type, transport
+reset role;
+insert into auth.users (email) values ('j01@test.io'), ('j02@test.io'), ('j03@test.io'), ('j04@test.io');
+select t.reg('JA', 'j01@test.io'), t.reg('JM', 'j02@test.io'), t.reg('JP', 'j03@test.io'), t.reg('JO', 'j04@test.io');
+set role authenticated;
+select t.as_user('S');
+insert into t.ctx select 'jclub', create_club('מועדון הצטרפות', 'j01@test.io');
+select t.as_user('JA');
+insert into t.ctx select 'JT', create_team(t.id('jclub'), 'ילדים ג', (select id from sports where slug = 'football'));
+create temp table jl as select create_join_link(t.id('JT')) as code;
+select t.as_user('JM');
+select t.check('a stranger sees the team behind the link', (select my_status from join_link_info((select code from jl))) = 'none');
+select t.denied('an unknown staff type is refused',
+  $$select submit_join_request((select code from jl), 'coach', 'מנהל', null, '[]', t.lk('absence_reason', 'illness'))$$);
+insert into t.ctx select 'jreq', submit_join_request((select code from jl), 'coach', 'מנהלת קבוצה', null, '[]', t.lk('staff_role', 'team_manager'));
+select t.check('the link now says the request is pending', (select my_status from join_link_info((select code from jl))) = 'pending');
+reset role;
+select t.check('the club admin is told by email', exists (select 1 from notifications
+  where user_id = t.id('JA') and email and body like '%מנהל קבוצה%'));
+set role authenticated;
+select t.as_user('JA');
+select t.check('the club admin sees the staff type asked for',
+  (select staff_role_id from pending_join_requests() where id = t.id('jreq')) = t.lk('staff_role', 'team_manager'));
+select decide_join_request(t.id('jreq'), true);
+reset role;
+select t.check('approved as team manager', exists (select 1 from memberships where user_id = t.id('JM')
+  and team_id = t.id('JT') and role = 'coach' and staff_role_id = t.lk('staff_role', 'team_manager')));
+select t.check('the requester is told by email', exists (select 1 from notifications where user_id = t.id('JM') and email));
+set role authenticated;
+select t.as_user('JP');
+insert into t.ctx select 'jreq2', submit_join_request((select code from jl), 'parent', 'הורה', null,
+  '[{"full_name": "ילד", "birth_date": "2016-05-01"}]');
+reset role;
+select t.check('the team manager is told of a parent request', exists (select 1 from notifications
+  where user_id = t.id('JM') and email and title = 'בקשת הצטרפות חדשה'));
+set role authenticated;
+select t.as_user('JM');
+select decide_join_request(t.id('jreq2'), true);
+insert into t.ctx select 'jkid', (select player_id from team_players where team_id = t.id('JT') limit 1);
+insert into t.ctx select 'jev', create_event(t.id('JT'), t.lk('event_type', 'match'), 'משחק', now() + interval '2 days');
+select set_event_transport(t.id('jev'), true);
+select t.as_user('JP');
+select set_transport_seats(t.id('jev'), 0, t.id('jkid'));
+select t.check('a parent says "not interested" (0 seats)', (select seats from event_transport_list(t.id('jev')) where player_id = t.id('jkid')) = 0);
+select set_transport_seats(t.id('jev'), 3, t.id('jkid'));
+select t.check('a parent sets the number of passengers', event_transport_total(t.id('jev')) = 3);
+select t.as_user('JO');
+select t.denied('an outsider cannot set seats', $$select set_transport_seats(t.id('jev'), 1, t.id('jkid'))$$);
+reset role;
+
 -- ---------------------------------------------------------------- summary
 reset role;
 select case when count(*) filter (where not ok) = 0

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { supabase } from '../../lib/supabase';
+import { isDemo, supabase } from '../../lib/supabase';
 import { q, rpc, useAction, useLoad } from '../../lib/db';
 import { teamAllowsPlayerAnswers } from '../../lib/team';
 import { useAuth } from '../../auth/AuthProvider';
@@ -13,6 +13,7 @@ import { LineupPitch } from '../../components/LineupPitch';
 import { EventDashboard } from '../../components/EventDashboard';
 import { KitSelect } from '../../components/Kit';
 import { EquipmentPicker } from '../../components/Equipment';
+import { TransportCard } from '../../components/Transport';
 import type { EntityRole, EventResponse, EventRow, EventStat, Player, Team, TeamKit } from '../../lib/types';
 
 // ISO time -> the value a datetime-local input expects, in the viewer's local time.
@@ -145,6 +146,11 @@ export default function EventPage() {
       {isMatch && (
         <AttributesPanel scope="event" entityId={event.id} myRoles={myRoles} clubId={team.club_id} teamIds={[team.id]} sportIds={[team.sport_id]} title="שיטת משחק"
           onSaved={() => setLineupKey((k) => k + 1)} />
+      )}
+
+      {!isDemo && (
+        <TransportCard event={event} players={players} responses={responses} canManage={canManage} myId={auth.profile?.id ?? ''}
+          myKids={acting === 'parent' ? myKids : []} isStaff={canManage && acting !== 'system_admin'} onToggled={reload} />
       )}
 
       <Card title="אישורי הגעה">

@@ -73,7 +73,15 @@ button.danger:hover:not(:disabled) { background: #fef2f2; border-color: var(--da
   position: relative; display: flex; gap: 1rem; align-items: center; padding: 1.1rem; border-radius: 20px; color: #fff;
   background: linear-gradient(135deg, #1e40af, #2563eb 55%, #60a5fa); box-shadow: 0 10px 30px rgba(37, 99, 235, 0.25); overflow: hidden;
 }
-.event-hero.match .event-hero-top { background: linear-gradient(135deg, #312e81, #4f46e5 55%, #818cf8); box-shadow: 0 10px 30px rgba(79, 70, 229, 0.25); }
+/* a match: a stadium at night behind the text, darkened on the text side (the right, in RTL) */
+.event-hero.match .event-hero-top { background: #040814; box-shadow: 0 10px 30px rgba(4, 8, 20, 0.35); min-height: 9.5rem; }
+.event-hero.match .event-hero-top::after {
+  inset: 0; width: auto; height: auto; border-radius: 0;
+  background: linear-gradient(to left, rgba(4, 8, 20, 0.82), rgba(4, 8, 20, 0.45) 60%, rgba(4, 8, 20, 0.2));
+}
+.stadium-art { position: absolute; inset: 0; width: 100%; height: 100%; }
+.event-hero.match .date-badge, .event-hero.match .score { position: relative; z-index: 1; }
+.event-hero.match .event-hero-text h2, .event-hero.match .score { text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6); }
 .event-hero-top::after {
   content: ''; position: absolute; inset-inline-end: -40px; top: -40px; width: 160px; height: 160px; border-radius: 50%;
   background: rgba(255, 255, 255, 0.08);
@@ -472,3 +480,24 @@ legend { font-weight: 600; font-size: 0.9rem; padding: 0 0.35rem; }
 .league-table th { text-align: start; color: var(--muted); font-weight: 600; padding: 0.4rem; border-bottom: 1px solid var(--border-strong); white-space: nowrap; }
 .league-table td { padding: 0.45rem 0.4rem; border-bottom: 1px solid var(--border); white-space: nowrap; }
 .league-table tr.ours td { background: var(--primary-soft); color: var(--primary); font-weight: 700; }
+
+/* ---- transport ---- */
+.transport-total { display: flex; align-items: baseline; gap: 0.5rem; padding: 0.6rem 0.9rem; margin-bottom: 0.5rem; border-radius: var(--radius); background: var(--primary-soft); }
+.transport-total strong { font-size: 1.8rem; color: var(--primary); }
+.transport-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.6rem 0; border-bottom: 1px solid var(--border); }
+.seat-picker { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; }
+.stepper { display: inline-flex; align-items: center; gap: 0.4rem; }
+.stepper button { width: 2.4rem; min-height: 2.4rem; padding: 0; font-size: 1.15rem; }
+.stepper output { min-width: 2ch; text-align: center; font-weight: 700; font-size: 1.1rem; }
+
+/* ---- join link ---- */
+.join-body > .card + .card, .join-body > .card + .stack { margin-top: 0.85rem; }
+.role-choice { display: grid; gap: 0.6rem; }
+.role-option {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 0.1rem; text-align: start;
+  background: var(--surface); color: var(--text); border: 1.5px solid var(--border-strong);
+}
+.role-option:hover:not(:disabled) { background: var(--primary-soft); border-color: var(--primary); }
+.role-option.on { background: var(--primary-soft); border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-ring); }
+.role-option small { color: var(--muted); font-weight: 400; }
+.join-child { padding: 0.5rem 0 0.75rem; border-bottom: 1px solid var(--border); margin-bottom: 0.5rem; }

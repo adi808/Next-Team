@@ -1,9 +1,10 @@
 import { useEffect } from 'react';
-import { Link, Navigate, NavLink, Outlet, useParams } from 'react-router-dom';
+import { Link, Navigate, NavLink, Outlet, useLocation, useParams } from 'react-router-dom';
 import { Picture } from './Picture';
 import { Icon, type IconName } from './Icon';
 import { useAuth } from '../auth/AuthProvider';
 import type { Mode } from '../lib/types';
+import { PendingRequestsBanner } from '../pages/RequestsPage';
 
 const NAV: Record<Mode, { to: string; label: string; icon: IconName }[]> = {
   sysadmin: [{ to: 'clubs', label: 'מועדונים', icon: 'shield' }, { to: 'lists', label: 'רשימות', icon: 'list' }],
@@ -29,6 +30,7 @@ export default function Shell() {
   const { modes, profile, signOut } = useAuth();
   const m = mode as Mode;
   const valid = modes.includes(m);
+  const { pathname } = useLocation();
 
   useEffect(() => {
     if (valid) try { localStorage.setItem('mode', m); } catch { /* storage may be unavailable */ }
@@ -45,7 +47,10 @@ export default function Shell() {
         </Link>
         <button className="link" onClick={signOut}>יציאה</button>
       </header>
-      <main><Outlet /></main>
+      <main>
+        {(m === 'coach' || m === 'admin' || m === 'sysadmin') && !pathname.endsWith('/requests') && <PendingRequestsBanner key={pathname} />}
+        <Outlet />
+      </main>
       <nav className="bottom-nav" aria-label="ניווט">
         {NAV[m].map((n) => (
           <NavLink key={n.to} to={`/m/${m}/${n.to}`} className={({ isActive }) => (isActive ? 'active' : '')}>

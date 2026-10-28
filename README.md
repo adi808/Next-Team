@@ -21,6 +21,9 @@ Built: everything in the business spec except features marked "proposed" there.
 | Lineup | on a football match the staff see a pitch sketch: players placed by the formation and their position, with photo and shirt number; tap to swap, save (`event_lineups`) |
 | Staff and parents | staff type per membership (list `staff_role`: team manager, head coach, assistant, fitness, secretary, medic; a label only, every team staff member has the coach's permissions), shown to the whole team; a parent's relation to the child (list `guardian_relation`: mom, dad, guardian) |
 | League | team parameter `league_url` (the team's page on football.org.il); the team's "league" tab shows the league table and fixtures, read by the `league` Edge Function (`supabase/functions/league`) |
+| Transport | staff turn on transport (הסעה) for an event; a parent answers per child "not interested" or the number of passengers, staff for themselves; everyone sees the total, staff see who travels (`event_transport`) |
+| Join link | one link per team (`join_links`); a signed-in member is recognised, anyone else picks coach / team manager / parent (with children) and sends a request; the club admin decides staff, the team's staff decide parents (`join_requests`, Requests screen) |
+| Notifications | in-app list, Web Push (`send-push`) and, for join requests and their answers, email through Brevo (`send-email`) |
 
 ### Generic by design
 * `lookups` - every "choose from a list" value (event types, absence reasons, match formats, formations, stat types). New values and new lists need no code (`upsert_lookup`, Lists screen). Dependent lists use `parent_id`; sport- and club-specific values use `sport_id` / `club_id`.

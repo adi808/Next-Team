@@ -112,6 +112,7 @@ export interface EventRow {
   kit_id: string | null;
   series_id: string | null;
   equipment: string[];
+  has_transport: boolean;
 }
 export interface TeamKit {
   id: string;

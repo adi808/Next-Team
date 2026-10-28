@@ -26,3 +26,10 @@ auth_token = "env(TWILIO_AUTH_TOKEN)"
 # Local development: fixed code for a test number (E.164, no +).
 [auth.sms.test_otp]
 972500000000 = "123456"
+
+# Called by the notifications_push / notifications_email triggers with a shared secret header, not a user JWT.
+[functions.send-push]
+verify_jwt = false
+
+[functions.send-email]
+verify_jwt = false
