@@ -55,7 +55,7 @@ export function AuthProvider({ children: kids }: { children: ReactNode }) {
     (async () => {
       const [p, m, g, players] = await Promise.all([
         q<Profile>(supabase.from('profiles').select('*').eq('id', userId).single()),
-        q<Membership[]>(supabase.from('memberships').select('id, club_id, team_id, role').eq('user_id', userId)),
+        q<Membership[]>(supabase.from('memberships').select('id, club_id, team_id, role, staff_role_id').eq('user_id', userId)),
         q<{ player_id: string }[]>(
           supabase.from('guardianships').select('player_id').eq('parent_id', userId).eq('status', 'approved')),
         q<Player[]>(supabase.from('v_players').select('*')),

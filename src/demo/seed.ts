@@ -34,7 +34,7 @@ export function seed(): Tables {
     lk('eq_shoes', 'equipment', 'נעלי ספורט', 4), lk('eq_ball', 'equipment', 'כדור', 5), lk('eq_towel', 'equipment', 'מגבת', 6),
     lk('eq_snack', 'equipment', 'כריך / פרי', 7), lk('eq_gloves', 'equipment', 'כפפות שוער', 8),
     lk('rel_mother', 'guardian_relation', 'אמא', 1), lk('rel_father', 'guardian_relation', 'אבא', 2), lk('rel_guardian', 'guardian_relation', 'אפוטרופוס', 3),
-    lk('sr_head', 'staff_role', 'מאמן ראשי', 1), lk('sr_assist', 'staff_role', 'עוזר מאמן', 2), lk('sr_fitness', 'staff_role', 'מנהל כושר', 3),
+    lk('sr_manager', 'staff_role', 'מנהל קבוצה', 0), lk('sr_head', 'staff_role', 'מאמן ראשי', 1), lk('sr_assist', 'staff_role', 'עוזר מאמן', 2), lk('sr_fitness', 'staff_role', 'מנהל כושר', 3),
     lk('sr_secretary', 'staff_role', 'מזכירה', 4), lk('sr_medic', 'staff_role', 'חובש', 5),
   ];
   [['4-3-3', 'fm11'], ['4-4-2', 'fm11'], ['3-5-2', 'fm11'], ['4-2-3-1', 'fm11'], ['3-3-2', 'fm9'], ['3-2-3', 'fm9'], ['2-3-1', 'fm7'], ['3-2-1', 'fm7'], ['2-2', 'fm5'], ['1-2-1', 'fm5']]

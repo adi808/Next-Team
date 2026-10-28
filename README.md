@@ -19,7 +19,7 @@ Built: everything in the business spec except features marked "proposed" there.
 | Chat | team channel (staff and parents write, players read) and personal coach-player chat (parents see all of it, club admin does not) |
 | Home dashboards | coach, parent and player see the nearest event and, below it, the nearest event of another type (e.g. training, then a match) |
 | Lineup | on a football match the staff see a pitch sketch: players placed by the formation and their position, with photo and shirt number; tap to swap, save (`event_lineups`) |
-| Staff and parents | staff type per membership (list `staff_role`: head coach, assistant, fitness, secretary, medic), shown to the whole team; a parent's relation to the child (list `guardian_relation`: mom, dad, guardian) |
+| Staff and parents | staff type per membership (list `staff_role`: team manager, head coach, assistant, fitness, secretary, medic; a label only, every team staff member has the coach's permissions), shown to the whole team; a parent's relation to the child (list `guardian_relation`: mom, dad, guardian) |
 | League | team parameter `league_url` (the team's page on football.org.il); the team's "league" tab shows the league table and fixtures, read by the `league` Edge Function (`supabase/functions/league`) |
 
 ### Generic by design
