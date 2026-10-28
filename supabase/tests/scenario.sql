@@ -340,6 +340,21 @@ select t.as_user('P3');
 select t.check('after approval the parent sees the child and the team', (select count(*) from v_players) >= 2
   and (select count(*) from events) = 2);
 
+-- ---------------------------------------------------------------- linking to yourself (testers only)
+select t.as_user('U2');
+select t.denied('a user cannot link to themselves', $$select request_guardianship('u06@test.io', false)$$);
+reset role;
+update players set user_id = t.id('S') where id = t.id('K1');            -- the system admin also has a player profile
+set role authenticated;
+select t.as_user('S');
+select request_guardianship('u01@test.io', true);
+select t.check('a system admin may link to themselves for testing',
+  exists (select 1 from guardianships where parent_id = t.id('S') and player_id = t.id('K1') and status = 'pending'));
+reset role;
+update players set user_id = null where id = t.id('K1');
+delete from guardianships where parent_id = t.id('S');
+set role authenticated;
+
 -- ---------------------------------------------------------------- catalogs
 select t.as_user('A');
 select upsert_lookup(null, 'absence_reason', 'exam', 'מבחן', null, null, null, t.id('club'), 7);
