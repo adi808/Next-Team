@@ -261,6 +261,7 @@ export class DemoServer {
       const email = String(a.p_other_email ?? '').trim().toLowerCase();
       const other = this.t.profiles.find((p) => p.email === email);
       if (!other) throw new PgError('P0002', 'no user with this email');
+      if (other.id === this.uid && !this.sys) this.bad('cannot link to yourself');
       const player = a.p_as_parent ? this.t.players.find((p) => p.user_id === other.id) : this.t.players.find((p) => p.user_id === this.uid);
       if (!player) throw new PgError('P0002', 'the player side has no player profile');
       const id = this.id('g');
