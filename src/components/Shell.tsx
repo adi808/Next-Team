@@ -1,9 +1,9 @@
 import { useEffect } from 'react';
-import { Link, Navigate, NavLink, Outlet, useNavigate, useParams } from 'react-router-dom';
+import { Link, Navigate, NavLink, Outlet, useParams } from 'react-router-dom';
 import { Picture } from './Picture';
 import { Icon, type IconName } from './Icon';
 import { useAuth } from '../auth/AuthProvider';
-import { MODE_LABELS, type Mode } from '../lib/types';
+import type { Mode } from '../lib/types';
 
 const NAV: Record<Mode, { to: string; label: string; icon: IconName }[]> = {
   sysadmin: [{ to: 'clubs', label: 'מועדונים', icon: 'shield' }, { to: 'lists', label: 'רשימות', icon: 'list' }],
@@ -23,22 +23,6 @@ const NAV: Record<Mode, { to: string; label: string; icon: IconName }[]> = {
 };
 
 export const homeOf = (m: Mode) => `/m/${m}/${NAV[m][0].to}`;
-
-/** Switching between the roles one account holds (coach / parent / player ...); shown only on the profile page,
- * since each screen already follows the role's permissions. */
-export function ModeSwitch() {
-  const { mode } = useParams();
-  const { modes } = useAuth();
-  const navigate = useNavigate();
-  if (modes.length < 2) return null;
-  return (
-    <div className="segment mode-switch" role="tablist" aria-label="מצב">
-      {modes.map((m) => (
-        <button key={m} role="tab" aria-selected={m === mode} onClick={() => m !== mode && navigate(homeOf(m))}>{MODE_LABELS[m]}</button>
-      ))}
-    </div>
-  );
-}
 
 export default function Shell() {
   const { mode } = useParams();

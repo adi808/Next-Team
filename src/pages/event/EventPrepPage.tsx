@@ -20,6 +20,7 @@ export default function EventPrepPage() {
   const acting = useActingRole();
   const types = useLookups('event_type', { includeInactive: true });
   const positions = useLookups('position', { includeInactive: true });
+  const kinds = useLookups('player_kind', { includeInactive: true });
   const [showList, setShowList] = useState(false);
   const { data, loading, error } = useLoad(async () => {
     const event = await q<EventRow>(supabase.from('events').select('*').eq('id', eventId).single());
@@ -49,15 +50,23 @@ export default function EventPrepPage() {
   const scope = { clubId: team.club_id, teamIds: [team.id], sportIds: [team.sport_id], roles: acting ? [acting] : [] };
   const visible = defsFor(defs, scope);
   const posDef = visible.find((d) => d.key === 'position');
+  const kindDef = visible.find((d) => d.key === 'player_kind');
   const scaleDefs = visible.filter((d) => d.data_type === 'scale');
   const positionOf = (pid: string) => {
     if (!posDef) return undefined;
     const v = values.find((x) => x.def_id === posDef.id && x.entity_id === pid)?.value; // values are newest first
     return positions.find((l) => l.id === v);
   };
+  const kindOf = (pid: string) => {
+    if (!kindDef) return undefined;
+    const v = values.find((x) => x.def_id === kindDef.id && x.entity_id === pid)?.value;
+    return kinds.find((l) => l.id === v);
+  };
+  // field player / goalkeeper decides; otherwise a goalkeeper position does
+  const isKeeper = (pid: string) => { const k = kindOf(pid); return k ? !!k.meta?.goalkeeper : !!positionOf(pid)?.meta?.goalkeeper; };
   const scoreOf = (pid: string) => average(latestRatings(scaleDefs, values, pid).map((r) => r.score));
 
-  const keepers = coming.filter((p) => positionOf(p.id)?.meta?.goalkeeper).length;
+  const keepers = coming.filter((p) => isKeeper(p.id)).length;
   const sportPositions = positions.filter((l) => l.sport_id === team.sport_id && l.active);
   const byPosition = sportPositions.map((l) => ({ l, n: coming.filter((p) => positionOf(p.id)?.id === l.id).length }));
   const noPosition = coming.filter((p) => !positionOf(p.id)).length;
@@ -83,7 +92,7 @@ export default function EventPrepPage() {
       <Card title="פילוח לפי תפקידים">
         {posDef ? (
           <>
-            {sportPositions.some((l) => l.meta?.goalkeeper) && (
+            {(!!kindDef || sportPositions.some((l) => l.meta?.goalkeeper)) && (
               <StatTiles items={[
                 { label: 'שוערים', value: keepers, tone: 'info' },
                 { label: 'שחקני שדה', value: coming.length - keepers, tone: 'info' },
@@ -91,11 +100,11 @@ export default function EventPrepPage() {
             )}
             <div className="position-grid">
               {byPosition.map(({ l, n }) => <div key={l.id} className="position-chip"><strong>{n}</strong><span>{l.name_he}</span></div>)}
-              {noPosition > 0 && <div className="position-chip muted"><strong>{noPosition}</strong><span>ללא עמדה</span></div>}
+              {noPosition > 0 && <div className="position-chip muted"><strong>{noPosition}</strong><span>ללא תפקיד</span></div>}
             </div>
-            {noPosition > 0 && <small className="muted">את העמדה של כל שחקן קובעים בפרופיל השחקן.</small>}
+            {noPosition > 0 && <small className="muted">את התפקיד של כל שחקן קובעים בפרופיל השחקן.</small>}
           </>
-        ) : <Empty>אין פרמטר עמדה לענף הזה.</Empty>}
+        ) : <Empty>אין פרמטר תפקיד לענף הזה.</Empty>}
       </Card>
 
       <Card title="ציון משוקלל של הסגל הזמין">

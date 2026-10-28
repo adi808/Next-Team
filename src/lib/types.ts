@@ -110,6 +110,7 @@ export interface EventRow {
   their_score: number | null;
   kit_id: string | null;
   series_id: string | null;
+  equipment: string[];
 }
 export interface TeamKit {
   id: string;

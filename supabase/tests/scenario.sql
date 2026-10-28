@@ -401,6 +401,24 @@ select t.denied('a parent cannot set the position', $$select set_attribute((sele
 select t.as_user('O');
 select t.check('an outsider does not see goals', not exists (select 1 from player_goals));
 
+-- ---------------------------------------------------------------- what to bring, player kind and strong foot
+set role authenticated;
+select t.as_user('C');
+select set_event_equipment((select id from events where team_id = t.id('T1') limit 1),
+  array[t.lk('equipment', 'water'), t.lk('equipment', 'boots'), t.lk('equipment', 'water')]);
+select t.check('the coach picks several items to bring (no duplicates)',
+  (select cardinality(equipment) from events where team_id = t.id('T1') and cardinality(equipment) > 0 limit 1) = 2);
+select t.denied('only items from the equipment list', $$select set_event_equipment((select id from events where team_id = t.id('T1') limit 1), array[t.lk('event_type', 'training')])$$);
+select set_attribute((select id from attribute_defs where key = 'player_kind'), t.id('K1'), to_jsonb(t.lk('player_kind', 'goalkeeper')::text));
+select set_attribute((select id from attribute_defs where key = 'strong_foot'), t.id('K1'), '"שמאל"');
+select t.check('the coach sets goalkeeper and strong foot',
+  (select count(*) from attribute_current where entity_id = t.id('K1')
+     and def_id in (select id from attribute_defs where key in ('player_kind', 'strong_foot'))) = 2);
+select t.denied('strong foot is right or left only', $$select set_attribute((select id from attribute_defs where key = 'strong_foot'), t.id('K1'), '"שתיים"')$$);
+select t.as_user('P1');
+select t.denied('a parent cannot choose what to bring', $$select set_event_equipment((select id from events where team_id = t.id('T1') limit 1), '{}')$$);
+select t.check('the parent sees what to bring', exists (select 1 from events where cardinality(equipment) = 2));
+
 -- ---------------------------------------------------------------- kits and recurring events
 set role authenticated;
 select t.as_user('C');

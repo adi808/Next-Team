@@ -31,6 +31,9 @@ const out = (ok, label, extra) => { if (!ok) fails++; console.log(`${ok ? 'PASS'
   await p.click('button:has-text("אבי כץ")'); await wait(1500);
   await has('coach lands on home with the next event', 'שלום, אבי', 'האירוע הבא', 'אימון קבוצתי', 'מגיעים', 'טרם השיבו', 'הכנה לאירוע'); await shot('coach-home');
   await hasNot('coach does not see the other coach team', 'נוער כדורסל');
+  await p.click('text=לפרטי האירוע'); await wait(1000);
+  await has('event shows what to bring', 'מה להביא', 'בקבוק מים', 'נעלי כדורגל', 'מגני שוקיים'); await shot('event');
+  await p.click('.bottom-nav >> text=בית'); await wait(1000);
   await p.click('text=הכנה לאירוע'); await wait(1000);
   await has('event prep: positions and team score', 'הכנה לאירוע', 'פילוח לפי תפקידים', 'שוערים', 'שחקני שדה', 'ציון משוקלל'); await shot('prep');
   await p.click('button:has-text("רשימת השחקנים")'); await wait(400);
@@ -46,7 +49,7 @@ const out = (ok, label, extra) => { if (!ok) fails++; console.log(`${ok ? 'PASS'
   await p.click('button:has-text("אישור")'); await wait(700);
   await hasNot('approving the request clears it', 'בקשות קישור');
   await p.click('text=דני כהן'); await wait(1000);
-  await has('player page: profile tabs and medical info', 'פרופיל שחקן', 'פרטים', 'הערכה', 'יעדים', 'אלרגיה', 'בוטנים', 'עמדה', 'קישור');
+  await has('player page: profile tabs and medical info', 'פרופיל שחקן', 'פרטים', 'הערכה', 'יעדים', 'אלרגיה', 'בוטנים', 'תפקיד ברירת מחדל', 'קישור', 'שחקן שדה', 'רגל חזקה', 'שמאל');
   await p.click('role=tab[name="הערכה"]'); await wait(700);
   await has('player rating: latest average and bars', 'הערכה מקצועית אחרונה', '7.7/10', 'שליטה בכדור', '8/10'); await shot('player');
   await p.click('role=tab[name="יעדים"]'); await wait(700);
@@ -82,16 +85,17 @@ const out = (ok, label, extra) => { if (!ok) fails++; console.log(`${ok ? 'PASS'
   await pick('רוני לוי');
   await has('player lands on events', 'אירועים קרובים', 'רוני לוי');
   await p.click('role=navigation >> text=אירועים'); await wait(800); await has('player events with attendance buttons (team allows it)', 'אימון קבוצתי', 'לימודים');
-  await p.click('role=navigation >> text=משימות'); await wait(700); await has('player tasks', '100 הרמות כדור'); await hasNot('player does not see parent tasks', 'משימה להורה');
+  await p.click('role=navigation >> text=משימות'); await wait(700); await has('player tasks: a done task earns a medal', '100 הרמות כדור', 'קיבלת מדליה', '🏅'); await shot('medal'); await hasNot('player does not see parent tasks', 'משימה להורה');
 
   // club admin who is also a parent: mode picker
   await pick('רונית מזרחי');
-  await has('mode picker for a user with two roles', 'איך נכנסים?', 'מנהל מועדון', 'הורה');
+  await has('mode picker for a user with two roles', 'איך נכנסים היום?', 'מנהל מועדון', 'הורה');
   await p.click('button:has-text("מנהל מועדון")'); await wait(900); await has('admin sees the club', 'מכבי הצפון');
   await p.click('text=מכבי הצפון'); await wait(900); await has('club teams for the admin', 'ילדים ב׳', 'נוער כדורסל'); await shot('club');
   await hasNot('no role strip on regular screens', 'החלפת תפקיד');
   await p.click('.topbar .who'); await wait(700); await has('role switch lives on the profile page', 'החלפת תפקיד');
-  await p.click('.mode-switch button:has-text("הורה")'); await wait(900); await has('switched to parent mode', 'נועה מזרחי');
+  await p.click('text=החלפת תפקיד'); await wait(700); await has('back on the entry screen', 'איך נכנסים היום?');
+  await p.click('.role-card:has-text("הורה")'); await wait(900); await has('switched to parent mode', 'נועה מזרחי');
 
   // system admin
   await pick('יוסי אברהם');

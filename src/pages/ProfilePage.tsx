@@ -5,7 +5,7 @@ import { uploadImage } from '../lib/images';
 import { useAuth } from '../auth/AuthProvider';
 import { Card, ErrorText, Field, PageHero } from '../components/ui';
 import { Picture, PicturePicker } from '../components/Picture';
-import { ModeSwitch } from '../components/Shell';
+import { Link } from 'react-router-dom';
 
 export default function ProfilePage() {
   const { profile, reload, modes } = useAuth();
@@ -32,7 +32,7 @@ export default function ProfilePage() {
   return (
     <>
       <PageHero kicker="חשבון" title="הפרופיל שלי" />
-      {modes.length > 1 && <Card title="החלפת תפקיד"><ModeSwitch /></Card>}
+      {modes.length > 1 && <Link className="button-link soft block" to="/pick">החלפת תפקיד</Link>}
       <Card>
         <div className="profile-card">
           <Picture bucket="avatars" path={profile.avatar_path} name={profile.full_name || profile.email || '?'} size={96} />

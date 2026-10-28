@@ -11,6 +11,7 @@ import { AttendanceWidget } from '../../components/Attendance';
 import { LookupSelect, useLookupName, useLookups } from '../../components/Lookups';
 import { EventDashboard } from '../../components/EventDashboard';
 import { KitSelect } from '../../components/Kit';
+import { EquipmentPicker } from '../../components/Equipment';
 import type { EntityRole, EventResponse, EventRow, EventStat, Player, Team, TeamKit } from '../../lib/types';
 
 // ISO time -> the value a datetime-local input expects, in the viewer's local time.
@@ -41,7 +42,7 @@ export default function EventPage() {
   const act = useAction();
   const acting = useActingRole();
   const [edit, setEdit] = useState(false);
-  const [f, setF] = useState({ title: '', starts: '', location: '', notes: '', opponent: '', our: '', their: '', kit: null as string | null });
+  const [f, setF] = useState({ title: '', starts: '', location: '', notes: '', opponent: '', our: '', their: '', kit: null as string | null, equipment: [] as string[] });
   const [statPlayer, setStatPlayer] = useState('');
   const [statType, setStatType] = useState<string | null>(null);
   const [minute, setMinute] = useState('');
@@ -67,7 +68,7 @@ export default function EventPage() {
   function startEdit() {
     setF({
       title: event.title, starts: toLocalInput(event.starts_at), location: event.location, notes: event.notes,
-      opponent: event.opponent ?? '', our: event.our_score?.toString() ?? '', their: event.their_score?.toString() ?? '', kit: event.kit_id,
+      opponent: event.opponent ?? '', our: event.our_score?.toString() ?? '', their: event.their_score?.toString() ?? '', kit: event.kit_id, equipment: event.equipment ?? [],
     });
     setEdit(true);
   }
@@ -78,6 +79,7 @@ export default function EventPage() {
         p_opponent: f.opponent || null, p_our_score: f.our === '' ? null : Number(f.our), p_their_score: f.their === '' ? null : Number(f.their),
       });
       if (f.kit !== event.kit_id) await rpc('set_event_kit', { p_event: event.id, p_kit: f.kit });
+      if (f.equipment.join() !== (event.equipment ?? []).join()) await rpc('set_event_equipment', { p_event: event.id, p_items: f.equipment });
       setEdit(false); reload();
     });
   }
@@ -101,6 +103,7 @@ export default function EventPage() {
             <Field label="מתי"><input type="datetime-local" value={f.starts} onChange={(e) => setF({ ...f, starts: e.target.value })} /></Field>
             <Field label="מיקום"><input value={f.location} onChange={(e) => setF({ ...f, location: e.target.value })} /></Field>
             <Field label="הערות"><textarea value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} /></Field>
+            <Field label="מה להביא"><EquipmentPicker value={f.equipment} onChange={(v) => setF({ ...f, equipment: v })} /></Field>
             {kits.length > 0 && <Field label="תלבושת"><KitSelect kits={kits} value={f.kit} onChange={(k) => setF({ ...f, kit: k })} /></Field>}
             {isMatch && (
               <>

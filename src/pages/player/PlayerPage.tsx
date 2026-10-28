@@ -270,7 +270,7 @@ function GoalsTab({ playerId, canEdit }: { playerId: string; canEdit: boolean })
 /** Every change to the player's parameters, newest first. */
 function HistoryCard({ playerId, scope }: { playerId: string; scope: Scope }) {
   const { data, loading, error } = usePlayerValues(playerId);
-  const positions = useLookups('position', { includeInactive: true });
+  const positions = [...useLookups('position', { includeInactive: true }), ...useLookups('player_kind', { includeInactive: true })];
   if (!data) return <Loading loading={loading} error={error} />;
   const defs = defsFor(data.defs, scope);
   const rows = data.values.filter((v) => defs.some((d) => d.id === v.def_id));

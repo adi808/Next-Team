@@ -392,3 +392,28 @@ legend { font-weight: 600; font-size: 0.9rem; padding: 0 0.35rem; }
 @keyframes fall { to { transform: translateY(105vh) rotate(540deg); opacity: 0.8; } }
 @media (prefers-reduced-motion: reduce) { .confetti { display: none; } .celebrate-card, .celebrate-trophy { animation: none; } }
 .hero:has(.hero-ball) .hero-text { padding-inline-end: 7rem; }
+.reward.medal { background: #e0ecff; color: #1e40af; display: inline-flex; align-items: center; gap: 0.35rem; }
+.medal-icon { font-size: 1.5rem; line-height: 1; animation: pop 0.45s cubic-bezier(0.2, 1.4, 0.4, 1); }
+.chips { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.chips button {
+  min-height: 0; padding: 0.4rem 0.85rem; border-radius: 999px; font-size: 0.88rem; font-weight: 600;
+  background: var(--surface); color: var(--text-2); border: 1px solid var(--border-strong);
+}
+.chips button:hover:not(:disabled) { background: var(--primary-soft); }
+.chips button.on { background: var(--primary-soft); color: var(--primary); border-color: var(--primary); }
+.tile.bring ul { list-style: none; margin: 0; padding: 0; font-size: 0.88rem; font-weight: 500; text-align: start; }
+.picker-page { max-width: 30rem; margin: 0 auto; padding: 0 1rem 2rem; }
+.picker-page .hero { margin: 0 -1rem; }
+.role-cards { display: grid; gap: 0.75rem; }
+.role-card {
+  display: flex; align-items: center; gap: 0.9rem; width: 100%; text-align: start; padding: 1rem 1.1rem; border-radius: var(--radius-lg);
+  background: var(--surface); color: var(--text); border: 1px solid var(--border); box-shadow: var(--shadow); font-weight: 400;
+}
+.role-card:hover:not(:disabled) { background: var(--surface); border-color: var(--primary); }
+.role-card .role-icon {
+  flex: none; display: inline-flex; align-items: center; justify-content: center; width: 3rem; height: 3rem; border-radius: 14px;
+  background: var(--primary-soft); color: var(--primary);
+}
+.role-card strong { display: block; font-size: 1.05rem; font-weight: 700; }
+.role-card small { color: var(--muted); }
+.role-card .chev { margin-inline-start: auto; color: var(--muted); font-size: 1.2rem; }

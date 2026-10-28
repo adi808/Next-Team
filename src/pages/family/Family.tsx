@@ -129,16 +129,17 @@ export function FamilyTasks() {
     return { assignments, tasks };
   }, []);
   const act = useAction();
-  const [party, setParty] = useState(0);
+  const [party, setParty] = useState<{ n: number; medal: boolean }>({ n: 0, medal: false });
   async function setDone(a: Assign, done: boolean) {
     await act.run(async () => {
       await rpc('complete_assignment', { p_assignment: a.id, p_done: done });
-      if (done) setParty((n) => n + 1);
+      if (done) setParty((p) => ({ n: p.n + 1, medal: a.kind === 'player' }));
       reload();
     });
   }
-  // Every completed task earns a like and a trophy.
-  const trophies = (data?.assignments ?? []).filter((a) => a.done_at).length;
+  // A player's completed task earns a medal; a parent's task a like and a trophy.
+  const medals = (data?.assignments ?? []).filter((a) => a.done_at && a.kind === 'player').length;
+  const trophies = (data?.assignments ?? []).filter((a) => a.done_at && a.kind === 'parent').length;
   const open = (data?.assignments ?? []).filter((a) => !a.done_at);
   const done = (data?.assignments ?? []).filter((a) => a.done_at);
   const card = (a: Assign) => {
@@ -150,7 +151,7 @@ export function FamilyTasks() {
         <small className="muted">{kid?.full_name} · {a.kind === 'parent' ? 'משימה להורה' : 'משימה לשחקן'}{t?.due_at ? ` · עד ${fmtDate(t.due_at)}` : ''}</small>
         {a.done_at ? (
           <div className="task-reward">
-            <span className="reward">👍 🏆 בוצע!</span>
+            <span className={`reward${a.kind === 'player' ? ' medal' : ''}`}>{a.kind === 'player' ? <><span className="medal-icon">🏅</span> קיבלת מדליה!</> : '👍 🏆 בוצע!'}</span>
             <button className="link" disabled={act.busy} onClick={() => setDone(a, false)}>ביטול</button>
           </div>
         ) : (
@@ -161,9 +162,16 @@ export function FamilyTasks() {
   };
   return (
     <>
-      {party > 0 && <Celebrate key={party} />}
+      {party.n > 0 && (party.medal
+        ? <Celebrate key={party.n} icon="🏅" note="קיבלת מדליה על המשימה" />
+        : <Celebrate key={party.n} />)}
       <PageHero kicker="משימות" title="המשימות שלי">
-        {trophies > 0 && <span className="trophies hero-chip" title="גביעים">🏆 {trophies}</span>}
+        {(medals > 0 || trophies > 0) && (
+          <span className="row hero-chip">
+            {medals > 0 && <span className="trophies" title="מדליות">🏅 {medals}</span>}
+            {trophies > 0 && <span className="trophies" title="גביעים">🏆 {trophies}</span>}
+          </span>
+        )}
       </PageHero>
       <Loading loading={loading} error={error} />
       <ErrorText error={act.error} />

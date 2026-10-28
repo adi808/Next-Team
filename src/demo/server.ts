@@ -113,10 +113,10 @@ export class DemoServer {
     let rows = this.visible(table).slice();
     params.forEach((val, key) => {
       if (['select', 'order', 'limit', 'offset'].includes(key)) return;
-      const m = /^(eq|neq|in|gte|lte|is)\.(.*)$/.exec(val);
+      const m = /^(not\.)?(eq|neq|in|gte|lte|is)\.(.*)$/.exec(val);
       if (!m) return;
-      const [, op, arg] = m;
-      rows = rows.filter((r) => {
+      const [, not, op, arg] = m;
+      rows = rows.filter((r) => !!not !== (() => {
         const v = r[key];
         switch (op) {
           case 'eq': return String(v) === arg;
@@ -127,7 +127,7 @@ export class DemoServer {
           case 'is': return arg === 'null' ? v === null || v === undefined : String(v) === arg;
           default: return true;
         }
-      });
+      })());
     });
     const order = params.get('order');
     if (order) {
@@ -288,8 +288,15 @@ export class DemoServer {
       if (!this.manageTeam(a.p_team)) this.deny('only the coach or club admin can create events');
       if (this.find('lookups', a.p_type)?.domain !== 'event_type') this.bad('unknown event type');
       const id = this.id('e');
-      this.t.events.push({ id, team_id: a.p_team, type_id: a.p_type, title: a.p_title ?? '', starts_at: a.p_starts, ends_at: a.p_ends ?? null, location: a.p_location ?? '', notes: a.p_notes ?? '', opponent: a.p_opponent ?? null, our_score: null, their_score: null });
+      this.t.events.push({ id, team_id: a.p_team, type_id: a.p_type, title: a.p_title ?? '', starts_at: a.p_starts, ends_at: a.p_ends ?? null, location: a.p_location ?? '', notes: a.p_notes ?? '', opponent: a.p_opponent ?? null, our_score: null, their_score: null, equipment: [], created_at: new Date().toISOString() });
       return id;
+    },
+    set_event_equipment(this: DemoServer, a: Row) {
+      const e = this.find('events', a.p_event);
+      if (!e || !this.manageTeam(e.team_id)) this.deny();
+      const items: string[] = a.p_items ?? [];
+      if (items.some((i) => !this.t.lookups.some((l) => l.id === i && l.domain === 'equipment'))) this.bad('unknown item');
+      e!.equipment = [...new Set(items)];
     },
     save_player_goal(this: DemoServer, a: Row) {
       if (!this.managePlayer(a.p_player)) this.deny();
@@ -337,7 +344,7 @@ export class DemoServer {
         const start = new Date(d); start.setHours(h, m, 0, 0);
         const end = a.p_duration_min ? new Date(start.getTime() + a.p_duration_min * 60_000).toISOString() : null;
         this.t.events.push({ id: this.id('e'), team_id: a.p_team, type_id: a.p_type, title: a.p_title ?? '', starts_at: start.toISOString(), ends_at: end,
-          location: a.p_location ?? '', notes: a.p_notes ?? '', opponent: null, our_score: null, their_score: null, kit_id: a.p_kit ?? null, series_id: series });
+          location: a.p_location ?? '', notes: a.p_notes ?? '', opponent: null, our_score: null, their_score: null, kit_id: a.p_kit ?? null, series_id: series, equipment: [], created_at: new Date(Date.now() + n).toISOString() });
       }
       return n;
     },

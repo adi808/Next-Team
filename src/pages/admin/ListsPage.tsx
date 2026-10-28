@@ -12,7 +12,9 @@ const DOMAINS: { id: string; label: string; hint: string }[] = [
   { id: 'match_format', label: 'מספר שחקנים במגרש', hint: '11 על 11, 9 על 9…' },
   { id: 'formation', label: 'מערכים', hint: '4-3-3, 4-4-2… (שייכים למספר שחקנים)' },
   { id: 'stat_type', label: 'סוגי סטטיסטיקה', hint: 'שער, בישול, כרטיס…' },
-  { id: 'position', label: 'עמדות', hint: 'שוער, הגנה, קישור… (לכל ענף)' },
+  { id: 'position', label: 'תפקידים', hint: 'הגנה, קישור, התקפה… (לכל ענף)' },
+  { id: 'player_kind', label: 'שחקן שדה / שוער', hint: 'לכל ענף' },
+  { id: 'equipment', label: 'מה להביא לאירוע', hint: 'מים, נעליים, מגני שוקיים…' },
 ];
 
 /** One screen manages every list in the system (they all live in the lookups table). */
