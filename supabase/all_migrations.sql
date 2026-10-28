@@ -2408,3 +2408,9 @@ join sports s on s.slug = 'football';
 -- The position parameter is the player's default role.
 update attribute_defs set label_he = 'תפקיד ברירת מחדל', sort_order = -1
  where scope = 'player' and key = 'position' and club_id is null and team_id is null;
+
+-- ===== 0019_shirt_number.sql =====
+-- Next Team: the player's shirt number (1-99), a regular player parameter for every sport.
+insert into attribute_defs (scope, key, label_he, data_type, config, visible_to, editable_by, sort_order) values
+  ('player', 'shirt_number', 'מספר חולצה', 'number', '{"min": 1, "max": 99}',
+   array['system_admin','club_admin','coach','parent','player'], array['system_admin','club_admin','coach'], -3);

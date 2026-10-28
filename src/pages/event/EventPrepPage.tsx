@@ -6,7 +6,7 @@ import { useAuth } from '../../auth/AuthProvider';
 import { useActingRole } from '../../auth/acting';
 import { Card, Empty, Loading, PageHero, ScoreRing, StatTiles } from '../../components/ui';
 import { useLookups } from '../../components/Lookups';
-import { PlayerAvatar } from '../../components/People';
+import { PlayerAvatar, ShirtNo, useShirtNumbers } from '../../components/People';
 import { average, defsFor, latestRatings } from '../../lib/scores';
 import type { AttrDef, AttrValue, EventResponse, EventRow, Player, Team } from '../../lib/types';
 
@@ -35,6 +35,7 @@ export default function EventPrepPage() {
       : [];
     return { event, team, players, responses, defs, values };
   }, [eventId]);
+  const shirt = useShirtNumbers(data?.players.map((p) => p.id) ?? []);
 
   if (loading || error || !data) return <Loading loading={loading} error={error} />;
   const { event, team, players, responses, defs, values } = data;
@@ -123,6 +124,7 @@ export default function EventPrepPage() {
               return (
                 <li key={p.id} className="row">
                   <PlayerAvatar player={p} size={32} />
+                  <ShirtNo n={shirt(p.id)} />
                   <Link to={`../player/${p.id}`}>{p.full_name}</Link>
                   <small className="muted">{positionOf(p.id)?.name_he ?? ''}</small>
                   <span className="grow" />
