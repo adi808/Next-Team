@@ -4,7 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { q, rpc, useAction, useLoad, ageOf } from '../../lib/db';
 import { normEmail } from '../../lib/email';
 import { Card, Empty, ErrorText, Field } from '../../components/ui';
-import { PersonAvatar, PlayerAvatar, useNames } from '../../components/People';
+import { PersonAvatar, PlayerAvatar, ShirtNo, useNames, useShirtNumbers } from '../../components/People';
 import type { TeamTabProps } from './TeamPage';
 
 interface Pending { id: string; parent_id: string; player_id: string }
@@ -22,6 +22,7 @@ export default function SquadTab({ team, players, canManage, reload }: TeamTabPr
       : Promise.resolve<Pending[]>([])),
     [ids.join(','), canManage],
   );
+  const shirt = useShirtNumbers(ids);
   const names = useNames((pending.data ?? []).map((p) => p.parent_id));
   const playerName = (id: string) => players.find((p) => p.id === id)?.full_name ?? '';
 
@@ -42,6 +43,7 @@ export default function SquadTab({ team, players, canManage, reload }: TeamTabPr
         {players.map((p) => (
           <li key={p.id} className="row">
             <PlayerAvatar player={p} />
+            <ShirtNo n={shirt(p.id)} />
             <Link to={`../player/${p.id}`}>{p.full_name}</Link>
             {p.birth_date && <small className="muted">גיל {ageOf(p.birth_date)}</small>}
             {canManage && (

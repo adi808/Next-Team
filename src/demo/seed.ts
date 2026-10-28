@@ -42,6 +42,7 @@ export function seed(): Tables {
   });
   const STAFF = ['system_admin', 'club_admin', 'coach'];
   const attribute_defs: Row[] = [
+    def('d_shirt', 'player', 'shirt_number', 'מספר חולצה', 'number', { min: 1, max: 99 }, ALL, STAFF, { sort_order: -3 }),
     def('d_kind', 'player', 'player_kind', 'שחקן שדה / שוער', 'lookup', { domain: 'player_kind' }, ALL, STAFF, { sport_id: 'sp_fb', sort_order: -2 }),
     def('d_pos', 'player', 'position', 'תפקיד ברירת מחדל', 'lookup', { domain: 'position' }, ALL, STAFF, { sort_order: -1 }),
     def('d_foot', 'player', 'strong_foot', 'רגל חזקה', 'select', { options: ['ימין', 'שמאל'] }, ALL, STAFF, { sport_id: 'sp_fb', sort_order: 1 }),
@@ -66,6 +67,7 @@ export function seed(): Tables {
     val('d_ball', 'k2', 8, 90), val('d_ball', 'k2', 9, 10), val('d_speed', 'k2', 7, 10), val('d_team', 'k2', 9, 10),
     val('d_ball', 'k3', 6, 30), val('d_speed', 'k3', 8, 30),
     val('d_kind', 'k1', 'kind_field', 60), val('d_kind', 'k2', 'kind_field', 60), val('d_kind', 'k3', 'kind_gk', 60),
+    val('d_shirt', 'k1', 10, 60), val('d_shirt', 'k2', 9, 60), val('d_shirt', 'k3', 1, 60), val('d_shirt', 'k4', 4, 60), val('d_shirt', 'k5', 5, 60), val('d_shirt', 'k6', 8, 60),
     val('d_foot', 'k1', 'שמאל', 60), val('d_foot', 'k2', 'ימין', 60),
     val('d_pos', 'k1', 'pos_mf', 60), val('d_pos', 'k2', 'pos_fw', 60), val('d_pos', 'k3', 'pos_gk', 60),
     val('d_pos', 'k4', 'pos_df', 60), val('d_pos', 'k5', 'pos_df', 60), val('d_pos', 'k6', 'pos_mf', 60),

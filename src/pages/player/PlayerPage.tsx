@@ -8,7 +8,7 @@ import { useActingRole } from '../../auth/acting';
 import { Badge, Card, Empty, ErrorText, Field, Loading, PageHero, ScoreBar, Tabs } from '../../components/ui';
 import { AttributesPanel } from '../../components/Attributes';
 import { useLookups } from '../../components/Lookups';
-import { PersonAvatar, PlayerAvatar, useNames } from '../../components/People';
+import { PersonAvatar, PlayerAvatar, ShirtNo, useNames, useShirtNumbers } from '../../components/People';
 import { average, defsFor, latestRatings } from '../../lib/scores';
 import type { AttrDef, AttrValue, EntityRole, EventStat, Player, Team } from '../../lib/types';
 
@@ -25,6 +25,7 @@ export default function PlayerPage() {
     const stats = await q<EventStat[]>(supabase.from('event_stats').select('*').eq('player_id', playerId));
     return { player, teams, guardians, stats };
   }, [playerId]);
+  const shirt = useShirtNumbers(playerId ? [playerId] : []);
   const names = useNames((data?.guardians ?? []).map((g) => g.parent_id));
   const act = useAction();
   const [name, setName] = useState<string | null>(null);
@@ -148,7 +149,7 @@ export default function PlayerPage() {
       <div className="card overlap profile-head row">
         <PlayerAvatar player={player} size={64} />
         <div>
-          <strong className="profile-name">{player.full_name}</strong>
+          <strong className="profile-name row">{player.full_name} <ShirtNo n={shirt(player.id)} /></strong>
           <small className="muted" style={{ display: 'block' }}>
             {player.birth_date ? `גיל ${ageOf(player.birth_date)} · נולד/ה ${fmtDay(player.birth_date)}` : ''}
             {teams.map((t, i) => <span key={t.id}>{i || player.birth_date ? ' · ' : ''}<Link to={`../team/${t.id}`}>{t.name}</Link></span>)}

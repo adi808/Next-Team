@@ -49,7 +49,7 @@ const out = (ok, label, extra) => { if (!ok) fails++; console.log(`${ok ? 'PASS'
   await p.click('button:has-text("אישור")'); await wait(700);
   await hasNot('approving the request clears it', 'בקשות קישור');
   await p.click('text=דני כהן'); await wait(1000);
-  await has('player page: profile tabs and medical info', 'פרופיל שחקן', 'פרטים', 'הערכה', 'יעדים', 'אלרגיה', 'בוטנים', 'תפקיד ברירת מחדל', 'קישור', 'שחקן שדה', 'רגל חזקה', 'שמאל');
+  await has('player page: profile tabs and medical info', 'פרופיל שחקן', 'פרטים', 'הערכה', 'יעדים', 'אלרגיה', 'בוטנים', 'תפקיד ברירת מחדל', 'קישור', 'שחקן שדה', 'רגל חזקה', 'שמאל', 'מספר חולצה');
   await p.click('role=tab[name="הערכה"]'); await wait(700);
   await has('player rating: latest average and bars', 'הערכה מקצועית אחרונה', '7.7/10', 'שליטה בכדור', '8/10'); await shot('player');
   await p.click('role=tab[name="יעדים"]'); await wait(700);
