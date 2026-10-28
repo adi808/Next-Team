@@ -52,7 +52,7 @@ export default function TasksTab({ team, players, canManage }: TeamTabProps) {
             <ul className="list compact">
               {items.map((a) => (
                 <li key={a.id} className="row">
-                  <span>{a.done_at ? '✓' : '○'}</span>
+                  <span title={a.done_at ? 'בוצע' : 'טרם בוצע'}>{a.done_at ? '🏆' : '○'}</span>
                   <span>{nameOf(a.player_id)}</span>
                   <small className="muted">{a.kind === 'parent' ? 'הורה' : 'שחקן'}</small>
                 </li>

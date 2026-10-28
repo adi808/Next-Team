@@ -77,6 +77,10 @@ export function seed(): Tables {
       { id: 't1', club_id: 'c1', name: 'ילדים ב׳', sport_id: 'sp_fb' },
       { id: 't2', club_id: 'c1', name: 'נוער כדורסל', sport_id: 'sp_bb' },
     ],
+    team_kits: [
+      { id: 'kit_home', team_id: 't1', name: 'בית', shirt: '#2563eb', shorts: '#ffffff', socks: '#2563eb', sort_order: 0, active: true },
+      { id: 'kit_away', team_id: 't1', name: 'חוץ', shirt: '#ffffff', shorts: '#1e3a8a', socks: '#ffffff', sort_order: 1, active: true },
+    ],
     profiles: [
       { id: 'u_sys', email: 'yossi@demo.nextteam.app', phone: null, full_name: 'יוסי אברהם', is_system_admin: true },
       { id: 'u_admin', email: 'ronit@demo.nextteam.app', phone: null, full_name: 'רונית מזרחי', is_system_admin: false },
@@ -105,8 +109,8 @@ export function seed(): Tables {
     ],
     events: [
       { id: 'e_past', team_id: 't1', type_id: 'lk_match', title: 'משחק ליגה נגד בית״ר', starts_at: at(-3, 10), ends_at: null, location: 'מגרש בית״ר', notes: '', opponent: 'בית״ר', our_score: 2, their_score: 1 },
-      { id: 'e_train', team_id: 't1', type_id: 'lk_train', title: 'אימון קבוצתי', starts_at: at(1, 17, 30), ends_at: null, location: 'מגרש 3', notes: 'להגיע עם מים וקרמפונים', opponent: null, our_score: null, their_score: null },
-      { id: 'e_match', team_id: 't1', type_id: 'lk_match', title: 'משחק ליגה נגד הפועל', starts_at: at(4, 10), ends_at: null, location: 'אצטדיון עירוני', notes: 'התכנסות שעה לפני', opponent: 'הפועל', our_score: null, their_score: null },
+      { id: 'e_train', team_id: 't1', type_id: 'lk_train', title: 'אימון קבוצתי', starts_at: at(1, 17, 30), ends_at: null, location: 'מגרש 3', notes: 'להגיע עם מים וקרמפונים', opponent: null, our_score: null, their_score: null, kit_id: 'kit_home' },
+      { id: 'e_match', team_id: 't1', type_id: 'lk_match', title: 'משחק ליגה נגד הפועל', starts_at: at(4, 10), ends_at: null, location: 'אצטדיון עירוני', notes: 'התכנסות שעה לפני', opponent: 'הפועל', our_score: null, their_score: null, kit_id: 'kit_away' },
       { id: 'e_build', team_id: 't1', type_id: 'lk_build', title: 'גיבוש סוף עונה', starts_at: at(9, 16), ends_at: null, location: 'פארק הירקון', notes: '', opponent: null, our_score: null, their_score: null },
       { id: 'e_bb', team_id: 't2', type_id: 'lk_train', title: 'אימון כדורסל', starts_at: at(2, 19), ends_at: null, location: 'אולם ספורט', notes: '', opponent: null, our_score: null, their_score: null },
     ],

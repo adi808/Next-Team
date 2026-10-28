@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import { Celebrate } from '../../components/Celebrate';
 import { q, rpc, useAction, useLoad, fmtDate, ageOf } from '../../lib/db';
 import { teamAllowsPlayerAnswers } from '../../lib/team';
 import { normEmail } from '../../lib/email';
@@ -128,26 +129,49 @@ export function FamilyTasks() {
     return { assignments, tasks };
   }, []);
   const act = useAction();
+  const [party, setParty] = useState(0);
+  async function setDone(a: Assign, done: boolean) {
+    await act.run(async () => {
+      await rpc('complete_assignment', { p_assignment: a.id, p_done: done });
+      if (done) setParty((n) => n + 1);
+      reload();
+    });
+  }
+  // Every completed task earns a like and a trophy.
+  const trophies = (data?.assignments ?? []).filter((a) => a.done_at).length;
+  const open = (data?.assignments ?? []).filter((a) => !a.done_at);
+  const done = (data?.assignments ?? []).filter((a) => a.done_at);
+  const card = (a: Assign) => {
+    const t = data!.tasks.find((x) => x.id === a.task_id);
+    const kid = kids.find((k) => k.id === a.player_id);
+    return (
+      <Card key={a.id} title={t?.title}>
+        {t?.description && <p>{t.description}</p>}
+        <small className="muted">{kid?.full_name} · {a.kind === 'parent' ? 'משימה להורה' : 'משימה לשחקן'}{t?.due_at ? ` · עד ${fmtDate(t.due_at)}` : ''}</small>
+        {a.done_at ? (
+          <div className="task-reward">
+            <span className="reward">👍 🏆 בוצע!</span>
+            <button className="link" disabled={act.busy} onClick={() => setDone(a, false)}>ביטול</button>
+          </div>
+        ) : (
+          <button className="done-btn" disabled={act.busy} onClick={() => setDone(a, true)}>✓ סיימתי</button>
+        )}
+      </Card>
+    );
+  };
   return (
     <>
-      <h2>משימות</h2>
+      {party > 0 && <Celebrate key={party} />}
+      <div className="title-row">
+        <h2>משימות</h2>
+        {trophies > 0 && <span className="trophies" title="גביעים">🏆 {trophies}</span>}
+      </div>
       <Loading loading={loading} error={error} />
       <ErrorText error={act.error} />
       {data && !data.assignments.length && <Empty>אין משימות.</Empty>}
-      {data?.assignments.map((a) => {
-        const t = data.tasks.find((x) => x.id === a.task_id);
-        const kid = kids.find((k) => k.id === a.player_id);
-        return (
-          <Card key={a.id} title={t?.title}>
-            {t?.description && <p>{t.description}</p>}
-            <small className="muted">{kid?.full_name} · {a.kind === 'parent' ? 'משימה להורה' : 'משימה לשחקן'}{t?.due_at ? ` · עד ${fmtDate(t.due_at)}` : ''}</small>
-            <label className="check">
-              <input type="checkbox" checked={!!a.done_at} disabled={act.busy}
-                onChange={(e) => act.run(async () => { await rpc('complete_assignment', { p_assignment: a.id, p_done: e.target.checked }); reload(); })} /> בוצע
-            </label>
-          </Card>
-        );
-      })}
+      {open.map(card)}
+      {done.length > 0 && <h3 className="section-title">בוצעו</h3>}
+      {done.map(card)}
     </>
   );
 }

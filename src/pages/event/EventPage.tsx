@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
-import { q, rpc, useAction, useLoad, fmtDate } from '../../lib/db';
+import { q, rpc, useAction, useLoad } from '../../lib/db';
 import { teamAllowsPlayerAnswers } from '../../lib/team';
 import { useAuth } from '../../auth/AuthProvider';
 import { useActingRole } from '../../auth/acting';
@@ -9,7 +9,15 @@ import { Badge, Card, Empty, ErrorText, Field, Loading } from '../../components/
 import { AttributesPanel } from '../../components/Attributes';
 import { AttendanceWidget } from '../../components/Attendance';
 import { LookupSelect, useLookupName, useLookups } from '../../components/Lookups';
-import type { EntityRole, EventResponse, EventRow, EventStat, Player, Team } from '../../lib/types';
+import { EventDashboard } from '../../components/EventDashboard';
+import { KitSelect } from '../../components/Kit';
+import type { EntityRole, EventResponse, EventRow, EventStat, Player, Team, TeamKit } from '../../lib/types';
+
+// ISO time -> the value a datetime-local input expects, in the viewer's local time.
+const toLocalInput = (iso: string) => {
+  const d = new Date(iso);
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+};
 
 export default function EventPage() {
   const { eventId = '' } = useParams();
@@ -27,18 +35,20 @@ export default function EventPage() {
     const players = ids.length ? await q<Player[]>(supabase.from('v_players').select('*').in('id', ids).order('full_name')) : [];
     const responses = await q<EventResponse[]>(supabase.from('event_responses').select('*').eq('event_id', eventId));
     const stats = await q<EventStat[]>(supabase.from('event_stats').select('*').eq('event_id', eventId).order('minute'));
-    return { event, team, players, responses, stats };
+    const kits = await q<TeamKit[]>(supabase.from('team_kits').select('*').eq('team_id', team.id).order('sort_order'));
+    return { event, team, players, responses, stats, kits };
   }, [eventId]);
   const act = useAction();
   const acting = useActingRole();
   const [edit, setEdit] = useState(false);
-  const [f, setF] = useState({ title: '', starts: '', location: '', notes: '', opponent: '', our: '', their: '' });
+  const [f, setF] = useState({ title: '', starts: '', location: '', notes: '', opponent: '', our: '', their: '', kit: null as string | null });
   const [statPlayer, setStatPlayer] = useState('');
   const [statType, setStatType] = useState<string | null>(null);
   const [minute, setMinute] = useState('');
 
   if (loading || error || !data) return <Loading loading={loading} error={error} />;
-  const { event, team, players, responses, stats } = data;
+  const { event, team, players, responses, stats, kits } = data;
+  const kit = kits.find((k) => k.id === event.kit_id);
   const isMatch = !!types.find((t) => t.id === event.type_id)?.meta?.is_match;
   const canManage = (acting === 'system_admin' && !!auth.profile?.is_system_admin) || (acting === 'coach' && auth.coachTeamIds.includes(team.id))
     || (acting === 'club_admin' && auth.adminClubIds.includes(team.club_id));
@@ -56,8 +66,8 @@ export default function EventPage() {
 
   function startEdit() {
     setF({
-      title: event.title, starts: event.starts_at.slice(0, 16), location: event.location, notes: event.notes,
-      opponent: event.opponent ?? '', our: event.our_score?.toString() ?? '', their: event.their_score?.toString() ?? '',
+      title: event.title, starts: toLocalInput(event.starts_at), location: event.location, notes: event.notes,
+      opponent: event.opponent ?? '', our: event.our_score?.toString() ?? '', their: event.their_score?.toString() ?? '', kit: event.kit_id,
     });
     setEdit(true);
   }
@@ -67,6 +77,7 @@ export default function EventPage() {
         p_event: event.id, p_title: f.title, p_starts: new Date(f.starts).toISOString(), p_location: f.location, p_notes: f.notes,
         p_opponent: f.opponent || null, p_our_score: f.our === '' ? null : Number(f.our), p_their_score: f.their === '' ? null : Number(f.their),
       });
+      if (f.kit !== event.kit_id) await rpc('set_event_kit', { p_event: event.id, p_kit: f.kit });
       setEdit(false); reload();
     });
   }
@@ -74,21 +85,22 @@ export default function EventPage() {
   return (
     <>
       <p><Link to={`../team/${team.id}`}>← {team.name}</Link></p>
-      <Card title={event.title || typeName(event.type_id)} actions={canManage && (
+      <EventDashboard event={event} typeLabel={typeName(event.type_id)} isMatch={isMatch} kit={kit}
+        attendance={canManage ? { yes: attending, no: absent, pending: players.length - responses.length } : undefined} />
+      {(canManage || event.notes) && <Card title="פרטים" actions={canManage && (
         <div className="row">
           <button className="small secondary" onClick={startEdit}>עריכה</button>
           <button className="small secondary" onClick={() => { if (confirm('למחוק את האירוע?')) act.run(async () => { await rpc('delete_event', { p_event: event.id }); navigate(`../team/${team.id}`); }); }}>מחיקה</button>
         </div>
       )}>
-        <p><Badge>{typeName(event.type_id)}</Badge> {fmtDate(event.starts_at)} {event.location && `· ${event.location}`}</p>
-        {event.opponent && <p>נגד {event.opponent}{event.our_score !== null && <strong> · {event.our_score}:{event.their_score}</strong>}</p>}
-        {event.notes && <p>{event.notes}</p>}
+        {event.notes ? <p>{event.notes}</p> : !edit && <p className="muted">אין הערות.</p>}
         {edit && (
           <div className="stack">
             <Field label="כותרת"><input value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} /></Field>
             <Field label="מתי"><input type="datetime-local" value={f.starts} onChange={(e) => setF({ ...f, starts: e.target.value })} /></Field>
             <Field label="מיקום"><input value={f.location} onChange={(e) => setF({ ...f, location: e.target.value })} /></Field>
             <Field label="הערות"><textarea value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} /></Field>
+            {kits.length > 0 && <Field label="תלבושת"><KitSelect kits={kits} value={f.kit} onChange={(k) => setF({ ...f, kit: k })} /></Field>}
             {isMatch && (
               <>
                 <Field label="יריבה"><input value={f.opponent} onChange={(e) => setF({ ...f, opponent: e.target.value })} /></Field>
@@ -102,7 +114,7 @@ export default function EventPage() {
           </div>
         )}
         <ErrorText error={act.error} />
-      </Card>
+      </Card>}
 
       {isMatch && (
         <AttributesPanel scope="event" entityId={event.id} myRoles={myRoles} clubId={team.club_id} teamIds={[team.id]} sportIds={[team.sport_id]} title="שיטת משחק" />
