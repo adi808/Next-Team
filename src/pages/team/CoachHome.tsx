@@ -6,7 +6,8 @@ import { useCoachTeam } from '../../auth/coachTeam';
 import { Badge, Empty, Loading, PageHero, StatTiles } from '../../components/ui';
 import { useLookups } from '../../components/Lookups';
 import { KitAvatar } from '../../components/Kit';
-import type { EventResponse, EventRow, Team, TeamKit } from '../../lib/types';
+import { isOver, nextAndOther } from '../../lib/events';
+import type { EventResponse, EventRow, Lookup, Team, TeamKit } from '../../lib/types';
 
 const TZ = 'Asia/Jerusalem';
 const fmt = (iso: string, o: Intl.DateTimeFormatOptions) => new Date(iso).toLocaleString('he-IL', { timeZone: TZ, ...o });
@@ -22,22 +23,26 @@ export default function CoachHome() {
   );
   const { data, loading, error } = useLoad(async () => {
     if (!teamId) return null;
-    const since = new Date(Date.now() - 3 * 3600_000).toISOString();
-    const events = await q<EventRow[]>(supabase.from('events').select('*').eq('team_id', teamId).gte('starts_at', since).order('starts_at').limit(4));
-    const next = events[0];
+    const since = new Date(Date.now() - 6 * 3600_000).toISOString();
+    const rows = await q<EventRow[]>(supabase.from('events').select('*').eq('team_id', teamId).gte('starts_at', since).order('starts_at').limit(40));
+    const events = rows.filter((e) => !isOver(e));
+    const [next, other] = nextAndOther(events);
+    const shown = [next, other].filter((e): e is EventRow => !!e);
     const players = await q<{ player_id: string }[]>(supabase.from('team_players').select('player_id').eq('team_id', teamId));
-    const responses = next ? await q<EventResponse[]>(supabase.from('event_responses').select('*').eq('event_id', next.id)) : [];
-    const kit = next?.kit_id ? (await q<TeamKit[]>(supabase.from('team_kits').select('*').eq('id', next.kit_id)))[0] : undefined;
-    return { events: events.slice(0, 4), next, squad: players.length, responses, kit };
+    const responses = shown.length ? await q<EventResponse[]>(supabase.from('event_responses').select('*').in('event_id', shown.map((e) => e.id))) : [];
+    const kitIds = shown.map((e) => e.kit_id).filter((k): k is string => !!k);
+    const kits = kitIds.length ? await q<TeamKit[]>(supabase.from('team_kits').select('*').in('id', kitIds)) : [];
+    const later = events.filter((e) => e !== next && e !== other).slice(0, 4);
+    return { next, other, later, squad: players.length, responses, kits };
   }, [teamId]);
 
   const team = teams.data?.find((t) => t.id === teamId);
   const typeOf = (id: string) => types.find((t) => t.id === id);
   const first = (profile?.full_name || '').split(' ')[0];
-  const next = data?.next;
-  const yes = data?.responses.filter((r) => r.status === 'attending').length ?? 0;
-  const no = data?.responses.filter((r) => r.status === 'not_attending').length ?? 0;
-  const isMatch = !!(next && typeOf(next.type_id)?.meta?.is_match);
+  const card = (e: EventRow, heading: string) => (
+    <NextEventCard key={e.id} event={e} heading={heading} teamName={team?.name ?? ''} type={typeOf(e.type_id)}
+      kit={data?.kits.find((k) => k.id === e.kit_id)} squad={data?.squad ?? 0} responses={data?.responses.filter((r) => r.event_id === e.id) ?? []} />
+  );
 
   return (
     <>
@@ -56,38 +61,10 @@ export default function CoachHome() {
         {!coachTeamIds.length && <div className="card"><Empty>אין לך עדיין קבוצות.</Empty></div>}
         <Loading loading={loading} error={error} />
 
-        {data && (next ? (
-          <section className="card next-event">
-            <div className="card-head">
-              <h3>האירוע הבא</h3>
-              <Badge>{typeOf(next.type_id)?.name_he ?? ''}</Badge>
-            </div>
-            <div className="next-event-title">
-              {isMatch && next.opponent ? (
-                <><strong>{team?.name}</strong><span className="vs">VS</span><strong>{next.opponent}</strong></>
-              ) : (
-                <strong>{next.title || typeOf(next.type_id)?.name_he}</strong>
-              )}
-            </div>
-            <div className="meta-row">
-              {data.kit && <span className="row"><KitAvatar kit={data.kit} size={26} />{data.kit.name}</span>}
-              <span>{fmt(next.starts_at, { hour: '2-digit', minute: '2-digit' })}</span>
-              <span>{fmt(next.starts_at, { weekday: 'long', day: 'numeric', month: 'numeric' })}</span>
-            </div>
-            {next.location && <small className="muted">{next.location}</small>}
-            <StatTiles items={[
-              { label: 'מגיעים', value: yes, tone: 'ok' },
-              { label: 'לא מגיעים', value: no, tone: 'bad' },
-              { label: 'טרם השיבו', value: Math.max(0, data.squad - yes - no), tone: 'muted' },
-            ]} />
-            <div className="row wrap">
-              <Link className="button-link grow" to={`../event/${next.id}/prep`}>הכנה לאירוע ←</Link>
-              <Link className="button-link soft" to={`../event/${next.id}`}>לפרטי האירוע</Link>
-            </div>
-          </section>
-        ) : (
+        {data && (data.next ? card(data.next, 'האירוע הבא') : (
           <div className="card"><Empty>אין אירועים קרובים.</Empty></div>
         ))}
+        {data?.other && card(data.other, `ה${typeOf(data.other.type_id)?.name_he ?? 'אירוע'} הקרוב`)}
 
         {teamId && (
           <div className="quick-actions">
@@ -96,11 +73,11 @@ export default function CoachHome() {
           </div>
         )}
 
-        {data && data.events.length > 1 && (
+        {data && data.later.length > 0 && (
           <section className="card">
             <h3>בהמשך</h3>
             <ul className="list compact">
-              {data.events.slice(1).map((e) => (
+              {data.later.map((e) => (
                 <li key={e.id} className="row">
                   <Badge>{typeOf(e.type_id)?.name_he ?? ''}</Badge>
                   <Link to={`../event/${e.id}`}>{e.title || typeOf(e.type_id)?.name_he}{e.opponent ? ` נגד ${e.opponent}` : ''}</Link>
@@ -114,5 +91,44 @@ export default function CoachHome() {
         {(teams.data?.length ?? 0) > 0 && <Link className="muted center-link" to="../teams">כל הקבוצות שלי</Link>}
       </div>
     </>
+  );
+}
+
+/** One upcoming event on the coach's home: who plays whom, when, the kit, and the attendance so far. */
+function NextEventCard({ event, heading, teamName, type, kit, squad, responses }: {
+  event: EventRow; heading: string; teamName: string; type?: Lookup; kit?: TeamKit; squad: number; responses: EventResponse[];
+}) {
+  const yes = responses.filter((r) => r.status === 'attending').length;
+  const no = responses.filter((r) => r.status === 'not_attending').length;
+  const isMatch = !!type?.meta?.is_match;
+  return (
+    <section className="card next-event">
+      <div className="card-head">
+        <h3>{heading}</h3>
+        <Badge>{type?.name_he ?? ''}</Badge>
+      </div>
+      <div className="next-event-title">
+        {isMatch && event.opponent ? (
+          <><strong>{teamName}</strong><span className="vs">VS</span><strong>{event.opponent}</strong></>
+        ) : (
+          <strong>{event.title || type?.name_he}</strong>
+        )}
+      </div>
+      <div className="meta-row">
+        {kit && <span className="row"><KitAvatar kit={kit} size={26} />{kit.name}</span>}
+        <span>{fmt(event.starts_at, { hour: '2-digit', minute: '2-digit' })}</span>
+        <span>{fmt(event.starts_at, { weekday: 'long', day: 'numeric', month: 'numeric' })}</span>
+      </div>
+      {event.location && <small className="muted">{event.location}</small>}
+      <StatTiles items={[
+        { label: 'מגיעים', value: yes, tone: 'ok' },
+        { label: 'לא מגיעים', value: no, tone: 'bad' },
+        { label: 'טרם השיבו', value: Math.max(0, squad - yes - no), tone: 'muted' },
+      ]} />
+      <div className="row wrap">
+        <Link className="button-link grow" to={`../event/${event.id}/prep`}>הכנה לאירוע ←</Link>
+        <Link className="button-link soft" to={`../event/${event.id}`}>לפרטי האירוע</Link>
+      </div>
+    </section>
   );
 }

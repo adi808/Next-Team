@@ -1,4 +1,4 @@
-import { Navigate, useParams } from 'react-router-dom';
+import { Navigate, useParams, useSearchParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { q, rpc, useAction, useLoad } from '../../lib/db';
 import { uploadImage } from '../../lib/images';
@@ -15,6 +15,7 @@ import EventsTab from './EventsTab';
 import TasksTab from './TasksTab';
 import SurveysTab from './SurveysTab';
 import ChatTab from './ChatTab';
+import LeagueTab from './LeagueTab';
 import SettingsTab from './SettingsTab';
 
 export interface TeamTabProps {
@@ -34,6 +35,7 @@ export function CoachTeamTab() {
 
 export default function TeamPage(opts: { teamId?: string; initialTab?: string }) {
   const params = useParams();
+  const [search] = useSearchParams();
   const teamId = opts.teamId ?? params.teamId ?? '';
   const auth = useAuth();
   const sports = useSports();
@@ -60,6 +62,7 @@ export default function TeamPage(opts: { teamId?: string; initialTab?: string })
     { id: 'tasks', label: 'משימות', render: () => <TasksTab {...props} /> },
     { id: 'surveys', label: 'סקרים', render: () => <SurveysTab {...props} /> },
     { id: 'chat', label: 'הודעות', render: () => <ChatTab {...props} /> },
+    ...(sport?.slug === 'football' ? [{ id: 'league', label: 'ליגה', render: () => <LeagueTab {...props} /> }] : []),
     ...(canManage ? [{ id: 'settings', label: 'הגדרות', render: () => <SettingsTab {...props} /> }] : []),
   ];
   async function setPhoto(file: File) {
@@ -81,7 +84,7 @@ export default function TeamPage(opts: { teamId?: string; initialTab?: string })
         {canManage && <PicturePicker label={team.photo_path ? 'החלפת תמונה' : 'הוספת תמונה'} busy={act.busy} onPick={setPhoto} />}
       </div>
       <ErrorText error={act.error} />
-      <Tabs tabs={tabs} initial={opts.initialTab} />
+      <Tabs tabs={tabs} initial={opts.initialTab ?? search.get('tab') ?? undefined} />
     </>
   );
 }

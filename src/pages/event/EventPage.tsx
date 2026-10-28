@@ -8,7 +8,8 @@ import { useActingRole } from '../../auth/acting';
 import { Badge, Card, Empty, ErrorText, Field, Loading } from '../../components/ui';
 import { AttributesPanel } from '../../components/Attributes';
 import { AttendanceWidget } from '../../components/Attendance';
-import { LookupSelect, useLookupName, useLookups } from '../../components/Lookups';
+import { LookupSelect, useLookupName, useLookups, useSports } from '../../components/Lookups';
+import { LineupPitch } from '../../components/LineupPitch';
 import { EventDashboard } from '../../components/EventDashboard';
 import { KitSelect } from '../../components/Kit';
 import { EquipmentPicker } from '../../components/Equipment';
@@ -28,6 +29,8 @@ export default function EventPage() {
   const reasonName = useLookupName('absence_reason');
   const statName = useLookupName('stat_type');
   const types = useLookups('event_type', { includeInactive: true });
+  const sports = useSports();
+  const [lineupKey, setLineupKey] = useState(0);
   const { data, loading, error, reload } = useLoad(async () => {
     const event = await q<EventRow>(supabase.from('events').select('*').eq('id', eventId).single());
     const team = await q<Team>(supabase.from('teams').select('id, club_id, name, sport_id, photo_path').eq('id', event.team_id).single());
@@ -42,7 +45,7 @@ export default function EventPage() {
   const act = useAction();
   const acting = useActingRole();
   const [edit, setEdit] = useState(false);
-  const [f, setF] = useState({ title: '', starts: '', location: '', notes: '', opponent: '', our: '', their: '', kit: null as string | null, equipment: [] as string[] });
+  const [f, setF] = useState({ type: null as string | null, title: '', starts: '', ends: '', location: '', notes: '', opponent: '', our: '', their: '', kit: null as string | null, equipment: [] as string[] });
   const [statPlayer, setStatPlayer] = useState('');
   const [statType, setStatType] = useState<string | null>(null);
   const [minute, setMinute] = useState('');
@@ -50,7 +53,8 @@ export default function EventPage() {
   if (loading || error || !data) return <Loading loading={loading} error={error} />;
   const { event, team, players, responses, stats, kits } = data;
   const kit = kits.find((k) => k.id === event.kit_id);
-  const isMatch = !!types.find((t) => t.id === event.type_id)?.meta?.is_match;
+  const isMatchType = (id: string | null) => !!types.find((t) => t.id === id)?.meta?.is_match;
+  const isMatch = isMatchType(event.type_id);
   const canManage = (acting === 'system_admin' && !!auth.profile?.is_system_admin) || (acting === 'coach' && auth.coachTeamIds.includes(team.id))
     || (acting === 'club_admin' && auth.adminClubIds.includes(team.club_id));
   const myKids = players.filter((p) => (acting === 'parent' && auth.children.some((c) => c.id === p.id)) || (acting === 'player' && auth.me?.id === p.id));
@@ -67,16 +71,19 @@ export default function EventPage() {
 
   function startEdit() {
     setF({
-      title: event.title, starts: toLocalInput(event.starts_at), location: event.location, notes: event.notes,
+      type: event.type_id, title: event.title, starts: toLocalInput(event.starts_at), ends: event.ends_at ? toLocalInput(event.ends_at) : '', location: event.location, notes: event.notes,
       opponent: event.opponent ?? '', our: event.our_score?.toString() ?? '', their: event.their_score?.toString() ?? '', kit: event.kit_id, equipment: event.equipment ?? [],
     });
     setEdit(true);
   }
   async function saveEdit() {
     await act.run(async () => {
-      await rpc('update_event', {
-        p_event: event.id, p_title: f.title, p_starts: new Date(f.starts).toISOString(), p_location: f.location, p_notes: f.notes,
-        p_opponent: f.opponent || null, p_our_score: f.our === '' ? null : Number(f.our), p_their_score: f.their === '' ? null : Number(f.their),
+      const match = isMatchType(f.type);
+      await rpc('save_event_details', {
+        p_event: event.id, p_type: f.type, p_title: f.title, p_starts: new Date(f.starts).toISOString(),
+        p_ends: f.ends ? new Date(f.ends).toISOString() : null, p_location: f.location, p_notes: f.notes,
+        p_opponent: match ? f.opponent || null : null,
+        p_our_score: match && f.our !== '' ? Number(f.our) : null, p_their_score: match && f.their !== '' ? Number(f.their) : null,
       });
       if (f.kit !== event.kit_id) await rpc('set_event_kit', { p_event: event.id, p_kit: f.kit });
       if (f.equipment.join() !== (event.equipment ?? []).join()) await rpc('set_event_equipment', { p_event: event.id, p_items: f.equipment });
@@ -89,23 +96,32 @@ export default function EventPage() {
       <p><Link to={`../team/${team.id}`}>← {team.name}</Link></p>
       <EventDashboard event={event} typeLabel={typeName(event.type_id)} isMatch={isMatch} kit={kit}
         attendance={canManage ? { yes: attending, no: absent, pending: players.length - responses.length } : undefined} />
-      {canManage && <Link className="button-link block" to={`../event/${event.id}/prep`}>הכנה לאירוע ←</Link>}
+      {canManage && (
+        <div className="row wrap">
+          <Link className="button-link grow" to={`../event/${event.id}/prep`}>הכנה לאירוע ←</Link>
+          {!edit && <button className="secondary" onClick={startEdit}>✏️ עריכת פרטי האירוע</button>}
+        </div>
+      )}
       {(canManage || event.notes) && <Card title="פרטים" actions={canManage && (
         <div className="row">
-          <button className="small secondary" onClick={startEdit}>עריכה</button>
+          {!edit && <button className="small secondary" onClick={startEdit}>עריכה</button>}
           <button className="small secondary" onClick={() => { if (confirm('למחוק את האירוע?')) act.run(async () => { await rpc('delete_event', { p_event: event.id }); navigate(`../team/${team.id}`); }); }}>מחיקה</button>
         </div>
       )}>
         {event.notes ? <p>{event.notes}</p> : !edit && <p className="muted">אין הערות.</p>}
         {edit && (
           <div className="stack">
+            <Field label="סוג"><LookupSelect domain="event_type" value={f.type} onChange={(v) => setF({ ...f, type: v })} /></Field>
             <Field label="כותרת"><input value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} /></Field>
-            <Field label="מתי"><input type="datetime-local" value={f.starts} onChange={(e) => setF({ ...f, starts: e.target.value })} /></Field>
+            <div className="row wrap">
+              <Field label="מתחיל"><input type="datetime-local" value={f.starts} onChange={(e) => setF({ ...f, starts: e.target.value })} /></Field>
+              <Field label="מסתיים (לא חובה)"><input type="datetime-local" value={f.ends} min={f.starts} onChange={(e) => setF({ ...f, ends: e.target.value })} /></Field>
+            </div>
             <Field label="מיקום"><input value={f.location} onChange={(e) => setF({ ...f, location: e.target.value })} /></Field>
             <Field label="הערות"><textarea value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} /></Field>
             <Field label="מה להביא"><EquipmentPicker value={f.equipment} onChange={(v) => setF({ ...f, equipment: v })} /></Field>
             {kits.length > 0 && <Field label="תלבושת"><KitSelect kits={kits} value={f.kit} onChange={(k) => setF({ ...f, kit: k })} /></Field>}
-            {isMatch && (
+            {isMatchType(f.type) && (
               <>
                 <Field label="יריבה"><input value={f.opponent} onChange={(e) => setF({ ...f, opponent: e.target.value })} /></Field>
                 <div className="row">
@@ -114,14 +130,21 @@ export default function EventPage() {
                 </div>
               </>
             )}
-            <button disabled={act.busy} onClick={saveEdit}>שמירה</button>
+            <div className="row">
+              <button disabled={act.busy || !f.type || !f.starts || (!!f.ends && f.ends < f.starts)} onClick={saveEdit}>שמירה</button>
+              <button className="secondary" onClick={() => setEdit(false)}>ביטול</button>
+            </div>
           </div>
         )}
         <ErrorText error={act.error} />
       </Card>}
 
+      {isMatch && canManage && sports.find((s) => s.id === team.sport_id)?.slug === 'football' && (
+        <LineupPitch key={lineupKey} event={event} players={players} responses={responses} />
+      )}
       {isMatch && (
-        <AttributesPanel scope="event" entityId={event.id} myRoles={myRoles} clubId={team.club_id} teamIds={[team.id]} sportIds={[team.sport_id]} title="שיטת משחק" />
+        <AttributesPanel scope="event" entityId={event.id} myRoles={myRoles} clubId={team.club_id} teamIds={[team.id]} sportIds={[team.sport_id]} title="שיטת משחק"
+          onSaved={() => setLineupKey((k) => k + 1)} />
       )}
 
       <Card title="אישורי הגעה">

@@ -449,6 +449,55 @@ select t.check('the coach clears an event kit', exists (select 1 from events whe
 select t.as_user('P1');
 select t.denied('a parent cannot create a series', $$select create_event_series(t.id('T1'), t.lk('event_type', 'training'), 'x', array[1], '17:00', 60, '2026-11-01', '2026-11-30')$$);
 
+-- ---------------------------------------------------------------- 0020: editing, lineup, relations, staff types
+set role authenticated;
+select t.as_user('C');
+select save_event_details(t.id('E_match'), t.lk('event_type', 'match'), 'משחק גביע', now() + interval '6 days',
+  now() + interval '6 days 2 hours', 'אצטדיון ב', 'להגיע מוקדם', '  מכבי  ', 2, 1);
+select t.check('coach edits every event field (type, end, opponent trimmed, score)',
+  (select title = 'משחק גביע' and ends_at is not null and opponent = 'מכבי' and our_score = 2 and notes = 'להגיע מוקדם'
+     from events where id = t.id('E_match')));
+select save_event_details(t.id('E_match'), t.lk('event_type', 'match'), 'משחק גביע', now() + interval '6 days', null, '', '', null, null, null);
+select t.check('save_event_details clears fields', (select ends_at is null and opponent is null and our_score is null and location = ''
+  from events where id = t.id('E_match')));
+select t.denied('the end cannot be before the start',
+  $$select save_event_details(t.id('E_match'), t.lk('event_type', 'match'), 'x', now(), now() - interval '1 hour')$$);
+select t.denied('a parent cannot edit an event',
+  $$select save_event_details(t.id('E_match'), t.lk('event_type', 'match'), 'x', now())$$) from (select t.as_user('P1')) _;
+
+select t.as_user('C');
+select set_event_lineup(t.id('E_match'), array[t.id('K1'), null, t.id('K2')]);
+select t.check('coach saves a lineup (slots 0 and 2)',
+  (select array_agg(slot order by slot) from event_lineups where event_id = t.id('E_match')) = array[0, 2]);
+select t.denied('the same player cannot stand in two slots', $$select set_event_lineup(t.id('E_match'), array[t.id('K1'), t.id('K1')])$$);
+select t.as_user('P1');
+select t.check('a parent does not see the lineup', not exists (select 1 from event_lineups));
+select t.denied('a parent cannot set the lineup', $$select set_event_lineup(t.id('E_match'), array[t.id('K1')])$$);
+
+select set_guardian_relation(t.id('K1'), t.id('P1'), t.lk('guardian_relation', 'mother'));
+select t.check('a parent sets their relation (mom)',
+  (select relation_id from player_guardians(t.id('K1')) where parent_id = t.id('P1')) = t.lk('guardian_relation', 'mother'));
+select t.denied('a parent cannot set another parent''s relation', $$select set_guardian_relation(t.id('K2'), t.id('P2'), t.lk('guardian_relation', 'father'))$$);
+select t.as_user('C');
+select set_guardian_relation(t.id('K2'), t.id('P2'), t.lk('guardian_relation', 'father'));
+select t.check('the coach sets a parent''s relation (dad)',
+  (select relation_id from player_guardians(t.id('K2')) where parent_id = t.id('P2')) = t.lk('guardian_relation', 'father'));
+select t.as_user('O');
+select t.check('an outsider sees no guardians', not exists (select 1 from player_guardians(t.id('K1'))));
+
+select t.as_user('C');
+select set_staff_role((select id from memberships where user_id = t.id('C') and team_id = t.id('T1')), t.lk('staff_role', 'head_coach'));
+select t.denied('a coach cannot set the type of another team''s coach',
+  $$select set_staff_role((select id from memberships where user_id = t.id('C2')), t.lk('staff_role', 'medic'))$$);
+select t.as_user('P1');
+select t.check('a parent sees the team staff with types',
+  (select staff_role_id from team_staff(t.id('T1')) where user_id = t.id('C')) = t.lk('staff_role', 'head_coach'));
+select t.check('a parent does not see another team''s staff', not exists (select 1 from team_staff(t.id('T2'))));
+select t.as_user('A');
+select set_staff_role((select id from memberships where user_id = t.id('C2')), t.lk('staff_role', 'fitness_coach'));
+select t.check('the club admin sets any staff type',
+  (select staff_role_id from memberships where user_id = t.id('C2')) = t.lk('staff_role', 'fitness_coach'));
+
 -- ---------------------------------------------------------------- edit / delete clubs and teams (RLS, no RPC)
 set role authenticated;
 select t.as_user('C');

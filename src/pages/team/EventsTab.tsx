@@ -7,10 +7,22 @@ import { Badge, Card, Empty, ErrorText, Field, Loading } from '../../components/
 import { LookupSelect, useLookups } from '../../components/Lookups';
 import { KitAvatar, KitSelect, useTeamKits } from '../../components/Kit';
 import { EquipmentPicker } from '../../components/Equipment';
+import { isOver } from '../../lib/events';
 import type { EventRow } from '../../lib/types';
 import type { TeamTabProps } from './TeamPage';
 
 const WEEKDAYS = ['א׳', 'ב׳', 'ג׳', 'ד׳', 'ה׳', 'ו׳', 'ש׳']; // index = day of week, 0 = Sunday
+
+type Show = 'upcoming' | 'past' | 'all';
+const SHOW: [Show, string][] = [['upcoming', 'טרם התקיימו'], ['past', 'התקיימו'], ['all', 'הכל']];
+
+/** "Near to far": upcoming events from the soonest, past ones from the latest; reversed on request. */
+function arrange(events: EventRow[], show: Show, nearFirst: boolean, now = Date.now()) {
+  const upcoming = events.filter((e) => !isOver(e, now)).sort((a, b) => a.starts_at.localeCompare(b.starts_at));
+  const past = events.filter((e) => isOver(e, now)).sort((a, b) => b.starts_at.localeCompare(a.starts_at));
+  const list = show === 'upcoming' ? upcoming : show === 'past' ? past : [...upcoming, ...past];
+  return nearFirst ? list : [...list].reverse();
+}
 
 export default function EventsTab({ team, canManage }: TeamTabProps) {
   const types = useLookups('event_type', { includeInactive: true });
@@ -33,6 +45,8 @@ export default function EventsTab({ team, canManage }: TeamTabProps) {
   const [until, setUntil] = useState('');
   const [equipment, setEquipment] = useState<string[]>([]);
   const [created, setCreated] = useState<number | null>(null);
+  const [show, setShow] = useState<Show>('upcoming');
+  const [nearFirst, setNearFirst] = useState(true);
   const act = useAction();
   const isMatch = (id: string | null) => !!types.find((t) => t.id === id)?.meta?.is_match;
   const typeName = (id: string) => types.find((t) => t.id === id)?.name_he ?? '';
@@ -70,17 +84,33 @@ export default function EventsTab({ team, canManage }: TeamTabProps) {
       reset(); reload();
     });
   }
+  const listed = arrange(data ?? [], show, nearFirst);
   const ready = !!typeId && (repeat ? days.length > 0 && !!time && !!from && !!until : !!starts);
 
   return (
     <>
       <Loading loading={loading} error={error} />
       {data && !data.length && <Empty>אין עדיין אירועים.</Empty>}
+      {!!data?.length && (
+        <div className="row wrap list-tools">
+          <div className="segment" role="tablist" aria-label="אילו אירועים">
+            {SHOW.map(([id, label]) => (
+              <button key={id} type="button" role="tab" aria-selected={show === id} onClick={() => setShow(id)}>{label}</button>
+            ))}
+          </div>
+          <span className="grow" />
+          <button type="button" className="small secondary" onClick={() => setNearFirst((v) => !v)}>
+            {nearFirst ? '⇅ מהקרוב לרחוק' : '⇅ מהרחוק לקרוב'}
+          </button>
+        </div>
+      )}
+      {data && !!data.length && !listed.length && <Empty>{show === 'upcoming' ? 'אין אירועים שטרם התקיימו.' : 'אין אירועים שהתקיימו.'}</Empty>}
       <ul className="list">
-        {data?.map((e) => {
+        {listed.map((e) => {
           const kit = kitOf(e.kit_id);
+          const over = isOver(e);
           return (
-            <li key={e.id} className="row">
+            <li key={e.id} className={`row${over ? ' past' : ''}`}>
               <Badge>{typeName(e.type_id)}</Badge>
               <Link to={`../event/${e.id}`}>{e.title || typeName(e.type_id)}</Link>
               <small className="muted">{fmtDate(e.starts_at)}{e.opponent ? ` · נגד ${e.opponent}` : ''}</small>

@@ -32,3 +32,9 @@
    update profiles set is_system_admin = true where email = 'you@example.com';
    ```
 3. רעננו את האתר: מופיע מצב "מנהל מערכת". צרו מועדון (עם המייל של מנהל המועדון), והמשיכו משם.
+
+## 4. לשונית ליגה (Edge Function)
+לשונית "ליגה" של הקבוצה קוראת את אתר ההתאחדות דרך ה־Edge Function בשם `league` (הדפדפן לא יכול לקרוא את האתר ישירות).
+פורסים אותה פעם אחת, ושוב אחרי כל שינוי בה: `npx supabase functions deploy league --project-ref <project-ref>`
+(בדיקת ה־JWT נשארת פעילה: רק משתמשים מחוברים יכולים לקרוא לה, והיא קוראת רק כתובות של football.org.il).
+אחר כך המאמן מדביק בלשונית הליגה (או בהגדרות הקבוצה) את כתובת דף הקבוצה, למשל `https://www.football.org.il/team-details/?team_id=8776&season_id=28`.

@@ -7,10 +7,13 @@ import { useAuth } from '../../auth/AuthProvider';
 import { useActingRole } from '../../auth/acting';
 import { Badge, Card, Empty, ErrorText, Field, Loading, PageHero, ScoreBar, Tabs } from '../../components/ui';
 import { AttributesPanel } from '../../components/Attributes';
-import { useLookups } from '../../components/Lookups';
-import { PersonAvatar, PlayerAvatar, ShirtNo, useNames, useShirtNumbers } from '../../components/People';
+import { useLookupName, useLookups } from '../../components/Lookups';
+import { Picture } from '../../components/Picture';
+import { PlayerAvatar, ShirtNo, useShirtNumbers } from '../../components/People';
 import { average, defsFor, latestRatings } from '../../lib/scores';
 import type { AttrDef, AttrValue, EntityRole, EventStat, Player, Team } from '../../lib/types';
+
+interface Guardian { parent_id: string; full_name: string; avatar_path: string | null; relation_id: string | null }
 
 export default function PlayerPage() {
   const { playerId = '' } = useParams();
@@ -21,12 +24,13 @@ export default function PlayerPage() {
     const player = await q<Player>(supabase.from('v_players').select('*').eq('id', playerId).single());
     const links = await q<{ team_id: string }[]>(supabase.from('team_players').select('team_id').eq('player_id', playerId));
     const teams = links.length ? await q<Team[]>(supabase.from('teams').select('id, club_id, name, sport_id, photo_path').in('id', links.map((l) => l.team_id))) : [];
-    const guardians = await q<{ parent_id: string }[]>(supabase.from('guardianships').select('parent_id').eq('player_id', playerId).eq('status', 'approved'));
+    const guardians = await rpc<Guardian[]>('player_guardians', { p_player: playerId });
     const stats = await q<EventStat[]>(supabase.from('event_stats').select('*').eq('player_id', playerId));
     return { player, teams, guardians, stats };
   }, [playerId]);
   const shirt = useShirtNumbers(playerId ? [playerId] : []);
-  const names = useNames((data?.guardians ?? []).map((g) => g.parent_id));
+  const relations = useLookups('guardian_relation');
+  const relationName = useLookupName('guardian_relation');
   const act = useAction();
   const [name, setName] = useState<string | null>(null);
   const [birth, setBirth] = useState<string | null>(null);
@@ -98,7 +102,23 @@ export default function PlayerPage() {
 
       <Card title="הורים וגישה">
         <ul className="list compact">
-          {guardians.map((g) => <li key={g.parent_id} className="row"><PersonAvatar id={g.parent_id} />{names(g.parent_id)}</li>)}
+          {guardians.map((g) => {
+            const canSet = manage || (isParent && g.parent_id === auth.profile?.id);
+            return (
+              <li key={g.parent_id} className="row">
+                <Picture bucket="avatars" path={g.avatar_path} name={g.full_name || '?'} size={28} />
+                <span>{g.full_name || 'הורה'}{g.parent_id === auth.profile?.id ? ' (אני)' : ''}</span>
+                <span className="grow" />
+                {canSet ? (
+                  <select className="inline-select" aria-label="קרבה לילד" value={g.relation_id ?? ''} disabled={act.busy}
+                    onChange={(e) => act.run(async () => { await rpc('set_guardian_relation', { p_player: player.id, p_parent: g.parent_id, p_relation: e.target.value || null }); reload(); })}>
+                    <option value="">אמא / אבא?</option>
+                    {relations.map((l) => <option key={l.id} value={l.id}>{l.name_he}</option>)}
+                  </select>
+                ) : g.relation_id && <Badge>{relationName(g.relation_id)}</Badge>}
+              </li>
+            );
+          })}
           {!guardians.length && <li className="muted">אין הורים מקושרים.</li>}
         </ul>
         {manage && (

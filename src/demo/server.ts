@@ -79,7 +79,8 @@ export class DemoServer {
     const t = this.t;
     switch (table) {
       case 'profiles': case 'sports': case 'lookups': case 'attribute_defs': return t[table];
-      case 'memberships': return t.memberships.filter((m) => m.user_id === this.uid);
+      case 'memberships': return t.memberships.filter((m) => m.user_id === this.uid || this.adminOf(m.club_id) || (m.team_id && this.coachOf(m.team_id)));
+      case 'event_lineups': return t.event_lineups.filter((r) => this.manageTeam(this.find('events', r.event_id)?.team_id));
       case 'guardianships': return t.guardianships.filter((g) => g.parent_id === this.uid || this.selfPlayer(g.player_id) || this.coachesPlayer(g.player_id) || this.sys);
       case 'v_players': return t.players.filter((p) => this.canView(p.id)).map((p) => {
         const fam = this.managePlayer(p.id) || this.parentOf(p.id) || this.selfPlayer(p.id);
@@ -354,6 +355,53 @@ export class DemoServer {
       const map: Record<string, string> = { p_title: 'title', p_starts: 'starts_at', p_location: 'location', p_notes: 'notes', p_opponent: 'opponent', p_our_score: 'our_score', p_their_score: 'their_score' };
       for (const [k, col] of Object.entries(map)) if (a[k] !== undefined && a[k] !== null) e[col] = a[k];
     },
+    save_event_details(this: DemoServer, a: Row) {
+      const e = this.find('events', a.p_event);
+      if (!e || !this.manageTeam(e.team_id)) this.deny();
+      if (this.find('lookups', a.p_type)?.domain !== 'event_type') this.bad('unknown event type');
+      if (a.p_ends && a.p_ends < a.p_starts) this.bad('the end must be after the start');
+      Object.assign(e, {
+        type_id: a.p_type, title: String(a.p_title ?? '').trim(), starts_at: a.p_starts, ends_at: a.p_ends ?? null, location: String(a.p_location ?? '').trim(),
+        notes: a.p_notes ?? '', opponent: String(a.p_opponent ?? '').trim() || null, our_score: a.p_our_score ?? null, their_score: a.p_their_score ?? null,
+      });
+    },
+    set_event_lineup(this: DemoServer, a: Row) {
+      const e = this.find('events', a.p_event);
+      if (!e || !this.manageTeam(e.team_id)) this.deny();
+      const ids = (a.p_players ?? []) as (string | null)[];
+      if (new Set(ids.filter(Boolean)).size !== ids.filter(Boolean).length) this.bad('a player can stand in one slot only');
+      this.t.event_lineups = this.t.event_lineups.filter((r) => r.event_id !== a.p_event);
+      ids.forEach((player_id, slot) => { if (player_id) this.t.event_lineups.push({ event_id: a.p_event, slot, player_id }); });
+    },
+    set_guardian_relation(this: DemoServer, a: Row) {
+      if (!((a.p_parent === this.uid && this.parentOf(a.p_player)) || this.managePlayer(a.p_player))) this.deny();
+      const g = this.t.guardianships.find((x) => x.player_id === a.p_player && x.parent_id === a.p_parent && x.status === 'approved');
+      if (!g) throw new PgError('P0002', 'no such parent');
+      g.relation_id = a.p_relation ?? null;
+    },
+    player_guardians(this: DemoServer, a: Row) {
+      if (!(this.managePlayer(a.p_player) || this.parentOf(a.p_player) || this.selfPlayer(a.p_player))) return [];
+      return this.t.guardianships.filter((g) => g.player_id === a.p_player && g.status === 'approved').map((g) => {
+        const p = this.find('profiles', g.parent_id);
+        return { parent_id: g.parent_id, full_name: p?.full_name || p?.email || '', avatar_path: p?.avatar_path ?? null, relation_id: g.relation_id ?? null };
+      });
+    },
+    set_staff_role(this: DemoServer, a: Row) {
+      const m = this.find('memberships', a.p_membership);
+      if (!m) throw new PgError('P0002', 'not found');
+      if (!(this.sys || this.adminOf(m.club_id) || (m.team_id && this.coachOf(m.team_id)))) this.deny();
+      m.staff_role_id = a.p_role ?? null;
+    },
+    team_staff(this: DemoServer, a: Row) {
+      if (!this.member(a.p_team)) return [];
+      const order = (id: string | null) => this.find('lookups', id ?? '')?.sort_order ?? 99;
+      return this.t.memberships.filter((m) => m.team_id === a.p_team && m.role === 'coach')
+        .sort((x, y) => order(x.staff_role_id) - order(y.staff_role_id))
+        .map((m) => {
+          const p = this.find('profiles', m.user_id);
+          return { membership_id: m.id, user_id: m.user_id, full_name: p?.full_name || p?.email || '', avatar_path: p?.avatar_path ?? null, staff_role_id: m.staff_role_id ?? null };
+        });
+    },
     delete_event(this: DemoServer, a: Row) {
       const e = this.find('events', a.p_event);
       if (!e || !this.manageTeam(e.team_id)) this.deny();
@@ -531,6 +579,7 @@ export class DemoServer {
         const r = this.query(table, url.searchParams, accept.includes('pgrst.object'));
         return json(r.status, r.body);
       }
+      if (url.pathname === '/functions/v1/league') return json(200, DEMO_LEAGUE());
       if (url.pathname.startsWith('/storage/')) {
         return json(400, { statusCode: '400', error: 'demo', message: 'העלאת תמונה אינה זמינה בדמו' });
       }
@@ -541,3 +590,29 @@ export class DemoServer {
     }
   };
 }
+
+// The demo's places and teams are made up, so the league tab shows a sample table instead of the real site.
+const DEMO_LEAGUE = () => {
+  const team = (pos: number, name: string, id: number, g: number, w: number, d: number, l: number, gf: number, ga: number) =>
+    ({ cells: [String(pos), name, String(g), String(w), String(d), String(l), `${gf}-${ga}`, String(w * 3 + d)], href: `https://www.football.org.il/team-details/?team_id=${id}&season_id=28` });
+  const day = (offset: number) => new Date(Date.now() + offset * 86400000).toLocaleDateString('he-IL');
+  return {
+    title: 'מכבי הצפון ילדים ב׳ (דמו)', sourceUrl: 'https://www.football.org.il/team-details/?team_id=8776&season_id=28',
+    leagueUrl: null, teamId: '8776', fetchedAt: new Date().toISOString(),
+    standings: {
+      title: 'טבלת ליגה (נתוני דמו)', columns: ['מיקום', 'קבוצה', 'משחקים', 'ניצחונות', 'תיקו', 'הפסדים', 'שערים', 'נקודות'],
+      rows: [
+        team(1, 'הפועל השרון', 1001, 8, 6, 1, 1, 22, 8), team(2, 'מכבי הצפון ילדים ב׳', 8776, 8, 5, 2, 1, 19, 9),
+        team(3, 'בית״ר העמק', 1003, 8, 4, 2, 2, 14, 11), team(4, 'עירוני הגליל', 1004, 8, 3, 1, 4, 12, 15),
+        team(5, 'הכוח הכרמל', 1005, 8, 2, 2, 4, 9, 14), team(6, 'אליצור החוף', 1006, 8, 0, 2, 6, 5, 24),
+      ],
+    },
+    games: {
+      title: 'משחקי הקבוצה (נתוני דמו)', columns: ['תאריך', 'משחק', 'מגרש', 'תוצאה'],
+      rows: [
+        { cells: [day(-3), 'בית״ר העמק - מכבי הצפון ילדים ב׳', 'מגרש בית״ר', '1-2'], href: null },
+        { cells: [day(4), 'מכבי הצפון ילדים ב׳ - הפועל השרון', 'אצטדיון עירוני', ''], href: null },
+      ],
+    },
+  };
+};

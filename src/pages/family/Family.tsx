@@ -9,9 +9,11 @@ import { useAuth } from '../../auth/AuthProvider';
 import { Badge, Card, Empty, ErrorText, Field, Loading, PageHero } from '../../components/ui';
 import { AttendanceWidget } from '../../components/Attendance';
 import { Conversation, TeamChannel } from '../../components/Chat';
-import { useLookupName } from '../../components/Lookups';
+import { useLookups, useSports } from '../../components/Lookups';
+import { EventDashboard } from '../../components/EventDashboard';
+import { isOver, nextAndOther } from '../../lib/events';
 import { PlayerAvatar } from '../../components/People';
-import type { EventResponse, EventRow, Player, Team } from '../../lib/types';
+import type { EventResponse, EventRow, Player, Team, TeamKit } from '../../lib/types';
 
 /** The children a parent follows, or the player's own profile. */
 function useKids() {
@@ -34,6 +36,7 @@ function useKids() {
 export function FamilyHome() {
   const { reload } = useAuth();
   const { kids, asParent, links, teams, loading, error } = useKids();
+  const sports = useSports();
   const [email, setEmail] = useState('');
   const [sent, setSent] = useState(false);
   const act = useAction();
@@ -64,6 +67,19 @@ export function FamilyHome() {
           </li>
         ))}
       </ul>
+      {teams.some((t) => sports.find((sp) => sp.id === t.sport_id)?.slug === 'football') && (
+        <Card title="הקבוצות והליגה">
+          <ul className="list compact">
+            {teams.filter((t) => sports.find((sp) => sp.id === t.sport_id)?.slug === 'football').map((t) => (
+              <li key={t.id} className="row">
+                <span>{t.name}</span>
+                <span className="grow" />
+                <Link to={`../team/${t.id}?tab=league`}>טבלה וקבוצות בליגה ←</Link>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
       <Card title={asParent ? 'קישור ילד נוסף' : 'קישור להורה'}>
         <p className="muted">
           {asParent ? 'אם לילד יש כניסה משלו, הזינו את המייל שלו. ' : 'הזינו את המייל של ההורה. '}
@@ -85,32 +101,53 @@ function KidAttendance({ event, kid, response, asParent, onSaved }: { event: Eve
 
 export function FamilyEvents() {
   const { kids, asParent, links, teams, loading, error } = useKids();
-  const typeName = useLookupName('event_type');
+  const types = useLookups('event_type', { includeInactive: true });
+  const typeName = (id: string) => types.find((t) => t.id === id)?.name_he ?? '';
   const tids = teams.map((t) => t.id).join(',');
   const { data, reload, loading: l2, error: e2 } = useLoad(async () => {
-    if (!teams.length) return { events: [] as EventRow[], responses: [] as EventResponse[] };
+    if (!teams.length) return { events: [] as EventRow[], responses: [] as EventResponse[], kits: [] as TeamKit[] };
     const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
-    const events = await q<EventRow[]>(supabase.from('events').select('*').in('team_id', teams.map((t) => t.id)).gte('starts_at', since).order('starts_at'));
+    const rows = await q<EventRow[]>(supabase.from('events').select('*').in('team_id', teams.map((t) => t.id)).gte('starts_at', since).order('starts_at'));
+    const events = rows.filter((e) => !isOver(e));
     const responses = events.length ? await q<EventResponse[]>(supabase.from('event_responses').select('*').in('event_id', events.map((e) => e.id))) : [];
-    return { events, responses };
+    const kitIds = [...new Set(events.map((e) => e.kit_id).filter((k): k is string => !!k))];
+    const kits = kitIds.length ? await q<TeamKit[]>(supabase.from('team_kits').select('*').in('id', kitIds)) : [];
+    return { events, responses, kits };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tids]);
+  const [next, other] = nextAndOther(data?.events ?? []);
+  const rest = (data?.events ?? []).filter((e) => e !== next && e !== other);
+  const answers = (e: EventRow) => kids.filter((k) => links.some((l) => l.team_id === e.team_id && l.player_id === k.id)).map((k) => (
+    <KidAttendance key={k.id} event={e} kid={k} asParent={asParent} response={data?.responses.find((r) => r.event_id === e.id && r.player_id === k.id)} onSaved={reload} />
+  ));
+  const dashboard = (e: EventRow, heading: string) => (
+    <section key={e.id} className="stack family-next">
+      <h3 className="section-title">{heading}{teams.length > 1 ? ` · ${teams.find((t) => t.id === e.team_id)?.name ?? ''}` : ''}</h3>
+      <EventDashboard event={e} typeLabel={typeName(e.type_id)} isMatch={!!types.find((t) => t.id === e.type_id)?.meta?.is_match}
+        kit={data?.kits.find((k) => k.id === e.kit_id)} />
+      <div className="card">
+        {answers(e)}
+        <Link to={`../event/${e.id}`}>לכל פרטי האירוע ←</Link>
+      </div>
+    </section>
+  );
 
   return (
     <>
       <PageHero kicker={asParent ? 'הורה' : 'שחקן'} title="אירועים קרובים" />
       <Loading loading={loading || l2} error={error || e2} />
       {data && !data.events.length && <Empty>אין אירועים קרובים.</Empty>}
-      {data?.events.map((e) => (
+      {next && dashboard(next, 'האירוע הבא')}
+      {other && dashboard(other, `ה${typeName(other.type_id) || 'אירוע'} הקרוב`)}
+      {rest.length > 0 && <h3 className="section-title">בהמשך</h3>}
+      {rest.map((e) => (
         <Card key={e.id} title={e.title || typeName(e.type_id)}>
           <p>
             <Badge>{typeName(e.type_id)}</Badge> {fmtDate(e.starts_at)} {e.location && `· ${e.location}`}
             {e.opponent && ` · נגד ${e.opponent}`} <small className="muted">· {teams.find((t) => t.id === e.team_id)?.name}</small>
           </p>
           <Link to={`../event/${e.id}`}>פרטים</Link>
-          {kids.filter((k) => links.some((l) => l.team_id === e.team_id && l.player_id === k.id)).map((k) => (
-            <KidAttendance key={k.id} event={e} kid={k} asParent={asParent} response={data.responses.find((r) => r.event_id === e.id && r.player_id === k.id)} onSaved={reload} />
-          ))}
+          {answers(e)}
         </Card>
       ))}
     </>
