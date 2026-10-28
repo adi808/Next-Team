@@ -14,13 +14,20 @@ export interface JoinRequest {
 
 export const loadRequests = () => (isDemo ? Promise.resolve<JoinRequest[]>([]) : rpc<JoinRequest[]>('pending_join_requests'));
 
-/** Shown above every staff screen while join requests wait for the viewer's decision. */
+/** Shown above every staff screen while join requests wait for the viewer's decision: how many, and who. */
 export function PendingRequestsBanner() {
   const { data } = useLoad(() => loadRequests().catch(() => []), []);
+  const staffName = useLookupName('staff_role');
   if (!data?.length) return null;
+  const as = (r: JoinRequest) => (r.role === 'parent' ? 'הורה' : staffName(r.staff_role_id) || 'מאמן');
   return (
-    <Link className="button-link soft block" to="requests">
-      🔔 {data.length === 1 ? 'בקשת הצטרפות אחת ממתינה' : `${data.length} בקשות הצטרפות ממתינות`} לאישור ←
+    <Link className="requests-banner" to="requests">
+      <strong>🔔 {data.length === 1 ? 'בקשת הצטרפות אחת ממתינה' : `${data.length} בקשות הצטרפות ממתינות`} לאישור</strong>
+      <ul>
+        {data.slice(0, 3).map((r) => <li key={r.id}>{r.full_name} · {as(r)} · {r.team_name}</li>)}
+        {data.length > 3 && <li>ועוד {data.length - 3}…</li>}
+      </ul>
+      <span className="go">לאישור או דחייה ←</span>
     </Link>
   );
 }

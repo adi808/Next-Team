@@ -216,3 +216,13 @@ begin
     grant execute on function notification_email(uuid) to service_role;
   end if;
 end $$;
+
+-- A notification to yourself, to try push (and email) on this device.
+create function send_test_notification() returns void
+language plpgsql security definer set search_path = public as $$
+declare v_uid uuid := require_auth();
+begin
+  perform notify(array[v_uid], 'התראת ניסיון', 'אם אתם רואים את זה, ההתראות עובדות במכשיר הזה.', '/', false);
+end $$;
+revoke execute on function send_test_notification() from public, anon;
+grant execute on function send_test_notification() to authenticated;

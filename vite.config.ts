@@ -9,6 +9,8 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      // Push and notification-click handling live in public/push-handler.js.
+      workbox: { importScripts: ['/push-handler.js'] },
       manifest: {
         name: 'Next Team',
         short_name: 'Next Team',

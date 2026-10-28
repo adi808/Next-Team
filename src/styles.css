@@ -501,3 +501,20 @@ legend { font-weight: 600; font-size: 0.9rem; padding: 0 0.35rem; }
 .role-option.on { background: var(--primary-soft); border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-ring); }
 .role-option small { color: var(--muted); font-weight: 400; }
 .join-child { padding: 0.5rem 0 0.75rem; border-bottom: 1px solid var(--border); margin-bottom: 0.5rem; }
+
+/* ---- pending requests banner, bell, notifications ---- */
+.requests-banner {
+  position: relative; z-index: 1;
+  display: block; margin: 0 0 0.85rem; padding: 0.8rem 1rem; border-radius: var(--radius-lg); color: #78350f; text-decoration: none;
+  background: #fffbeb; border: 1px solid #fcd34d; box-shadow: var(--shadow);
+}
+.requests-banner:hover { text-decoration: none; background: #fef3c7; }
+.requests-banner ul { list-style: none; margin: 0.3rem 0; padding: 0; font-size: 0.9rem; }
+.requests-banner .go { font-weight: 600; font-size: 0.9rem; color: var(--primary); }
+.bell { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 2.2rem; height: 2.2rem; color: #fff; }
+.bell b {
+  position: absolute; top: -0.1rem; inset-inline-start: -0.15rem; min-width: 1.15rem; height: 1.15rem; padding: 0 0.25rem; border-radius: 999px;
+  background: #ef4444; color: #fff; font-size: 0.7rem; line-height: 1.15rem; text-align: center; font-weight: 700;
+}
+.notif-list a { display: flex; flex-direction: column; gap: 0.1rem; color: inherit; text-decoration: none; }
+.notif-list li.unread { background: var(--primary-soft); margin-inline: -0.5rem; padding-inline: 0.5rem; border-radius: 8px; }

@@ -17,6 +17,7 @@ import EventPage from './pages/event/EventPage';
 import ProfilePage from './pages/ProfilePage';
 import JoinPage from './pages/JoinPage';
 import RequestsPage from './pages/RequestsPage';
+import NotificationsPage from './pages/NotificationsPage';
 import { pendingJoin, rememberJoin } from './lib/join';
 import type { Mode } from './lib/types';
 import { FamilyChat, FamilyEvents, FamilyHome, FamilySurveys, FamilyTasks } from './pages/family/Family';
@@ -71,6 +72,7 @@ function Gate() {
         <Route path="player/:playerId" element={<PlayerPage />} />
         <Route path="me" element={<ProfilePage />} />
         <Route path="requests" element={<RequestsPage />} />
+        <Route path="notifications" element={<NotificationsPage />} />
         <Route path="event/:eventId" element={<EventPage />} />
         <Route path="event/:eventId/prep" element={<EventPrepPage />} />
         <Route path="home" element={<FamilyHome />} />

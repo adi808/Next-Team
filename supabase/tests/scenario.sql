@@ -569,6 +569,8 @@ select t.check('a parent says "not interested" (0 seats)', (select seats from ev
 select set_transport_seats(t.id('jev'), 3, t.id('jkid'));
 select t.check('a parent sets the number of passengers', event_transport_total(t.id('jev')) = 3);
 select t.as_user('JO');
+select send_test_notification();
+select t.check('a test notification reaches only the caller', (select count(*) from notifications where title = 'התראת ניסיון') = 1);
 select t.denied('an outsider cannot set seats', $$select set_transport_seats(t.id('jev'), 1, t.id('jkid'))$$);
 reset role;
 

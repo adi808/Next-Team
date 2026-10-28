@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { mutateOne, rpc, useAction } from '../lib/db';
 import { uploadImage } from '../lib/images';
@@ -6,6 +6,8 @@ import { useAuth } from '../auth/AuthProvider';
 import { Card, ErrorText, Field, PageHero } from '../components/ui';
 import { Picture, PicturePicker } from '../components/Picture';
 import { Link } from 'react-router-dom';
+import { disablePush, enablePush, pushState, type PushState } from '../lib/push';
+import { isDemo } from '../lib/supabase';
 
 export default function ProfilePage() {
   const { profile, reload, modes } = useAuth();
@@ -48,6 +50,38 @@ export default function ProfilePage() {
           {saved && <span className="ok">נשמר</span>}
         </div>
       </Card>
+      {!isDemo && <PushCard />}
     </>
+  );
+}
+
+function PushCard() {
+  const [state, setState] = useState<PushState | null>(null);
+  const act = useAction();
+  const [sent, setSent] = useState(false);
+  useEffect(() => { pushState().then(setState, () => setState('unsupported')); }, []);
+  const toggle = () => act.run(async () => setState(state === 'on' ? await disablePush() : await enablePush()));
+  return (
+    <Card title="🔔 התראות למכשיר">
+      {state === null && <p className="muted">בודק…</p>}
+      {state === 'unsupported' && (
+        <p>המכשיר או הדפדפן לא תומכים בהתראות. באייפון: פתחו בספארי, לחצו "שיתוף" ואז "הוסף למסך הבית", ופתחו את האפליקציה משם (iOS 16.4 ומעלה).</p>
+      )}
+      {state === 'denied' && <p>ההתראות חסומות בהגדרות הדפדפן. אפשרו אותן לאתר הזה ונסו שוב.</p>}
+      {(state === 'on' || state === 'off') && (
+        <>
+          <p>{state === 'on' ? 'ההתראות פעילות במכשיר הזה.' : 'קבלו התראה על בקשות הצטרפות, אישורים ועדכונים.'}</p>
+          <div className="row wrap">
+            <button className={state === 'on' ? 'secondary' : ''} disabled={act.busy} onClick={toggle}>{state === 'on' ? 'כיבוי התראות' : 'הפעלת התראות'}</button>
+            {state === 'on' && (
+              <button className="secondary" disabled={act.busy}
+                onClick={() => act.run(async () => { await rpc('send_test_notification'); setSent(true); })}>שליחת התראת ניסיון</button>
+            )}
+          </div>
+          {sent && <p className="ok">נשלחה. תוך כמה שניות היא אמורה לקפוץ.</p>}
+        </>
+      )}
+      <ErrorText error={act.error} />
+    </Card>
   );
 }
