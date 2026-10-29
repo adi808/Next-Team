@@ -17,6 +17,7 @@ import SurveysTab from './SurveysTab';
 import ChatTab from './ChatTab';
 import LeagueTab from './LeagueTab';
 import SettingsTab from './SettingsTab';
+import { TeamContacts } from '../../components/Contacts';
 
 export interface TeamTabProps {
   team: Team;
@@ -62,6 +63,7 @@ export default function TeamPage(opts: { teamId?: string; initialTab?: string })
     { id: 'tasks', label: 'משימות', render: () => <TasksTab {...props} /> },
     { id: 'surveys', label: 'סקרים', render: () => <SurveysTab {...props} /> },
     { id: 'chat', label: 'הודעות', render: () => <ChatTab {...props} /> },
+    { id: 'contacts', label: 'אנשי קשר', render: () => <TeamContacts teamId={team.id} clubId={team.club_id} /> },
     ...(sport?.slug === 'football' ? [{ id: 'league', label: 'ליגה', render: () => <LeagueTab {...props} /> }] : []),
     ...(canManage ? [{ id: 'settings', label: 'הגדרות', render: () => <SettingsTab {...props} /> }] : []),
   ];

@@ -44,7 +44,10 @@ export interface Sport {
   sort_order: number;
 }
 
-export interface Club { id: string; name: string; logo_path: string | null }
+export interface Club {
+  id: string; name: string; logo_path: string | null;
+  phone?: string | null; email?: string | null; address?: string; website?: string;
+}
 export interface Team { id: string; club_id: string; name: string; sport_id: string; photo_path: string | null }
 
 export interface Player {

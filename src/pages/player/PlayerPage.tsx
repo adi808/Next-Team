@@ -10,10 +10,12 @@ import { AttributesPanel } from '../../components/Attributes';
 import { useLookupName, useLookups } from '../../components/Lookups';
 import { Picture } from '../../components/Picture';
 import { PlayerAvatar, ShirtNo, useShirtNumbers } from '../../components/People';
+import { ContactLinks, fmtPhone } from '../../components/Contacts';
 import { average, defsFor, latestRatings } from '../../lib/scores';
 import type { AttrDef, AttrValue, EntityRole, EventStat, Player, Team } from '../../lib/types';
 
 interface Guardian { parent_id: string; full_name: string; avatar_path: string | null; relation_id: string | null }
+interface Details { phone: string | null; account_email: string | null }
 
 export default function PlayerPage() {
   const { playerId = '' } = useParams();
@@ -26,7 +28,9 @@ export default function PlayerPage() {
     const teams = links.length ? await q<Team[]>(supabase.from('teams').select('id, club_id, name, sport_id, photo_path').in('id', links.map((l) => l.team_id))) : [];
     const guardians = await rpc<Guardian[]>('player_guardians', { p_player: playerId });
     const stats = await q<EventStat[]>(supabase.from('event_stats').select('*').eq('player_id', playerId));
-    return { player, teams, guardians, stats };
+    // Contact details, for staff, the player's parents and the player (empty for anyone else).
+    const [details] = await rpc<Details[]>('player_details', { p_player: playerId });
+    return { player, teams, guardians, stats, details: details ?? null };
   }, [playerId]);
   const shirt = useShirtNumbers(playerId ? [playerId] : []);
   const relations = useLookups('guardian_relation');
@@ -34,11 +38,12 @@ export default function PlayerPage() {
   const act = useAction();
   const [name, setName] = useState<string | null>(null);
   const [birth, setBirth] = useState<string | null>(null);
+  const [phone, setPhone] = useState<string | null>(null);
   const [accountEmail, setAccountEmail] = useState('');
   const [parentEmail, setParentEmail] = useState('');
 
   if (!data) return <Loading loading={loading} error={error} />; // on reload, keep showing the page (and its open tab)
-  const { player, teams, guardians, stats } = data;
+  const { player, teams, guardians, stats, details } = data;
   const isSys = acting === 'system_admin' && !!auth.profile?.is_system_admin;
   const isAdmin = acting === 'club_admin' && auth.adminClubIds.includes(player.club_id);
   const isCoach = acting === 'coach' && teams.some((t) => auth.coachTeamIds.includes(t.id));
@@ -54,8 +59,9 @@ export default function PlayerPage() {
 
   async function saveProfile() {
     await act.run(async () => {
-      await rpc('update_player', { p_player: player.id, p_full_name: name, p_birth_date: birth });
-      setName(null); setBirth(null); reload();
+      if (name !== null || birth !== null) await rpc('update_player', { p_player: player.id, p_full_name: name, p_birth_date: birth });
+      if (phone !== null) await rpc('set_player_phone', { p_player: player.id, p_phone: phone.trim() || null });
+      setName(null); setBirth(null); setPhone(null); reload();
     });
   }
   async function upload(file: File) {
@@ -80,9 +86,20 @@ export default function PlayerPage() {
         <Card title="פרטי שחקן">
           <Field label="שם מלא"><input value={name ?? player.full_name} onChange={(e) => setName(e.target.value)} /></Field>
           <Field label="תאריך לידה"><input type="date" value={birth ?? player.birth_date ?? ''} onChange={(e) => setBirth(e.target.value)} /></Field>
+          <Field label="טלפון של השחקן (לא חובה, גלוי לחברי הקבוצה)">
+            <input type="tel" dir="ltr" inputMode="tel" placeholder="050-1234567"
+              value={phone ?? (details?.phone ? fmtPhone(details.phone) : '')} onChange={(e) => setPhone(e.target.value)} />
+          </Field>
+          {details?.account_email && <small className="muted">מייל הכניסה של השחקן: <bdi>{details.account_email}</bdi></small>}
           <Field label="תמונה"><input type="file" accept="image/*" onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])} /></Field>
           <ErrorText error={act.error} />
-          <button disabled={(name === null && birth === null) || act.busy} onClick={saveProfile}>שמירה</button>
+          <button disabled={(name === null && birth === null && phone === null) || act.busy} onClick={saveProfile}>שמירה</button>
+        </Card>
+      )}
+
+      {isSelf && details && (
+        <Card title="פרטי קשר">
+          <ContactLinks phone={details.phone} email={details.account_email} />
         </Card>
       )}
 

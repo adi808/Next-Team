@@ -93,7 +93,7 @@ export function seed(): Tables {
       { id: 'sp_bb', slug: 'basketball', name_he: 'כדורסל', sort_order: 2, icon_path: 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zM12 2v20M2 12h20M5 5c3 3 3 11 0 14M19 5c-3 3-3 11 0 14' },
     ],
     lookups,
-    clubs: [{ id: 'c1', name: 'מכבי הצפון' }],
+    clubs: [{ id: 'c1', name: 'מכבי הצפון', phone: '+97246001234', email: 'office@maccabi-north.example', address: 'רחוב הספורט 10, חיפה', website: 'www.maccabi-north.example' }],
     teams: [
       { id: 't1', club_id: 'c1', name: 'ילדים ב׳', sport_id: 'sp_fb' },
       { id: 't2', club_id: 'c1', name: 'נוער כדורסל', sport_id: 'sp_bb' },
@@ -104,12 +104,12 @@ export function seed(): Tables {
     ],
     profiles: [
       { id: 'u_sys', email: 'yossi@demo.nextteam.app', phone: null, full_name: 'יוסי אברהם', is_system_admin: true },
-      { id: 'u_admin', email: 'ronit@demo.nextteam.app', phone: null, full_name: 'רונית מזרחי', is_system_admin: false },
-      { id: 'u_coach', email: 'avi@demo.nextteam.app', phone: null, full_name: 'אבי כץ', is_system_admin: false },
-      { id: 'u_coach2', email: 'michal@demo.nextteam.app', phone: null, full_name: 'מיכל ברק', is_system_admin: false },
-      { id: 'u_p1', email: 'sara@demo.nextteam.app', phone: null, full_name: 'שרה כהן', is_system_admin: false },
+      { id: 'u_admin', email: 'ronit@demo.nextteam.app', phone: '+972521112233', full_name: 'רונית מזרחי', is_system_admin: false },
+      { id: 'u_coach', email: 'avi@demo.nextteam.app', phone: '+972501234567', full_name: 'אבי כץ', is_system_admin: false },
+      { id: 'u_coach2', email: 'michal@demo.nextteam.app', phone: '+972547654321', full_name: 'מיכל ברק', is_system_admin: false },
+      { id: 'u_p1', email: 'sara@demo.nextteam.app', phone: '+972528887766', full_name: 'שרה כהן', is_system_admin: false },
       { id: 'u_k2', email: 'roni@demo.nextteam.app', phone: null, full_name: 'רוני לוי', is_system_admin: false },
-      { id: 'u_p2', email: 'david@demo.nextteam.app', phone: null, full_name: 'דוד לוי', is_system_admin: false },
+      { id: 'u_p2', email: 'david@demo.nextteam.app', phone: '+972503334455', full_name: 'דוד לוי', is_system_admin: false },
       { id: 'u_p4', email: 'ilana@demo.nextteam.app', phone: null, full_name: 'אילנה פרידמן', is_system_admin: false },
     ],
     memberships: [

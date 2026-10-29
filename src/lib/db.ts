@@ -13,6 +13,7 @@ const BY_CODE: Record<string, string> = {
 
 export function friendlyError(e: unknown): string {
   const err = e as PgError;
+  if (err?.message?.includes('phone number belongs')) return 'מספר הטלפון כבר שייך לחשבון אחר';
   if (err?.code && BY_CODE[err.code]) return BY_CODE[err.code];
   if (err?.code === '22023') return `הנתונים שהוזנו אינם תקינים (${err.message})`;
   return err?.message ?? 'משהו השתבש';

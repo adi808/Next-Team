@@ -574,6 +574,35 @@ select t.check('a test notification reaches only the caller', (select count(*) f
 select t.denied('an outsider cannot set seats', $$select set_transport_seats(t.id('jev'), 1, t.id('jkid'))$$);
 reset role;
 
+-- ---------------------------------------------------------------- contacts (0027)
+set role authenticated;
+select t.as_user('JP');
+select update_my_profile('הורה', '050-111 2233');
+select t.check('a parent saves a phone (normalized)', (select phone from profiles where id = t.id('JP')) = '+972501112233');
+select set_player_phone(t.id('jkid'), '052-9998877');
+select t.check('a parent sees the staff in the team contacts', exists (select 1 from team_contacts(t.id('JT'))
+  where kind = 'staff' and person_id = t.id('JM') and email = 'j02@test.io'));
+select t.check('a parent sees the club admin in the team contacts', exists (select 1 from team_contacts(t.id('JT'))
+  where kind = 'admin' and person_id = t.id('JA')));
+select t.as_user('JM');
+select t.check('staff see a parent''s phone and children', exists (select 1 from team_contacts(t.id('JT'))
+  where kind = 'parent' and person_id = t.id('JP') and phone = '+972501112233' and note = 'ילד'));
+select t.check('the child''s phone is in the team contacts', exists (select 1 from team_contacts(t.id('JT'))
+  where kind = 'player' and person_id = t.id('jkid') and phone = '+972529998877'));
+select t.as_user('JO');
+select t.check('an outsider sees no team contacts', not exists (select 1 from team_contacts(t.id('JT'))));
+select t.denied('an outsider cannot set a player''s phone', $$select set_player_phone(t.id('jkid'), '0501234567')$$);
+select t.denied('an outsider cannot edit the club details', $$select update_club_details(t.id('jclub'), '03-1234567', null, '', '')$$);
+select t.as_user('JM');
+select t.denied('staff cannot edit the club details', $$select update_club_details(t.id('jclub'), '03-1234567', null, '', '')$$);
+select t.as_user('JA');
+select update_club_details(t.id('jclub'), '03-123 4567', 'Office@Club.Example', 'רחוב 1', 'club.example');
+select t.denied('the club email must be valid', $$select update_club_details(t.id('jclub'), null, 'not-an-email', '', '')$$);
+select t.as_user('JP');
+select t.check('a parent reads the club contact details', (select phone = '+97231234567' and email = 'office@club.example'
+  from clubs where id = t.id('jclub')));
+reset role;
+
 -- ---------------------------------------------------------------- summary
 reset role;
 select case when count(*) filter (where not ok) = 0

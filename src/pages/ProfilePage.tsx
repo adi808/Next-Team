@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
-import { supabase } from '../lib/supabase';
-import { mutateOne, rpc, useAction } from '../lib/db';
+import { rpc, useAction } from '../lib/db';
 import { uploadImage } from '../lib/images';
 import { useAuth } from '../auth/AuthProvider';
 import { Card, ErrorText, Field, PageHero } from '../components/ui';
@@ -8,10 +7,12 @@ import { Picture, PicturePicker } from '../components/Picture';
 import { Link } from 'react-router-dom';
 import { disablePush, enablePush, pushDiagnostics, pushState, showLocalTest, wantsPush, type PushState } from '../lib/push';
 import { isDemo } from '../lib/supabase';
+import { fmtPhone } from '../components/Contacts';
 
 export default function ProfilePage() {
   const { profile, reload, modes } = useAuth();
   const [name, setName] = useState(profile?.full_name ?? '');
+  const [phone, setPhone] = useState(profile?.phone ? fmtPhone(profile.phone) : '');
   const [saved, setSaved] = useState(false);
   const act = useAction();
   if (!profile) return null;
@@ -23,9 +24,10 @@ export default function ProfilePage() {
       reload();
     });
   }
-  async function saveName() {
+  const phoneChanged = phone.trim() !== (profile.phone ? fmtPhone(profile.phone) : '');
+  async function saveDetails() {
     await act.run(async () => {
-      await mutateOne(supabase.from('profiles').update({ full_name: name.trim() }).eq('id', profile!.id).select('id'));
+      await rpc('update_my_profile', { p_full_name: name.trim(), p_phone: phone.trim() || null });
       setSaved(true);
       reload();
     });
@@ -39,14 +41,18 @@ export default function ProfilePage() {
         <div className="profile-card">
           <Picture bucket="avatars" path={profile.avatar_path} name={profile.full_name || profile.email || '?'} size={96} />
           <PicturePicker label={profile.avatar_path ? 'החלפת תמונה' : 'הוספת תמונה'} busy={act.busy} onPick={setAvatar} />
-          <small className="muted"><bdi>{profile.email}</bdi></small>
+          <small className="muted">מייל: <bdi>{profile.email}</bdi> (כתובת הכניסה)</small>
         </div>
         <Field label="השם שיוצג לאחרים">
           <input value={name} onChange={(e) => { setName(e.target.value); setSaved(false); }} placeholder="שם מלא" />
         </Field>
+        <Field label="טלפון (לא חובה, גלוי לחברי הקבוצה)">
+          <input type="tel" dir="ltr" inputMode="tel" autoComplete="tel" value={phone} placeholder="050-1234567"
+            onChange={(e) => { setPhone(e.target.value); setSaved(false); }} />
+        </Field>
         <ErrorText error={act.error} />
         <div className="row">
-          <button disabled={!name.trim() || name.trim() === profile.full_name || act.busy} onClick={saveName}>שמירה</button>
+          <button disabled={!name.trim() || (name.trim() === profile.full_name && !phoneChanged) || act.busy} onClick={saveDetails}>שמירה</button>
           {saved && <span className="ok">נשמר</span>}
         </div>
       </Card>

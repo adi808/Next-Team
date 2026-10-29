@@ -23,6 +23,7 @@ Built: everything in the business spec except features marked "proposed" there.
 | Staff and parents | staff type per membership (list `staff_role`: team manager, head coach, assistant, fitness, secretary, medic; a label only, every team staff member has the coach's permissions), shown to the whole team; a parent's relation to the child (list `guardian_relation`: mom, dad, guardian) |
 | League | team parameter `league_url` (the team's page on football.org.il); the team's "league" tab shows the league table and fixtures, read by the `league` Edge Function (`supabase/functions/league`) |
 | Transport | staff turn on transport (הסעה) for an event; a parent answers per child "not interested" or the number of passengers, staff for themselves; everyone sees the total, staff see who travels (`event_transport`) |
+| Contacts | phone (optional) and email for everyone: own profile (club admin, staff, parent), player (parent or staff edit; the player's own account email), club (phone, email, address, website; club admin edits). The team's "contacts" tab lists the club, its admins, the staff, the parents (with their children) and the players with call / WhatsApp / email buttons, for every member of the team (`team_contacts`) |
 | Join link | one link per team (`join_links`); a signed-in member is recognised, anyone else picks coach / team manager / parent (with children) and sends a request; the club admin decides staff, the team's staff decide parents (`join_requests`, Requests screen) |
 | Notifications | in-app list, Web Push (`send-push`) and, for join requests and their answers, email through Brevo (`send-email`) |
 
@@ -35,7 +36,7 @@ Built: everything in the business spec except features marked "proposed" there.
 `npm run build:demo` writes `dist-demo/next-team-demo.html`: one self-contained page with the real UI and an in-browser sample backend (`src/demo/`), with a person picker. It is excluded from the production bundle. `node tests/demo-e2e.cjs` drives it (65 checks).
 
 ### Verified
-* `supabase/tests/scenario.sql`: 149 role-by-role checks on Postgres 16 (against a stub `auth` schema). Run it with `supabase/tests/stub_auth.sql` first, then the migrations, then the scenario.
+* `supabase/tests/scenario.sql`: 172 role-by-role checks on Postgres 16 (against a stub `auth` schema). Run it with `supabase/tests/stub_auth.sql` first, then the migrations, then the scenario.
 * `tests/api-integration.cjs`: 29 checks over HTTP through a real PostgREST 12 with signed JWTs per role: table and function exposure, grants, RLS, RPCs with named parameters, error responses.
 * `tests/ui-e2e.cjs`: 44 checks with the built UI in a real browser against that PostgREST and database, one session per role (coach, parent, player, club admin, system admin, outsider), including saving an attendance answer and posting a message.
 * `tests/ui-smoke.cjs`: the same screens against a mocked API (this found and fixed a reload loop).

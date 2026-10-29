@@ -534,3 +534,13 @@ legend { font-weight: 600; font-size: 0.9rem; padding: 0 0.35rem; }
 .transport-line { display: block; padding: 0.55rem 0.8rem; border-radius: var(--radius); background: var(--primary-soft); color: var(--text); text-decoration: none; }
 .transport-line:hover { text-decoration: none; background: #dbe6fe; }
 .transport-line strong { color: var(--primary); font-size: 1.15rem; }
+
+/* ---- contacts ---- */
+.contacts .contact { display: flex; align-items: flex-start; gap: 0.6rem; padding: 0.55rem 0; }
+.contacts .contact + .contact { border-top: 1px solid var(--border); }
+.contact-links { display: flex; flex-wrap: wrap; gap: 0.35rem 0.5rem; margin-top: 0.3rem; }
+.contact-links a {
+  display: inline-flex; align-items: center; gap: 0.25rem; padding: 0.2rem 0.6rem; border-radius: 999px;
+  background: var(--primary-soft); font-size: 0.85rem; text-decoration: none; word-break: break-all;
+}
+.contact-extra { margin: 0.4rem 0 0; font-size: 0.9rem; }
