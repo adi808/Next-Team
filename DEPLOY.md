@@ -42,6 +42,8 @@
 אחר כך המאמן מדביק בלשונית הליגה (או בהגדרות הקבוצה) את כתובת דף הקבוצה, למשל `https://www.football.org.il/team-details/?team_id=8776&season_id=28`.
 
 ## מיילים לאישור בקשות הצטרפות (Brevo, חינמי)
+**כרגע לא בשימוש:** בייצור ההתראות נשלחות באפליקציה וב־Push בלבד. הפונקציה `send-email` פרוסה אבל לא פועלת כל עוד לא הוגדרו `email_hook_url` ו־`BREVO_API_KEY`. השלבים כאן לשימוש עתידי.
+
 1. ב־brevo.com: הרשמה, ואז Senders, Domains & Dedicated IPs ← Senders: אמתו את כתובת השולח.
 2. SMTP & API ← API Keys: צרו מפתח.
 3. ב־Supabase ← Edge Functions ← Secrets הוסיפו: `BREVO_API_KEY` (המפתח), `MAIL_FROM` (כתובת השולח המאומתת), `APP_URL` (כתובת האתר, למשל `https://next-team.pages.dev`).

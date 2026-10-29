@@ -27,7 +27,7 @@ Built: everything in the business spec except features marked "proposed" there.
 | Parents | both parents of a child with relation (mom / dad / guardian), phone and email. A parent or the staff add the second parent (also in the join form); without an account they are kept as a contact (`guardian_contacts`), and signing in with that email links them to the child |
 | Roster | club admins (whole club, filter by team) and coaches (their team) see a table of every child with parents and contact details; search, edit a child and its parents, unlink a parent, delete a child (club admin), export to Excel (CSV) (`club_roster`) |
 | Join link | one link per team (`join_links`); a signed-in member is recognised, anyone else picks coach / team manager / parent (with children) and sends a request; the club admin decides staff, the team's staff decide parents (`join_requests`, Requests screen) |
-| Notifications | in-app list, Web Push (`send-push`) and, for join requests and their answers, email through Brevo (`send-email`) |
+| Notifications | in-app list, Web Push (`send-push`) and, for join requests and their answers, email through Brevo (`send-email`, not enabled yet: production uses in-app and push only) |
 
 ### Generic by design
 * `lookups` - every "choose from a list" value (event types, absence reasons, match formats, formations, stat types). New values and new lists need no code (`upsert_lookup`, Lists screen). Dependent lists use `parent_id`; sport- and club-specific values use `sport_id` / `club_id`.
