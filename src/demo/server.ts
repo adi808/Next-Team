@@ -402,6 +402,123 @@ export class DemoServer {
           return { membership_id: m.id, user_id: m.user_id, full_name: p?.full_name || p?.email || '', avatar_path: p?.avatar_path ?? null, staff_role_id: m.staff_role_id ?? null };
         });
     },
+    update_my_profile(this: DemoServer, a: Row) {
+      const phone = normPhone(a.p_phone);
+      if (phone && this.t.profiles.some((p) => p.phone === phone && p.id !== this.uid)) throw new PgError('23505', 'this phone number belongs to another account');
+      const me = this.find('profiles', this.uid)!;
+      me.full_name = String(a.p_full_name ?? '').trim() || me.full_name;
+      me.phone = phone;
+    },
+    player_details(this: DemoServer, a: Row) {
+      const p = this.find('players', a.p_player);
+      if (!p || !(this.managePlayer(p.id) || this.parentOf(p.id) || this.selfPlayer(p.id))) return [];
+      return [{ id: p.id, full_name: p.full_name, birth_date: p.birth_date, phone: p.phone ?? null, photo_path: p.photo_path ?? null,
+        photo_consent: !!p.photo_consent, account_email: p.user_id ? this.find('profiles', p.user_id)?.email ?? null : null,
+        invite_email: null, can_edit: this.managePlayer(p.id) || this.parentOf(p.id), is_parent: this.parentOf(p.id) }];
+    },
+    set_player_phone(this: DemoServer, a: Row) {
+      if (!(this.managePlayer(a.p_player) || this.parentOf(a.p_player))) this.deny();
+      this.find('players', a.p_player)!.phone = normPhone(a.p_phone);
+    },
+    update_club_details(this: DemoServer, a: Row) {
+      if (!(this.sys || this.adminOf(a.p_club))) this.deny();
+      const email = String(a.p_email ?? '').trim().toLowerCase();
+      if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) this.bad('invalid email');
+      Object.assign(this.find('clubs', a.p_club)!, { phone: normPhone(a.p_phone), email: email || null,
+        address: String(a.p_address ?? '').trim(), website: String(a.p_website ?? '').trim() });
+    },
+    team_contacts(this: DemoServer, a: Row) {
+      if (!this.member(a.p_team)) return [];
+      const club = this.clubOfTeam(a.p_team);
+      const person = (kind: string, id: string, extra: Row = {}) => {
+        const p = this.find('profiles', id)!;
+        return { kind, person_id: id, full_name: p.full_name || p.email || '', avatar_path: p.avatar_path ?? null, email: p.email ?? null,
+          phone: p.phone ?? null, staff_role_id: null, note: null, ...extra };
+      };
+      const kids = this.t.team_players.filter((x) => x.team_id === a.p_team).map((x) => this.find('players', x.player_id)!);
+      const parents = new Map<string, string[]>();
+      this.t.guardianships.filter((g) => g.status === 'approved' && kids.some((k) => k.id === g.player_id))
+        .forEach((g) => parents.set(g.parent_id, [...(parents.get(g.parent_id) ?? []), this.find('players', g.player_id)!.full_name]));
+      const rows = [
+        ...this.t.memberships.filter((m) => m.club_id === club && m.role === 'club_admin').map((m) => person('admin', m.user_id)),
+        ...[...parents].map(([id, names]) => person('parent', id, { note: names.sort().join(', ') })),
+        ...(this.t.guardian_contacts ?? []).filter((c) => kids.some((k) => k.id === c.player_id)).map((c) => ({ kind: 'parent', person_id: c.id,
+          full_name: c.full_name, avatar_path: null, email: c.email ?? null, phone: c.phone ?? null, staff_role_id: null, note: this.find('players', c.player_id)!.full_name })),
+        ...kids.map((k) => ({ kind: 'player', person_id: k.id, full_name: k.full_name, avatar_path: null,
+          email: k.user_id ? this.find('profiles', k.user_id)?.email ?? null : null, phone: k.phone ?? null, staff_role_id: null, note: null })),
+        ...this.t.memberships.filter((m) => m.team_id === a.p_team && m.role === 'coach').map((m) => person('staff', m.user_id, { staff_role_id: m.staff_role_id ?? null })),
+      ];
+      return rows.sort((x, y) => x.kind.localeCompare(y.kind) || x.full_name.localeCompare(y.full_name, 'he'));
+    },
+    player_parents(this: DemoServer, a: Row) {
+      if (!(this.managePlayer(a.p_player) || this.parentOf(a.p_player) || this.selfPlayer(a.p_player))) return [];
+      const accounts = this.t.guardianships.filter((g) => g.player_id === a.p_player && g.status === 'approved').map((g) => {
+        const p = this.find('profiles', g.parent_id)!;
+        return { kind: 'account', id: p.id, full_name: p.full_name || p.email || '', avatar_path: p.avatar_path ?? null, relation_id: g.relation_id ?? null, phone: p.phone ?? null, email: p.email ?? null };
+      });
+      const contacts = (this.t.guardian_contacts ?? []).filter((c) => c.player_id === a.p_player)
+        .map((c) => ({ kind: 'contact', id: c.id, full_name: c.full_name, avatar_path: null, relation_id: c.relation_id ?? null, phone: c.phone ?? null, email: c.email ?? null }));
+      const byName = (x: Row, y: Row) => String(x.full_name).localeCompare(String(y.full_name), 'he');
+      return [...accounts.sort(byName), ...contacts.sort(byName)];
+    },
+    add_guardian(this: DemoServer, a: Row) {
+      if (!(this.managePlayer(a.p_player) || this.parentOf(a.p_player))) this.deny();
+      if (!String(a.p_full_name ?? '').trim()) this.bad('a name is required');
+      const email = String(a.p_email ?? '').trim().toLowerCase() || null;
+      const account = email ? this.t.profiles.find((p) => p.email === email) : null;
+      if (account) {
+        if (this.t.guardianships.some((g) => g.player_id === a.p_player && g.parent_id === account.id && g.status === 'approved')) throw new PgError('23505', 'this parent is already linked to the child');
+        this.t.guardianships.push({ id: this.id('g'), parent_id: account.id, player_id: a.p_player, status: 'approved', relation_id: a.p_relation ?? null });
+        return;
+      }
+      (this.t.guardian_contacts ??= []).push({ id: this.id('gc'), player_id: a.p_player, full_name: String(a.p_full_name).trim(), relation_id: a.p_relation ?? null, phone: normPhone(a.p_phone), email });
+    },
+    update_guardian_contact(this: DemoServer, a: Row) {
+      const c = (this.t.guardian_contacts ?? []).find((x) => x.id === a.p_id);
+      if (!c) throw new PgError('P0002', 'not found');
+      if (!(this.managePlayer(c.player_id) || this.parentOf(c.player_id))) this.deny();
+      Object.assign(c, { full_name: String(a.p_full_name ?? '').trim() || c.full_name, relation_id: a.p_relation ?? null, phone: normPhone(a.p_phone), email: String(a.p_email ?? '').trim().toLowerCase() || null });
+    },
+    remove_guardian_contact(this: DemoServer, a: Row) {
+      const c = (this.t.guardian_contacts ?? []).find((x) => x.id === a.p_id);
+      if (!c) throw new PgError('P0002', 'not found');
+      if (!(this.managePlayer(c.player_id) || this.parentOf(c.player_id))) this.deny();
+      this.t.guardian_contacts = this.t.guardian_contacts.filter((x) => x.id !== a.p_id);
+    },
+    unlink_guardian(this: DemoServer, a: Row) {
+      if (!this.managePlayer(a.p_player)) this.deny();
+      this.t.guardianships = this.t.guardianships.filter((g) => !(g.player_id === a.p_player && g.parent_id === a.p_parent));
+    },
+    update_parent_profile(this: DemoServer, a: Row) {
+      if (!this.t.guardianships.some((g) => g.parent_id === a.p_parent && g.status === 'approved' && this.managePlayer(g.player_id))) this.deny();
+      const p = this.find('profiles', a.p_parent)!;
+      p.full_name = String(a.p_full_name ?? '').trim() || p.full_name;
+      p.phone = normPhone(a.p_phone);
+    },
+    delete_player(this: DemoServer, a: Row) {
+      const p = this.find('players', a.p_player);
+      if (!p) throw new PgError('P0002', 'not found');
+      if (!(this.sys || this.adminOf(p.club_id))) this.deny();
+      const t = this.t;
+      t.players = t.players.filter((x) => x.id !== p.id);
+      for (const k of ['team_players', 'guardianships', 'guardian_contacts', 'event_responses', 'event_stats', 'task_assignments', 'player_goals']) {
+        if (t[k]) t[k] = t[k].filter((x) => x.player_id !== p.id);
+      }
+      t.attribute_values = t.attribute_values.filter((v) => v.entity_id !== p.id);
+    },
+    club_roster(this: DemoServer, a: Row) {
+      return this.t.players
+        .filter((p) => p.club_id === a.p_club && (this.sys || this.adminOf(a.p_club) || this.coachesPlayer(p.id)))
+        .filter((p) => !a.p_team || this.t.team_players.some((x) => x.team_id === a.p_team && x.player_id === p.id))
+        .sort((x, y) => String(x.full_name).localeCompare(String(y.full_name), 'he'))
+        .map((p) => {
+          const teams = this.teamsOf(p.id).map((id) => this.find('teams', id)!).sort((x, y) => String(x.name).localeCompare(String(y.name), 'he'));
+          return { player_id: p.id, full_name: p.full_name, birth_date: p.birth_date, phone: p.phone ?? null,
+            email: p.user_id ? this.find('profiles', p.user_id)?.email ?? null : null,
+            team_ids: teams.map((t) => t.id), team_names: teams.map((t) => t.name).join(', '),
+            parents: this.rpcs.player_parents.call(this, { p_player: p.id }) };
+        });
+    },
     delete_event(this: DemoServer, a: Row) {
       const e = this.find('events', a.p_event);
       if (!e || !this.manageTeam(e.team_id)) this.deny();
@@ -616,3 +733,11 @@ const DEMO_LEAGUE = () => {
     },
   };
 };
+
+// Same rules as norm_phone in the database: digits only, a leading 0 becomes +972.
+function normPhone(p: unknown): string | null {
+  const raw = String(p ?? ''); const d = raw.replace(/\D/g, '');
+  if (!d) return null;
+  if (raw.trim().startsWith('+')) return `+${d}`;
+  return d.startsWith('0') ? `+972${d.slice(1)}` : `+${d}`;
+}

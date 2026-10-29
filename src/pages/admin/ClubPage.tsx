@@ -12,6 +12,8 @@ import { Picture, PicturePicker } from '../../components/Picture';
 import { uploadImage } from '../../lib/images';
 import { PersonAvatar, useNames } from '../../components/People';
 import { StaffRoleSelect } from '../../components/Staff';
+import { fmtPhone } from '../../components/Contacts';
+import { Roster } from '../../components/Roster';
 import type { Club, Team } from '../../lib/types';
 
 interface StaffMembership { id: string; user_id: string; team_id: string | null; role: 'club_admin' | 'coach'; staff_role_id: string | null }
@@ -24,7 +26,7 @@ export default function ClubPage() {
   const acting = useActingRole();
   const { data, loading, error, reload } = useLoad(async () => {
     const [club, teams, staff] = await Promise.all([
-      q<Club>(supabase.from('clubs').select('id, name, logo_path').eq('id', clubId).single()),
+      q<Club>(supabase.from('clubs').select('id, name, logo_path, phone, email, address, website').eq('id', clubId).single()),
       q<Team[]>(supabase.from('teams').select('id, club_id, name, sport_id, photo_path').eq('club_id', clubId).order('name')),
       q<StaffMembership[]>(supabase.from('memberships').select('id, user_id, team_id, role, staff_role_id').eq('club_id', clubId).order('created_at')),
     ]);
@@ -189,6 +191,8 @@ export default function ClubPage() {
             </>
           ),
         },
+        { id: 'roster', label: 'שחקנים והורים', render: () => <Roster clubId={clubId} teams={data.teams} isClubAdmin title={`שחקנים והורים - ${data.club.name}`} /> },
+        { id: 'contact', label: 'פרטי קשר', render: () => <ClubContactCard club={data.club} onSaved={reload} /> },
         {
           id: 'params', label: 'פרמטרים לשחקנים', render: () => (
             <>
@@ -202,5 +206,35 @@ export default function ClubPage() {
         },
       ]} />
     </>
+  );
+}
+
+/** The club's phone, email, address and website; every member of the club sees them in a team's contact list. */
+function ClubContactCard({ club, onSaved }: { club: Club; onSaved: () => void }) {
+  const initial = { phone: club.phone ? fmtPhone(club.phone) : '', email: club.email ?? '', address: club.address ?? '', website: club.website ?? '' };
+  const [f, setF] = useState(initial);
+  const [saved, setSaved] = useState(false);
+  const act = useAction();
+  const set = (k: keyof typeof f) => (e: { target: { value: string } }) => { setF({ ...f, [k]: e.target.value }); setSaved(false); };
+  const changed = (Object.keys(f) as (keyof typeof f)[]).some((k) => f[k].trim() !== initial[k]);
+  const bad = !!f.email.trim() && !normEmail(f.email);
+  return (
+    <Card title="פרטי הקשר של המועדון">
+      <p className="muted">כל השדות לא חובה. ההורים והשחקנים רואים אותם בלשונית "אנשי קשר" של הקבוצה.</p>
+      <Field label="טלפון"><input type="tel" dir="ltr" inputMode="tel" value={f.phone} onChange={set('phone')} placeholder="03-1234567" /></Field>
+      <Field label="מייל"><input type="email" dir="ltr" value={f.email} onChange={set('email')} placeholder="office@club.co.il" /></Field>
+      <Field label="כתובת"><input value={f.address} onChange={set('address')} /></Field>
+      <Field label="אתר"><input dir="ltr" value={f.website} onChange={set('website')} placeholder="www.club.co.il" /></Field>
+      {bad && <p className="error">כתובת מייל לא תקינה</p>}
+      <ErrorText error={act.error} />
+      <div className="row">
+        <button disabled={!changed || bad || act.busy}
+          onClick={() => act.run(async () => {
+            await rpc('update_club_details', { p_club: club.id, p_phone: f.phone.trim() || null, p_email: f.email.trim() || null, p_address: f.address, p_website: f.website });
+            setSaved(true); onSaved();
+          })}>שמירה</button>
+        {saved && <span className="ok">נשמר</span>}
+      </div>
+    </Card>
   );
 }

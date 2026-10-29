@@ -574,6 +574,103 @@ select t.check('a test notification reaches only the caller', (select count(*) f
 select t.denied('an outsider cannot set seats', $$select set_transport_seats(t.id('jev'), 1, t.id('jkid'))$$);
 reset role;
 
+-- ---------------------------------------------------------------- contacts (0027)
+set role authenticated;
+select t.as_user('JP');
+select update_my_profile('הורה', '050-111 2233');
+select t.check('a parent saves a phone (normalized)', (select phone from profiles where id = t.id('JP')) = '+972501112233');
+select set_player_phone(t.id('jkid'), '052-9998877');
+select t.check('a parent sees the staff in the team contacts', exists (select 1 from team_contacts(t.id('JT'))
+  where kind = 'staff' and person_id = t.id('JM') and email = 'j02@test.io'));
+select t.check('a parent sees the club admin in the team contacts', exists (select 1 from team_contacts(t.id('JT'))
+  where kind = 'admin' and person_id = t.id('JA')));
+select t.as_user('JM');
+select t.check('staff see a parent''s phone and children', exists (select 1 from team_contacts(t.id('JT'))
+  where kind = 'parent' and person_id = t.id('JP') and phone = '+972501112233' and note = 'ילד'));
+select t.check('the child''s phone is in the team contacts', exists (select 1 from team_contacts(t.id('JT'))
+  where kind = 'player' and person_id = t.id('jkid') and phone = '+972529998877'));
+select t.as_user('JO');
+select t.check('an outsider sees no team contacts', not exists (select 1 from team_contacts(t.id('JT'))));
+select t.denied('an outsider cannot set a player''s phone', $$select set_player_phone(t.id('jkid'), '0501234567')$$);
+select t.denied('an outsider cannot edit the club details', $$select update_club_details(t.id('jclub'), '03-1234567', null, '', '')$$);
+select t.as_user('JM');
+select t.denied('staff cannot edit the club details', $$select update_club_details(t.id('jclub'), '03-1234567', null, '', '')$$);
+select t.as_user('JA');
+select update_club_details(t.id('jclub'), '03-123 4567', 'Office@Club.Example', 'רחוב 1', 'club.example');
+select t.denied('the club email must be valid', $$select update_club_details(t.id('jclub'), null, 'not-an-email', '', '')$$);
+select t.as_user('JP');
+select t.check('a parent reads the club contact details', (select phone = '+97231234567' and email = 'office@club.example'
+  from clubs where id = t.id('jclub')));
+reset role;
+
+-- ---------------------------------------------------------------- second parent and roster (0028)
+set role authenticated;
+select t.as_user('JP');
+select add_guardian(t.id('jkid'), 'אבא שני', t.lk('guardian_relation', 'father'), '050-2223344', 'Dad2@test.io');
+select t.check('a parent adds the second parent as a contact', exists (select 1 from player_parents(t.id('jkid'))
+  where kind = 'contact' and full_name = 'אבא שני' and phone = '+972502223344' and email = 'dad2@test.io'));
+select t.denied('the second parent cannot be the child''s parent already',
+  $$select add_guardian(t.id('jkid'), 'אני', null, null, 'j03@test.io')$$);
+select t.as_user('JM');
+select t.check('the second parent is in the team contacts', exists (select 1 from team_contacts(t.id('JT'))
+  where kind = 'parent' and full_name = 'אבא שני' and phone = '+972502223344'));
+select t.as_user('JO');
+select t.denied('an outsider cannot add a parent', $$select add_guardian(t.id('jkid'), 'x')$$);
+reset role;
+insert into auth.users (email) values ('dad2@test.io');
+select t.reg('JD', 'dad2@test.io');
+select t.check('signing in with that email links the second parent', exists (select 1 from guardianships
+  where parent_id = t.id('JD') and player_id = t.id('jkid') and status = 'approved'
+    and relation_id = t.lk('guardian_relation', 'father')));
+select t.check('the contact becomes the account (no duplicate)', not exists (select 1 from guardian_contacts
+  where player_id = t.id('jkid')));
+select t.check('the contact''s phone and name move to the new account', (select phone = '+972502223344' and full_name = 'אבא שני'
+  from profiles where id = t.id('JD')));
+set role authenticated;
+select t.as_user('JA');
+select t.check('the club admin sees the child with both parents in the roster', (select jsonb_array_length(parents)
+  from club_roster(t.id('jclub')) where player_id = t.id('jkid')) = 2);
+select t.as_user('JM');
+select t.check('the coach sees the team in the roster', exists (select 1 from club_roster(t.id('jclub'), t.id('JT'))
+  where player_id = t.id('jkid')));
+select update_parent_profile(t.id('JD'), 'דוד שני', '052-0001112');
+select t.check('staff correct a parent''s name and phone', (select full_name = 'דוד שני' and phone = '+972520001112'
+  from profiles where id = t.id('JD')));
+select t.as_user('JP');
+select t.check('a parent does not see the roster', not exists (select 1 from club_roster(t.id('jclub'))));
+select t.denied('a parent cannot unlink a parent', $$select unlink_guardian(t.id('jkid'), t.id('JD'))$$);
+select t.as_user('JO');
+select t.denied('an outsider cannot edit a parent', $$select update_parent_profile(t.id('JD'), 'x', null)$$);
+select t.as_user('JM');
+select unlink_guardian(t.id('jkid'), t.id('JD'));
+select t.check('staff unlink a parent from a child', not exists (select 1 from guardianships
+  where parent_id = t.id('JD') and player_id = t.id('jkid')));
+reset role;
+insert into auth.users (email) values ('j05@test.io');
+select t.reg('JQ', 'j05@test.io');
+set role authenticated;
+select t.as_user('JQ');
+insert into t.ctx select 'jreq3', submit_join_request((select code from jl), 'parent', 'אמא חדשה', null,
+  '[{"full_name": "ילדה חדשה", "birth_date": "2015-02-02", "phone": "054-1112222"}]', null,
+  t.lk('guardian_relation', 'mother'),
+  jsonb_build_object('full_name', 'אבא חדש', 'relation_id', t.lk('guardian_relation', 'father'), 'phone', '053-3334444'));
+select t.as_user('JM');
+select t.check('the decider sees the relation and the other parent', exists (select 1 from pending_join_requests()
+  where id = t.id('jreq3') and relation_id = t.lk('guardian_relation', 'mother') and other_parent ->> 'full_name' = 'אבא חדש'));
+select decide_join_request(t.id('jreq3'), true);
+insert into t.ctx select 'jkid2', (select player_id from club_roster(t.id('jclub')) where full_name = 'ילדה חדשה');
+select t.check('approval keeps the parent''s relation', exists (select 1 from guardianships
+  where parent_id = t.id('JQ') and player_id = t.id('jkid2') and relation_id = t.lk('guardian_relation', 'mother')));
+select t.check('approval adds the other parent to the child', exists (select 1 from player_parents(t.id('jkid2'))
+  where kind = 'contact' and full_name = 'אבא חדש' and phone = '+972533334444'));
+select t.check('the child''s phone from the join form', (select phone from club_roster(t.id('jclub')) where player_id = t.id('jkid2')) = '+972541112222');
+select t.denied('staff cannot delete a child from the club', $$select delete_player(t.id('jkid2'))$$);
+select t.as_user('JA');
+select delete_player(t.id('jkid2'));
+reset role;
+select t.check('the club admin deletes a child with its parents'' links', not exists (select 1 from players where id = t.id('jkid2'))
+  and not exists (select 1 from guardianships where player_id = t.id('jkid2')));
+
 -- ---------------------------------------------------------------- summary
 reset role;
 select case when count(*) filter (where not ok) = 0

@@ -17,6 +17,8 @@ import SurveysTab from './SurveysTab';
 import ChatTab from './ChatTab';
 import LeagueTab from './LeagueTab';
 import SettingsTab from './SettingsTab';
+import { TeamContacts } from '../../components/Contacts';
+import { Roster } from '../../components/Roster';
 
 export interface TeamTabProps {
   team: Team;
@@ -62,7 +64,13 @@ export default function TeamPage(opts: { teamId?: string; initialTab?: string })
     { id: 'tasks', label: 'משימות', render: () => <TasksTab {...props} /> },
     { id: 'surveys', label: 'סקרים', render: () => <SurveysTab {...props} /> },
     { id: 'chat', label: 'הודעות', render: () => <ChatTab {...props} /> },
+    { id: 'contacts', label: 'אנשי קשר', render: () => <TeamContacts teamId={team.id} clubId={team.club_id} /> },
     ...(sport?.slug === 'football' ? [{ id: 'league', label: 'ליגה', render: () => <LeagueTab {...props} /> }] : []),
+    ...(canManage ? [{
+      id: 'roster', label: 'טבלת הורים',
+      render: () => <Roster clubId={team.club_id} teamId={team.id} title={`שחקנים והורים - ${team.name}`}
+        isClubAdmin={(acting === 'system_admin' && !!auth.profile?.is_system_admin) || (acting === 'club_admin' && auth.adminClubIds.includes(team.club_id))} />,
+    }] : []),
     ...(canManage ? [{ id: 'settings', label: 'הגדרות', render: () => <SettingsTab {...props} /> }] : []),
   ];
   async function setPhoto(file: File) {
