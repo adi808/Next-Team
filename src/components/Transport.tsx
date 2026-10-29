@@ -1,4 +1,5 @@
-import { rpc, useAction, useLoad } from '../lib/db';
+import { q, rpc, useAction, useLoad } from '../lib/db';
+import { isDemo, supabase } from '../lib/supabase';
 import type { EventResponse, EventRow, Player } from '../lib/types';
 import { Badge, Card, Empty, ErrorText } from './ui';
 
@@ -32,8 +33,8 @@ function SeatPicker({ seats, busy, onSave }: { seats: number | null; busy: boole
  * how many passengers (the child and anyone travelling with them), and staff answer for themselves.
  * Everyone on the team sees the total; staff also see who answered what.
  */
-export function TransportCard({ event, players, responses, myKids, canManage, isStaff, myId, onToggled }: {
-  event: EventRow; players: Player[]; responses: EventResponse[]; myKids: Player[]; canManage: boolean;
+export function TransportCard({ event, players = [], responses, myKids, canManage, isStaff, myId, onToggled }: {
+  event: EventRow; players?: Player[]; responses: EventResponse[]; myKids: Player[]; canManage: boolean;
   /** the viewer is on the team's staff (coach / club admin), so has a seat row of their own */
   isStaff: boolean; myId: string; onToggled: () => void;
 }) {
@@ -101,4 +102,22 @@ export function TransportCard({ event, players, responses, myKids, canManage, is
       <ErrorText error={act.error ?? list.error} />
     </Card>
   );
+}
+
+/** Total passengers per event, for the events with transport turned on (one query for all of them). */
+export function useTransportTotals(events: EventRow[]): Map<string, number> {
+  const ids = events.filter((e) => e.has_transport).map((e) => e.id);
+  const { data } = useLoad(
+    () => (isDemo || !ids.length ? Promise.resolve([]) : q<{ event_id: string; seats: number }[]>(supabase.from('event_transport').select('event_id, seats').in('event_id', ids))),
+    [ids.join(',')],
+  );
+  const totals = new Map<string, number>(ids.map((id) => [id, 0]));
+  for (const r of data ?? []) totals.set(r.event_id, (totals.get(r.event_id) ?? 0) + r.seats);
+  return totals;
+}
+
+/** "🚌 7 נוסעים" next to an event that offers transport. */
+export function TransportChip({ total }: { total: number | undefined }) {
+  if (total === undefined) return null;
+  return <Badge tone={total > 0 ? 'ok' : undefined}>🚌 {total > 0 ? `${total} נוסעים` : 'הסעה'}</Badge>;
 }

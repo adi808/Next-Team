@@ -103,6 +103,11 @@ export default function EventPage() {
           {!edit && <button className="secondary" onClick={startEdit}>✏️ עריכת פרטי האירוע</button>}
         </div>
       )}
+      {!isDemo && (
+        <TransportCard event={event} players={players} responses={responses} canManage={canManage} myId={auth.profile?.id ?? ''}
+          myKids={acting === 'parent' ? myKids : []} isStaff={canManage && acting !== 'system_admin'} onToggled={reload} />
+      )}
+
       {(canManage || event.notes) && <Card title="פרטים" actions={canManage && (
         <div className="row">
           {!edit && <button className="small secondary" onClick={startEdit}>עריכה</button>}
@@ -146,11 +151,6 @@ export default function EventPage() {
       {isMatch && (
         <AttributesPanel scope="event" entityId={event.id} myRoles={myRoles} clubId={team.club_id} teamIds={[team.id]} sportIds={[team.sport_id]} title="שיטת משחק"
           onSaved={() => setLineupKey((k) => k + 1)} />
-      )}
-
-      {!isDemo && (
-        <TransportCard event={event} players={players} responses={responses} canManage={canManage} myId={auth.profile?.id ?? ''}
-          myKids={acting === 'parent' ? myKids : []} isStaff={canManage && acting !== 'system_admin'} onToggled={reload} />
       )}
 
       <Card title="אישורי הגעה">

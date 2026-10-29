@@ -11,6 +11,8 @@ import { AttendanceWidget } from '../../components/Attendance';
 import { Conversation, TeamChannel } from '../../components/Chat';
 import { useLookups, useSports } from '../../components/Lookups';
 import { EventDashboard } from '../../components/EventDashboard';
+import { TransportCard } from '../../components/Transport';
+import { isDemo } from '../../lib/supabase';
 import { isOver, nextAndOther } from '../../lib/events';
 import { PlayerAvatar } from '../../components/People';
 import type { EventResponse, EventRow, Player, Team, TeamKit } from '../../lib/types';
@@ -129,6 +131,10 @@ export function FamilyEvents() {
         {answers(e)}
         <Link to={`../event/${e.id}`}>לכל פרטי האירוע ←</Link>
       </div>
+      {!isDemo && (
+        <TransportCard event={e} responses={data?.responses ?? []} canManage={false} isStaff={false} myId="" onToggled={reload}
+          myKids={asParent ? kids.filter((k) => links.some((l) => l.team_id === e.team_id && l.player_id === k.id)) : []} />
+      )}
     </section>
   );
 

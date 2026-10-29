@@ -518,3 +518,7 @@ legend { font-weight: 600; font-size: 0.9rem; padding: 0 0.35rem; }
 }
 .notif-list a { display: flex; flex-direction: column; gap: 0.1rem; color: inherit; text-decoration: none; }
 .notif-list li.unread { background: var(--primary-soft); margin-inline: -0.5rem; padding-inline: 0.5rem; border-radius: 8px; }
+
+.transport-line { display: block; padding: 0.55rem 0.8rem; border-radius: var(--radius); background: var(--primary-soft); color: var(--text); text-decoration: none; }
+.transport-line:hover { text-decoration: none; background: #dbe6fe; }
+.transport-line strong { color: var(--primary); font-size: 1.15rem; }

@@ -6,6 +6,7 @@ import { useCoachTeam } from '../../auth/coachTeam';
 import { Badge, Empty, Loading, PageHero, StatTiles } from '../../components/ui';
 import { useLookupName, useLookups } from '../../components/Lookups';
 import { KitAvatar } from '../../components/Kit';
+import { TransportChip, useTransportTotals } from '../../components/Transport';
 import { isOver, nextAndOther } from '../../lib/events';
 import type { EventResponse, EventRow, Lookup, Team, TeamKit } from '../../lib/types';
 
@@ -37,12 +38,13 @@ export default function CoachHome() {
     return { next, other, later, squad: players.length, responses, kits };
   }, [teamId]);
 
+  const transport = useTransportTotals([data?.next, data?.other, ...(data?.later ?? [])].filter((e): e is EventRow => !!e));
   const team = teams.data?.find((t) => t.id === teamId);
   const typeOf = (id: string) => types.find((t) => t.id === id);
   const first = (profile?.full_name || '').split(' ')[0];
   const card = (e: EventRow, heading: string) => (
     <NextEventCard key={e.id} event={e} heading={heading} teamName={team?.name ?? ''} type={typeOf(e.type_id)}
-      kit={data?.kits.find((k) => k.id === e.kit_id)} squad={data?.squad ?? 0} responses={data?.responses.filter((r) => r.event_id === e.id) ?? []} />
+      kit={data?.kits.find((k) => k.id === e.kit_id)} squad={data?.squad ?? 0} transport={transport.get(e.id)} responses={data?.responses.filter((r) => r.event_id === e.id) ?? []} />
   );
 
   return (
@@ -82,6 +84,7 @@ export default function CoachHome() {
                 <li key={e.id} className="row">
                   <Badge>{typeOf(e.type_id)?.name_he ?? ''}</Badge>
                   <Link to={`../event/${e.id}`}>{e.title || typeOf(e.type_id)?.name_he}{e.opponent ? ` נגד ${e.opponent}` : ''}</Link>
+                  <TransportChip total={transport.get(e.id)} />
                   <span className="grow" />
                   <small className="muted">{fmt(e.starts_at, { weekday: 'short', day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' })}</small>
                 </li>
@@ -96,8 +99,8 @@ export default function CoachHome() {
 }
 
 /** One upcoming event on the coach's home: who plays whom, when, the kit, and the attendance so far. */
-function NextEventCard({ event, heading, teamName, type, kit, squad, responses }: {
-  event: EventRow; heading: string; teamName: string; type?: Lookup; kit?: TeamKit; squad: number; responses: EventResponse[];
+function NextEventCard({ event, heading, teamName, type, kit, squad, responses, transport }: {
+  event: EventRow; heading: string; teamName: string; type?: Lookup; kit?: TeamKit; squad: number; responses: EventResponse[]; transport?: number;
 }) {
   const yes = responses.filter((r) => r.status === 'attending').length;
   const no = responses.filter((r) => r.status === 'not_attending').length;
@@ -126,6 +129,9 @@ function NextEventCard({ event, heading, teamName, type, kit, squad, responses }
         { label: 'לא מגיעים', value: no, tone: 'bad' },
         { label: 'טרם השיבו', value: Math.max(0, squad - yes - no), tone: 'muted' },
       ]} />
+      {transport !== undefined && (
+        <Link className="transport-line" to={`../event/${event.id}`}>🚌 הסעה: <strong>{transport}</strong> נוסעים ←</Link>
+      )}
       <div className="row wrap">
         <Link className="button-link grow" to={`../event/${event.id}/prep`}>הכנה לאירוע ←</Link>
         <Link className="button-link soft" to={`../event/${event.id}`}>לפרטי האירוע</Link>

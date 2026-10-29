@@ -7,6 +7,7 @@ import { Badge, Card, Empty, ErrorText, Field, Loading } from '../../components/
 import { LookupSelect, useLookups } from '../../components/Lookups';
 import { KitAvatar, KitSelect, useTeamKits } from '../../components/Kit';
 import { EquipmentPicker } from '../../components/Equipment';
+import { TransportChip, useTransportTotals } from '../../components/Transport';
 import { isOver } from '../../lib/events';
 import type { EventRow } from '../../lib/types';
 import type { TeamTabProps } from './TeamPage';
@@ -31,6 +32,7 @@ export default function EventsTab({ team, canManage }: TeamTabProps) {
     () => q<EventRow[]>(supabase.from('events').select('*').eq('team_id', team.id).order('starts_at', { ascending: false })),
     [team.id],
   );
+  const transport = useTransportTotals(data ?? []);
   const [typeId, setTypeId] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [starts, setStarts] = useState('');
@@ -115,6 +117,7 @@ export default function EventsTab({ team, canManage }: TeamTabProps) {
               <Link to={`../event/${e.id}`}>{e.title || typeName(e.type_id)}</Link>
               <small className="muted">{fmtDate(e.starts_at)}{e.opponent ? ` · נגד ${e.opponent}` : ''}</small>
               {e.our_score !== null && <strong>{e.our_score}:{e.their_score}</strong>}
+              <TransportChip total={transport.get(e.id)} />
               <span className="grow" />
               {kit && <KitAvatar kit={kit} size={30} />}
             </li>
