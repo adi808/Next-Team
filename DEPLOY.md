@@ -10,6 +10,7 @@
 4. התחברות (חינמית, בלי SMS): Google וקוד במייל.
    * **Google:** ב־Google Cloud Console ← APIs & Services ← Credentials ← Create Credentials ← OAuth client ID ← Web application. ב־Authorized redirect URIs הדביקו את ה־Callback URL שמופיע ב־Supabase ← Authentication ← Sign In / Providers ← Google. העתיקו את Client ID ו־Client Secret ל־Supabase, הפעילו את Google ושמרו.
    * **קוד במייל:** Email מופעל כברירת מחדל. ב־Authentication ← Emails ← Templates ← Magic Link הוסיפו לתבנית את `{{ .Token }}` כדי שהמייל יכלול גם קוד (הקישור במייל עובד גם בלעדיו).
+   * **Apple:** לא נתמך בשלב זה. כניסה עם Apple מחייבת חשבון Apple Developer בתשלום (99$ לשנה). משתמשי אייפון נכנסים עם Google או עם קוד במייל.
    * **שליחת מיילים בחינם:** שירות המייל המובנה של Supabase מוגבל לכמה מיילים בשעה. לשימוש אמיתי: Authentication ← Emails ← SMTP Settings, עם שרת SMTP חינמי (למשל Brevo, עד 300 מיילים ביום, או Gmail עם App Password).
 5. Authentication ← URL Configuration: הכניסו את כתובת האתר (אחרי שלב 2) ב־Site URL וגם ב־Redirect URLs.
 
