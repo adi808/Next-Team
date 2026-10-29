@@ -7,14 +7,13 @@ import { useAuth } from '../../auth/AuthProvider';
 import { useActingRole } from '../../auth/acting';
 import { Badge, Card, Empty, ErrorText, Field, Loading, PageHero, ScoreBar, Tabs } from '../../components/ui';
 import { AttributesPanel } from '../../components/Attributes';
-import { useLookupName, useLookups } from '../../components/Lookups';
-import { Picture } from '../../components/Picture';
+import { useLookups } from '../../components/Lookups';
 import { PlayerAvatar, ShirtNo, useShirtNumbers } from '../../components/People';
 import { ContactLinks, fmtPhone } from '../../components/Contacts';
+import { ParentsEditor } from '../../components/Parents';
 import { average, defsFor, latestRatings } from '../../lib/scores';
 import type { AttrDef, AttrValue, EntityRole, EventStat, Player, Team } from '../../lib/types';
 
-interface Guardian { parent_id: string; full_name: string; avatar_path: string | null; relation_id: string | null }
 interface Details { phone: string | null; account_email: string | null }
 
 export default function PlayerPage() {
@@ -26,24 +25,20 @@ export default function PlayerPage() {
     const player = await q<Player>(supabase.from('v_players').select('*').eq('id', playerId).single());
     const links = await q<{ team_id: string }[]>(supabase.from('team_players').select('team_id').eq('player_id', playerId));
     const teams = links.length ? await q<Team[]>(supabase.from('teams').select('id, club_id, name, sport_id, photo_path').in('id', links.map((l) => l.team_id))) : [];
-    const guardians = await rpc<Guardian[]>('player_guardians', { p_player: playerId });
     const stats = await q<EventStat[]>(supabase.from('event_stats').select('*').eq('player_id', playerId));
     // Contact details, for staff, the player's parents and the player (empty for anyone else).
     const [details] = await rpc<Details[]>('player_details', { p_player: playerId });
-    return { player, teams, guardians, stats, details: details ?? null };
+    return { player, teams, stats, details: details ?? null };
   }, [playerId]);
   const shirt = useShirtNumbers(playerId ? [playerId] : []);
-  const relations = useLookups('guardian_relation');
-  const relationName = useLookupName('guardian_relation');
   const act = useAction();
   const [name, setName] = useState<string | null>(null);
   const [birth, setBirth] = useState<string | null>(null);
   const [phone, setPhone] = useState<string | null>(null);
   const [accountEmail, setAccountEmail] = useState('');
-  const [parentEmail, setParentEmail] = useState('');
 
   if (!data) return <Loading loading={loading} error={error} />; // on reload, keep showing the page (and its open tab)
-  const { player, teams, guardians, stats, details } = data;
+  const { player, teams, stats, details } = data;
   const isSys = acting === 'system_admin' && !!auth.profile?.is_system_admin;
   const isAdmin = acting === 'club_admin' && auth.adminClubIds.includes(player.club_id);
   const isCoach = acting === 'coach' && teams.some((t) => auth.coachTeamIds.includes(t.id));
@@ -117,40 +112,12 @@ export default function PlayerPage() {
       <AttributesPanel scope="player" entityId={player.id} myRoles={roles} clubId={player.club_id}
         teamIds={teams.map((t) => t.id)} sportIds={teams.map((t) => t.sport_id)} title="פרמטרים" skipTypes={['scale']} />
 
-      <Card title="הורים וגישה">
-        <ul className="list compact">
-          {guardians.map((g) => {
-            const canSet = manage || (isParent && g.parent_id === auth.profile?.id);
-            return (
-              <li key={g.parent_id} className="row">
-                <Picture bucket="avatars" path={g.avatar_path} name={g.full_name || '?'} size={28} />
-                <span>{g.full_name || 'הורה'}{g.parent_id === auth.profile?.id ? ' (אני)' : ''}</span>
-                <span className="grow" />
-                {canSet ? (
-                  <select className="inline-select" aria-label="קרבה לילד" value={g.relation_id ?? ''} disabled={act.busy}
-                    onChange={(e) => act.run(async () => { await rpc('set_guardian_relation', { p_player: player.id, p_parent: g.parent_id, p_relation: e.target.value || null }); reload(); })}>
-                    <option value="">אמא / אבא?</option>
-                    {relations.map((l) => <option key={l.id} value={l.id}>{l.name_he}</option>)}
-                  </select>
-                ) : g.relation_id && <Badge>{relationName(g.relation_id)}</Badge>}
-              </li>
-            );
-          })}
-          {!guardians.length && <li className="muted">אין הורים מקושרים.</li>}
-        </ul>
-        {manage && (
-          <>
-            <Field label="הזמנת הורה לפי מייל">
-              <div className="row">
-                <input type="email" dir="ltr" value={parentEmail} onChange={(e) => setParentEmail(e.target.value)} placeholder="name@example.com" />
-                <button className="small" disabled={!normEmail(parentEmail) || act.busy}
-                  onClick={() => act.run(async () => { await rpc('invite_parent', { p_player: player.id, p_email: normEmail(parentEmail) }); setParentEmail(''); reload(); })}>הוספה</button>
-              </div>
-            </Field>
-          </>
-        )}
+      <Card title="הורים">
+        <ParentsEditor playerId={player.id} canManage={manage} canAdd={manage || isParent} myId={auth.profile?.id} />
+      </Card>
+      {((manage || isParent) || player.has_account) && <Card title="כניסה עצמאית לשחקן">
         {(manage || isParent) && !player.has_account && (
-          <Field label="כניסה עצמאית לשחקן (מייל של השחקן)">
+          <Field label="מייל של השחקן (לא חובה)">
             <div className="row">
               <input type="email" dir="ltr" value={accountEmail} onChange={(e) => setAccountEmail(e.target.value)} />
               <button className="small" disabled={!normEmail(accountEmail) || act.busy}
@@ -159,7 +126,7 @@ export default function PlayerPage() {
           </Field>
         )}
         {player.has_account && <small className="muted">לשחקן יש כניסה משלו. ילד בלי מייל מנוהל על ידי ההורה.</small>}
-      </Card>
+      </Card>}
         </>
       ),
     },

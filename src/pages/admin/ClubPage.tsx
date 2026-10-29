@@ -13,6 +13,7 @@ import { uploadImage } from '../../lib/images';
 import { PersonAvatar, useNames } from '../../components/People';
 import { StaffRoleSelect } from '../../components/Staff';
 import { fmtPhone } from '../../components/Contacts';
+import { Roster } from '../../components/Roster';
 import type { Club, Team } from '../../lib/types';
 
 interface StaffMembership { id: string; user_id: string; team_id: string | null; role: 'club_admin' | 'coach'; staff_role_id: string | null }
@@ -190,6 +191,7 @@ export default function ClubPage() {
             </>
           ),
         },
+        { id: 'roster', label: 'שחקנים והורים', render: () => <Roster clubId={clubId} teams={data.teams} isClubAdmin title={`שחקנים והורים - ${data.club.name}`} /> },
         { id: 'contact', label: 'פרטי קשר', render: () => <ClubContactCard club={data.club} onSaved={reload} /> },
         {
           id: 'params', label: 'פרמטרים לשחקנים', render: () => (

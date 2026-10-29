@@ -544,3 +544,23 @@ legend { font-weight: 600; font-size: 0.9rem; padding: 0 0.35rem; }
   background: var(--primary-soft); font-size: 0.85rem; text-decoration: none; word-break: break-all;
 }
 .contact-extra { margin: 0.4rem 0 0; font-size: 0.9rem; }
+
+/* ---- parents and roster ---- */
+.parent-form { display: grid; gap: 0.5rem; margin: 0.4rem 0; }
+.parent-actions { margin-top: 0.35rem; }
+.add-parent { margin-top: 0.6rem; padding: 0.75rem; border-radius: var(--radius-lg); background: var(--bg); }
+.roster-filters { margin-bottom: 0.6rem; }
+.roster-filters select { width: auto; }
+.roster-filters input { flex: 1; min-width: 12rem; }
+.table-scroll { overflow-x: auto; margin: 0.4rem -0.25rem 0; -webkit-overflow-scrolling: touch; }
+table.roster { border-collapse: collapse; width: 100%; font-size: 0.86rem; }
+table.roster th { text-align: start; font-weight: 600; color: var(--muted); padding: 0.45rem 0.5rem; border-bottom: 1px solid var(--border-strong); white-space: nowrap; }
+table.roster td { padding: 0.5rem; border-bottom: 1px solid var(--border); vertical-align: top; min-width: 6.5rem; }
+table.roster tr.open > td { background: var(--primary-soft); }
+table.roster .cell-line { display: block; white-space: nowrap; }
+table.roster .cell-line.email { white-space: normal; overflow-wrap: anywhere; font-size: 0.8rem; }
+.roster-editor-wrap { margin-top: 0.85rem; padding: 0.85rem; border-radius: var(--radius-lg); background: var(--bg); scroll-margin-top: 4rem; }
+.roster-editor-wrap h3 { margin: 0 0 0.6rem; font-size: 1rem; }
+.roster-editor h4 { margin: 0 0 0.4rem; }
+.roster-editor-grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); margin-bottom: 0.6rem; }
+.small-link { font-size: 0.85rem; }

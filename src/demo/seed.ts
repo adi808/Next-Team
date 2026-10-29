@@ -122,6 +122,9 @@ export function seed(): Tables {
       player('k4', 'גיל פרידמן', '2014-01-20'), player('k5', 'תומר שמש', '2013-11-05'), player('k6', 'יובל אורן', '2012-07-30'),
     ],
     team_players: ['k1', 'k2', 'k3', 'k4', 'k5', 'k6'].map((player_id) => ({ team_id: 't1', player_id })),
+    guardian_contacts: [
+      { id: 'gc1', player_id: 'k1', full_name: 'משה כהן', relation_id: 'rel_father', phone: '+972509990011', email: 'moshe@demo.nextteam.app' },
+    ],
     guardianships: [
       { id: 'g1', parent_id: 'u_p1', player_id: 'k1', status: 'approved', relation_id: 'rel_mother' },
       { id: 'g2', parent_id: 'u_p2', player_id: 'k2', status: 'approved', relation_id: 'rel_father' },

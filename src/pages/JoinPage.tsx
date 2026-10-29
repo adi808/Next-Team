@@ -4,11 +4,12 @@ import { useAuth } from '../auth/AuthProvider';
 import { rpc, useAction, useLoad } from '../lib/db';
 import { normEmail } from '../lib/email';
 import { forgetJoin } from '../lib/join';
-import { useLookups } from '../components/Lookups';
+import { LookupSelect, useLookups } from '../components/Lookups';
 import { Card, ErrorText, Field, Loading, PageHero } from '../components/ui';
 
 interface LinkInfo { team_id: string; team_name: string; club_name: string; sport_name: string | null; my_status: 'coach' | 'member' | 'pending' | 'none' }
-interface Child { full_name: string; birth_date: string; email: string }
+interface Child { full_name: string; birth_date: string; email: string; phone: string }
+interface OtherParent { full_name: string; relation_id: string | null; phone: string; email: string }
 type As = 'coach' | 'manager' | 'parent';
 
 const AS: { id: As; label: string; hint: string }[] = [
@@ -16,7 +17,7 @@ const AS: { id: As; label: string; hint: string }[] = [
   { id: 'manager', label: 'מנהל קבוצה', hint: 'ניהול הקבוצה, אירועים והודעות' },
   { id: 'parent', label: 'הורה', hint: 'רישום הילד או הילדים לקבוצה' },
 ];
-const emptyChild = (): Child => ({ full_name: '', birth_date: '', email: '' });
+const emptyChild = (): Child => ({ full_name: '', birth_date: '', email: '', phone: '' });
 
 /**
  * A team's join link. A signed-in user who is already on the team is told so; anyone else picks how they join
@@ -33,6 +34,8 @@ export default function JoinPage() {
   const [name, setName] = useState(auth.profile?.full_name ?? '');
   const [phone, setPhone] = useState(auth.profile?.phone ?? '');
   const [kids, setKids] = useState<Child[]>([emptyChild()]);
+  const [relation, setRelation] = useState<string | null>(null);
+  const [other, setOther] = useState<OtherParent>({ full_name: '', relation_id: null, phone: '', email: '' });
   const [sent, setSent] = useState(false);
   const act = useAction();
   useEffect(forgetJoin, []);
@@ -55,13 +58,18 @@ export default function JoinPage() {
 
   async function send() {
     const role = as === 'parent' ? 'parent' : 'coach';
-    const children = kids.map((k) => ({ ...k, full_name: k.full_name.trim(), email: k.email.trim() ? normEmail(k.email) : null }));
+    const children = kids.map((k) => ({ ...k, full_name: k.full_name.trim(), email: k.email.trim() ? normEmail(k.email) : null, phone: k.phone.trim() || null }));
     if (role === 'parent' && children.some((k, n) => kids[n].email.trim() && !k.email)) return act.setError('כתובת מייל של ילד לא תקינה');
+    if (role === 'parent' && other.email.trim() && !normEmail(other.email)) return act.setError('כתובת המייל של ההורה השני לא תקינה');
+    const otherParent = role === 'parent' && other.full_name.trim()
+      ? { full_name: other.full_name.trim(), relation_id: other.relation_id, phone: other.phone.trim() || null, email: normEmail(other.email) }
+      : null;
     const staff = as === 'manager' ? staffRoles.find((l) => l.slug === 'team_manager')?.id ?? null : null;
     await act.run(async () => {
       await rpc('submit_join_request', {
         p_code: code, p_role: role, p_full_name: name, p_phone: phone.trim() || null,
         p_children: role === 'parent' ? children : [], p_staff_role: staff,
+        p_relation: role === 'parent' ? relation : null, p_other_parent: otherParent,
       });
       setSent(true);
     });
@@ -105,6 +113,11 @@ export default function JoinPage() {
             <div className="stack">
               <Field label="שם מלא"><input value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" /></Field>
               <Field label="טלפון (לא חובה)"><input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} autoComplete="tel" /></Field>
+              {as === 'parent' && (
+                <label className="field"><span>הקרבה שלי לילדים</span>
+                  <LookupSelect domain="guardian_relation" value={relation} onChange={setRelation} empty="בחרו…" />
+                </label>
+              )}
               <small className="muted">מייל: {auth.profile?.email}</small>
             </div>
           </Card>
@@ -120,11 +133,25 @@ export default function JoinPage() {
                   </div>
                   <Field label="שם מלא"><input value={k.full_name} onChange={(e) => set({ full_name: e.target.value })} /></Field>
                   <Field label="תאריך לידה"><input type="date" value={k.birth_date} onChange={(e) => set({ birth_date: e.target.value })} /></Field>
-                  <Field label="מייל של הילד (לא חובה)"><input type="email" value={k.email} onChange={(e) => set({ email: e.target.value })} /></Field>
+                  <Field label="מייל של הילד (לא חובה, לכניסה עצמאית)"><input type="email" dir="ltr" value={k.email} onChange={(e) => set({ email: e.target.value })} /></Field>
+                  <Field label="טלפון של הילד (לא חובה)"><input type="tel" dir="ltr" value={k.phone} onChange={(e) => set({ phone: e.target.value })} /></Field>
                 </div>
               );
             })}
             {kids.length < 6 && <button className="small secondary" onClick={() => setKids([...kids, emptyChild()])}>+ ילד נוסף</button>}
+          </Card>
+        )}
+        {as === 'parent' && (
+          <Card title="ההורה השני (לא חובה)">
+            <p className="muted">הפרטים יופיעו אצל הצוות ובאנשי הקשר. אם תזינו מייל, ההורה השני יוכל להיכנס לאפליקציה עם המייל הזה ויקושר לילדים אוטומטית.</p>
+            <div className="stack">
+              <Field label="שם מלא"><input value={other.full_name} onChange={(e) => setOther({ ...other, full_name: e.target.value })} /></Field>
+              <label className="field"><span>קרבה לילדים</span>
+                <LookupSelect domain="guardian_relation" value={other.relation_id} onChange={(v) => setOther({ ...other, relation_id: v })} empty="בחרו…" />
+              </label>
+              <Field label="טלפון"><input type="tel" dir="ltr" value={other.phone} onChange={(e) => setOther({ ...other, phone: e.target.value })} /></Field>
+              <Field label="מייל"><input type="email" dir="ltr" value={other.email} onChange={(e) => setOther({ ...other, email: e.target.value })} /></Field>
+            </div>
           </Card>
         )}
         {as && (

@@ -7,7 +7,7 @@
 2. Project Settings ← API: העתיקו את **Project URL** ואת **anon public key**.
 3. העלאת הסכמה (בלי התקנות): בתפריט הצד ← **SQL Editor** ← New query. הדביקו את כל התוכן של הקובץ `supabase/all_migrations.sql` ולחצו **Run**. מצופה "Success. No rows returned". הקובץ יוצר את כל הטבלאות, ההרשאות, הרשימות ההתחלתיות והגדרת אחסון התמונות. מריצים פעם אחת בלבד, בפרויקט חדש.
    (חלופה למפתחים: `npx supabase link` ואחריו `npx supabase db push`.)
-   **עדכון פרויקט קיים:** לא מריצים שוב את `all_migrations.sql`. מריצים ב־SQL Editor רק את הקבצים החדשים מתוך `supabase/migrations`, לפי הסדר. למשל, לפרטי הקשר (טלפון ומייל לכל ישות ורשימת אנשי קשר לקבוצה): `0027_contacts.sql`.
+   **עדכון פרויקט קיים:** לא מריצים שוב את `all_migrations.sql`. מריצים ב־SQL Editor רק את הקבצים החדשים מתוך `supabase/migrations`, לפי הסדר. למשל: `0027_contacts.sql` (פרטי קשר ואנשי קשר לקבוצה), ואחריו `0028_second_parent_and_roster.sql` (הורה שני וטבלת שחקנים והורים).
 4. התחברות (חינמית, בלי SMS): Google וקוד במייל.
    * **Google:** ב־Google Cloud Console ← APIs & Services ← Credentials ← Create Credentials ← OAuth client ID ← Web application. ב־Authorized redirect URIs הדביקו את ה־Callback URL שמופיע ב־Supabase ← Authentication ← Sign In / Providers ← Google. העתיקו את Client ID ו־Client Secret ל־Supabase, הפעילו את Google ושמרו.
    * **קוד במייל:** Email מופעל כברירת מחדל. ב־Authentication ← Emails ← Templates ← Magic Link הוסיפו לתבנית את `{{ .Token }}` כדי שהמייל יכלול גם קוד (הקישור במייל עובד גם בלעדיו).

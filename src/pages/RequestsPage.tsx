@@ -9,7 +9,9 @@ import type { Player } from '../lib/types';
 export interface JoinRequest {
   id: string; team_id: string; team_name: string; role: 'coach' | 'parent'; staff_role_id: string | null;
   full_name: string; email: string | null; phone: string | null; avatar_path: string | null;
-  children: { full_name: string; birth_date: string; email: string | null }[]; created_at: string;
+  children: { full_name: string; birth_date: string; email: string | null; phone?: string | null }[]; created_at: string;
+  relation_id?: string | null;
+  other_parent?: { full_name: string; relation_id: string | null; phone: string | null; email: string | null } | null;
 }
 
 export const loadRequests = () => (isDemo ? Promise.resolve<JoinRequest[]>([]) : rpc<JoinRequest[]>('pending_join_requests'));
@@ -47,6 +49,7 @@ export default function RequestsPage() {
 
 function RequestCard({ r, onDone }: { r: JoinRequest; onDone: () => void }) {
   const staffName = useLookupName('staff_role');
+  const relationName = useLookupName('guardian_relation');
   const [staff, setStaff] = useState<string | null>(r.staff_role_id);
   const [matches, setMatches] = useState<Record<number, string>>({});
   const roster = useLoad(async () => {
@@ -68,8 +71,15 @@ function RequestCard({ r, onDone }: { r: JoinRequest; onDone: () => void }) {
     <Card title={r.full_name} actions={<Badge tone="warn">{asLabel}</Badge>}>
       <p className="muted">
         {r.team_name} · {fmtDate(r.created_at)}<br />
-        {r.email}{r.phone ? ` · ${r.phone}` : ''}
+        {r.email}{r.phone ? ` · ${r.phone}` : ''}{r.relation_id ? ` · ${relationName(r.relation_id)}` : ''}
       </p>
+      {r.other_parent && (
+        <p className="muted">
+          הורה שני: <strong>{r.other_parent.full_name}</strong>
+          {r.other_parent.relation_id ? ` · ${relationName(r.other_parent.relation_id)}` : ''}
+          {r.other_parent.phone ? ` · ${r.other_parent.phone}` : ''}{r.other_parent.email ? ` · ${r.other_parent.email}` : ''}
+        </p>
+      )}
       {r.role === 'coach' && (
         <label className="field"><span>סוג צוות באישור</span>
           <LookupSelect domain="staff_role" value={staff} onChange={setStaff} empty="מאמן (ללא סוג)" />
@@ -79,7 +89,7 @@ function RequestCard({ r, onDone }: { r: JoinRequest; onDone: () => void }) {
         <ul className="list compact">
           {r.children.map((c, n) => (
             <li key={n} className="stack">
-              <span><strong>{c.full_name}</strong> <small className="muted">גיל {ageOf(c.birth_date)}{c.email ? ` · ${c.email}` : ''}</small></span>
+              <span><strong>{c.full_name}</strong> <small className="muted">גיל {ageOf(c.birth_date)}{c.email ? ` · ${c.email}` : ''}{c.phone ? ` · ${c.phone}` : ''}</small></span>
               {!!roster.data?.length && (
                 <select value={matches[n] ?? ''} onChange={(e) => setMatches({ ...matches, [n]: e.target.value })}>
                   <option value="">שחקן חדש בקבוצה</option>
