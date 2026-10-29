@@ -30,20 +30,32 @@ function keyBytes(base64url: string): Uint8Array<ArrayBuffer> {
   return Uint8Array.from(raw, (c) => c.charCodeAt(0));
 }
 
+const withTimeout = <T,>(p: Promise<T>, ms: number, what: string): Promise<T> =>
+  Promise.race([p, new Promise<T>((_, rej) => setTimeout(() => rej(new Error(`${what}: timed out after ${ms / 1000}s`)), ms))]);
+
+/** Turns push on for this device. Each step names itself in the error, so a failure shows where it stopped. */
 export async function enablePush(): Promise<PushState> {
   if (!(await pushSupported())) return 'unsupported';
-  if ((await Notification.requestPermission()) !== 'granted') return 'denied';
-  const reg = await navigator.serviceWorker.ready;
-  const sub =
-    (await reg.pushManager.getSubscription()) ??
-    (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes((await vapidKey())!) }));
+  const perm = await Notification.requestPermission();
+  if (perm !== 'granted') return perm === 'denied' ? 'denied' : 'off';
+  const reg = await withTimeout(navigator.serviceWorker.ready, 8000, 'service worker is not ready');
+  let sub = await reg.pushManager.getSubscription();
+  if (!sub) {
+    try {
+      sub = await withTimeout(
+        reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes((await vapidKey())!) }),
+        15000, 'push subscribe');
+    } catch (e) {
+      throw new Error(`subscribe: ${(e as Error).name}: ${(e as Error).message}`);
+    }
+  }
   const json = sub.toJSON();
   const { error } = await supabase.rpc('save_push_subscription', {
     p_endpoint: sub.endpoint,
     p_p256dh: json.keys?.p256dh,
     p_auth: json.keys?.auth,
   });
-  if (error) throw error;
+  if (error) throw new Error(`save: ${error.message}`);
   return 'on';
 }
 

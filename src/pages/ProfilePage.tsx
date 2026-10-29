@@ -60,7 +60,12 @@ function PushCard() {
   const act = useAction();
   const [sent, setSent] = useState(false);
   useEffect(() => { pushState().then(setState, () => setState('unsupported')); }, []);
-  const toggle = () => act.run(async () => setState(state === 'on' ? await disablePush() : await enablePush()));
+  const [detail, setDetail] = useState('');
+  const toggle = async () => {
+    setDetail('');
+    const next = await act.run(async () => (state === 'on' ? await disablePush() : await enablePush()));
+    if (next) { setState(next); if (next === 'off' && state === 'off') setDetail('לא אושרה הרשאה להתראות. נסו שוב ואשרו כשהדפדפן שואל.'); }
+  };
   return (
     <Card title="🔔 התראות למכשיר">
       {state === null && <p className="muted">בודק…</p>}
@@ -82,6 +87,7 @@ function PushCard() {
         </>
       )}
       <ErrorText error={act.error} />
+      {detail && <p className="muted">{detail}</p>}
     </Card>
   );
 }
