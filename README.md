@@ -9,6 +9,7 @@ Built: everything in the business spec except features marked "proposed" there.
 | Area | What it does |
 |---|---|
 | Login | Google or an emailed code (free, no SMS), role/mode picker (a user who is parent and club admin picks a mode, and can switch) |
+| Install | banner inviting browser users to add the app to the home screen: one-tap install on Android Chrome, Share → Add to Home Screen steps on iPhone; hidden once installed, or for a month after closing |
 | Clubs / teams | system admin creates clubs; club admin creates teams (with a sport) and invites staff by email |
 | Players | first-class: name, birth date (mandatory), photo (parent consent per child). A child may have no email: the parent manages the profile |
 | Events | type from a table (training / match / team building ...), attendance answers with a reason from a table and a note, last answer wins, no time limit |
