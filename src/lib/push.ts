@@ -34,10 +34,20 @@ const withTimeout = <T,>(p: Promise<T>, ms: number, what: string): Promise<T> =>
   Promise.race([p, new Promise<T>((_, rej) => setTimeout(() => rej(new Error(`${what}: timed out after ${ms / 1000}s`)), ms))]);
 
 /** Turns push on for this device. Each step names itself in the error, so a failure shows where it stopped. */
+const WANT = 'wantsPush';
+/** True when the user pressed "enable" and the subscription has not been saved yet (the app may have restarted). */
+export function wantsPush(): boolean {
+  try { return localStorage.getItem(WANT) === '1'; } catch { return false; }
+}
+function setWant(on: boolean) {
+  try { if (on) localStorage.setItem(WANT, '1'); else localStorage.removeItem(WANT); } catch { /* storage may be unavailable */ }
+}
+
 export async function enablePush(): Promise<PushState> {
   if (!(await pushSupported())) return 'unsupported';
+  setWant(true);
   const perm = await Notification.requestPermission();
-  if (perm !== 'granted') return perm === 'denied' ? 'denied' : 'off';
+  if (perm !== 'granted') { setWant(false); return perm === 'denied' ? 'denied' : 'off'; }
   const reg = await withTimeout(navigator.serviceWorker.ready, 8000, 'service worker is not ready');
   let sub = await reg.pushManager.getSubscription();
   if (!sub) {
@@ -56,10 +66,12 @@ export async function enablePush(): Promise<PushState> {
     p_auth: json.keys?.auth,
   });
   if (error) throw new Error(`save: ${error.message}`);
+  setWant(false);
   return 'on';
 }
 
 export async function disablePush(): Promise<PushState> {
+  setWant(false);
   const reg = await navigator.serviceWorker.getRegistration();
   const sub = await reg?.pushManager.getSubscription();
   if (sub) {

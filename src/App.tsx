@@ -19,6 +19,7 @@ import JoinPage from './pages/JoinPage';
 import RequestsPage from './pages/RequestsPage';
 import NotificationsPage from './pages/NotificationsPage';
 import { pendingJoin, rememberJoin } from './lib/join';
+import { recentPlace } from './lib/place';
 import type { Mode } from './lib/types';
 import { FamilyChat, FamilyEvents, FamilyHome, FamilySurveys, FamilyTasks } from './pages/family/Family';
 
@@ -31,8 +32,11 @@ function JoinLater() {
 
 // After sign-in, a join link opened before it wins over the usual entry screen.
 function Home() {
+  const { session } = useAuth();
   const [code] = useState(pendingJoin);
-  return code ? <Navigate to={`/join/${code}`} replace /> : <ModePicker auto />;
+  const [place] = useState(() => recentPlace(session?.user.id));
+  if (code) return <Navigate to={`/join/${code}`} replace />;
+  return place ? <Navigate to={place} replace /> : <ModePicker auto />;
 }
 
 // The emailed link to a join request opens the requests screen in a mode that may decide it.

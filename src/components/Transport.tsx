@@ -38,8 +38,10 @@ export function TransportCard({ event, players = [], responses, myKids, canManag
   /** the viewer is on the team's staff (coach / club admin), so has a seat row of their own */
   isStaff: boolean; myId: string; onToggled: () => void;
 }) {
+  // The answers are part of the key: changing one reloads the seats (the server clears them when a child is marked not coming).
+  const answers = responses.filter((r) => r.event_id === event.id).map((r) => `${r.player_id}:${r.status}`).sort().join(',');
   const list = useLoad(() => (event.has_transport ? rpc<Seat[]>('event_transport_list', { p_event: event.id }) : Promise.resolve([])),
-    [event.id, event.has_transport]);
+    [event.id, event.has_transport, answers]);
   const act = useAction();
   if (!event.has_transport && !canManage) return null;
 
@@ -47,7 +49,7 @@ export function TransportCard({ event, players = [], responses, myKids, canManag
   const total = rows.reduce((s, r) => s + r.seats, 0);
   const seatsOf = (playerId: string | null, profileId: string | null) =>
     rows.find((r) => (playerId ? r.player_id === playerId : r.profile_id === profileId))?.seats ?? null;
-  const absent = (pid: string) => responses.some((r) => r.player_id === pid && r.status === 'not_attending');
+  const answerOf = (pid: string) => responses.find((r) => r.event_id === event.id && r.player_id === pid)?.status;
   const save = (n: number, player: string | null, profile: string | null) => act.run(async () => {
     await rpc('set_transport_seats', { p_event: event.id, p_seats: n, p_player: player, p_profile: profile });
     list.reload();
@@ -65,7 +67,7 @@ export function TransportCard({ event, players = [], responses, myKids, canManag
   }
 
   const answered = rows.filter((r) => r.role === 'player');
-  const waiting = players.filter((p) => !absent(p.id) && !answered.some((r) => r.player_id === p.id));
+  const waiting = players.filter((p) => answerOf(p.id) === 'attending' && !answered.some((r) => r.player_id === p.id));
   return (
     <Card title="🚌 הסעה" actions={canManage && (
       <button className="small secondary" disabled={act.busy} onClick={() => { if (confirm('לבטל את ההסעה לאירוע? התשובות יישמרו.')) toggle(false); }}>ביטול הסעה</button>
@@ -74,8 +76,9 @@ export function TransportCard({ event, players = [], responses, myKids, canManag
       {myKids.map((k) => (
         <div key={k.id} className="transport-row">
           <strong>{k.full_name}</strong>
-          {absent(k.id) ? <Badge>לא מגיע לאירוע</Badge>
-            : <SeatPicker seats={seatsOf(k.id, null)} busy={act.busy} onSave={(n) => save(n, k.id, null)} />}
+          {answerOf(k.id) === 'attending'
+            ? <SeatPicker seats={seatsOf(k.id, null)} busy={act.busy} onSave={(n) => save(n, k.id, null)} />
+            : <small className="muted">{answerOf(k.id) === 'not_attending' ? 'לא מגיע לאירוע, אין הסעה' : 'אפשר לבקש הסעה אחרי שמסמנים שהילד מגיע'}</small>}
         </div>
       ))}
       {isStaff && (

@@ -6,7 +6,7 @@ import { useAuth } from '../auth/AuthProvider';
 import { Card, ErrorText, Field, PageHero } from '../components/ui';
 import { Picture, PicturePicker } from '../components/Picture';
 import { Link } from 'react-router-dom';
-import { disablePush, enablePush, pushState, type PushState } from '../lib/push';
+import { disablePush, enablePush, pushState, wantsPush, type PushState } from '../lib/push';
 import { isDemo } from '../lib/supabase';
 
 export default function ProfilePage() {
@@ -59,7 +59,15 @@ function PushCard() {
   const [state, setState] = useState<PushState | null>(null);
   const act = useAction();
   const [sent, setSent] = useState(false);
-  useEffect(() => { pushState().then(setState, () => setState('unsupported')); }, []);
+  useEffect(() => {
+    // If the app restarted right after the permission was granted, finish the subscription that was started.
+    pushState().then(async (st) => {
+      if (st === 'off' && wantsPush() && Notification.permission === 'granted') {
+        try { st = await enablePush(); } catch { /* the button shows the error on the next try */ }
+      }
+      setState(st);
+    }, () => setState('unsupported'));
+  }, []);
   const [detail, setDetail] = useState('');
   const toggle = async () => {
     setDetail('');

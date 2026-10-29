@@ -3,6 +3,7 @@ import { Link, Navigate, NavLink, Outlet, useLocation, useParams } from 'react-r
 import { Picture } from './Picture';
 import { Icon, type IconName } from './Icon';
 import { useAuth } from '../auth/AuthProvider';
+import { rememberPlace } from '../lib/place';
 import { isDemo, supabase } from '../lib/supabase';
 import type { Mode } from '../lib/types';
 import { PendingRequestsBanner } from '../pages/RequestsPage';
@@ -48,6 +49,8 @@ export default function Shell() {
   const m = mode as Mode;
   const valid = modes.includes(m);
   const { pathname } = useLocation();
+  const uid = profile?.id;
+  useEffect(() => { if (uid) rememberPlace(uid, pathname); }, [uid, pathname]);
   const { unread, refresh } = useUnread(pathname);
 
   useEffect(() => {
