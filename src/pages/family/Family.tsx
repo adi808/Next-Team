@@ -13,7 +13,7 @@ import { useLookups, useSports } from '../../components/Lookups';
 import { EventDashboard } from '../../components/EventDashboard';
 import { TransportCard } from '../../components/Transport';
 import { isDemo } from '../../lib/supabase';
-import { isOver, nextAndOther } from '../../lib/events';
+import { eventHeading, isOver, nextAndOther } from '../../lib/events';
 import { PlayerAvatar } from '../../components/People';
 import type { EventResponse, EventRow, Player, Team, TeamKit } from '../../lib/types';
 
@@ -126,7 +126,7 @@ export function FamilyEvents() {
     <section key={e.id} className="stack family-next">
       <h3 className="section-title">{heading}{teams.length > 1 ? ` · ${teams.find((t) => t.id === e.team_id)?.name ?? ''}` : ''}</h3>
       <EventDashboard event={e} typeLabel={typeName(e.type_id)} isMatch={!!types.find((t) => t.id === e.type_id)?.meta?.is_match}
-        kit={data?.kits.find((k) => k.id === e.kit_id)} />
+        kit={data?.kits.find((k) => k.id === e.kit_id)} teamName={teams.find((t) => t.id === e.team_id)?.name} />
       <div className="card">
         {answers(e)}
         <Link to={`../event/${e.id}`}>לכל פרטי האירוע ←</Link>
@@ -147,10 +147,10 @@ export function FamilyEvents() {
       {other && dashboard(other, `ה${typeName(other.type_id) || 'אירוע'} הקרוב`)}
       {rest.length > 0 && <h3 className="section-title">בהמשך</h3>}
       {rest.map((e) => (
-        <Card key={e.id} title={e.title || typeName(e.type_id)}>
+        <Card key={e.id} title={eventHeading(e, typeName(e.type_id), teams.find((t) => t.id === e.team_id)?.name)}>
           <p>
             <Badge>{typeName(e.type_id)}</Badge> {fmtDate(e.starts_at)} {e.location && `· ${e.location}`}
-            {e.opponent && ` · נגד ${e.opponent}`} <small className="muted">· {teams.find((t) => t.id === e.team_id)?.name}</small>
+            <small className="muted">· {teams.find((t) => t.id === e.team_id)?.name}</small>
           </p>
           <Link to={`../event/${e.id}`}>פרטים</Link>
           {answers(e)}

@@ -6,7 +6,7 @@ import { useAuth } from '../auth/AuthProvider';
 import { Card, ErrorText, Field, PageHero } from '../components/ui';
 import { Picture, PicturePicker } from '../components/Picture';
 import { Link } from 'react-router-dom';
-import { disablePush, enablePush, pushState, wantsPush, type PushState } from '../lib/push';
+import { disablePush, enablePush, pushDiagnostics, pushState, showLocalTest, wantsPush, type PushState } from '../lib/push';
 import { isDemo } from '../lib/supabase';
 
 export default function ProfilePage() {
@@ -69,6 +69,7 @@ function PushCard() {
     }, () => setState('unsupported'));
   }, []);
   const [detail, setDetail] = useState('');
+  const [diag, setDiag] = useState<string[] | null>(null);
   const toggle = async () => {
     setDetail('');
     const next = await act.run(async () => (state === 'on' ? await disablePush() : await enablePush()));
@@ -92,6 +93,13 @@ function PushCard() {
             )}
           </div>
           {sent && <p className="ok">נשלחה. תוך כמה שניות היא אמורה לקפוץ.</p>}
+          {state === 'on' && (
+            <div className="row wrap">
+              <button className="small secondary" disabled={act.busy} onClick={() => act.run(showLocalTest)}>בדיקה מקומית (בלי שרת)</button>
+              <button className="small secondary" onClick={async () => setDiag(await pushDiagnostics())}>פרטי אבחון</button>
+            </div>
+          )}
+          {diag && <ul className="list compact">{diag.map((l) => <li key={l}>{l}</li>)}</ul>}
         </>
       )}
       <ErrorText error={act.error} />

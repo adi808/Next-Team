@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { armResume } from './place';
 
 export type PushState = 'unsupported' | 'denied' | 'off' | 'on';
 
@@ -46,6 +47,7 @@ function setWant(on: boolean) {
 export async function enablePush(): Promise<PushState> {
   if (!(await pushSupported())) return 'unsupported';
   setWant(true);
+  armResume();
   const perm = await Notification.requestPermission();
   if (perm !== 'granted') { setWant(false); return perm === 'denied' ? 'denied' : 'off'; }
   const reg = await withTimeout(navigator.serviceWorker.ready, 8000, 'service worker is not ready');
@@ -79,4 +81,28 @@ export async function disablePush(): Promise<PushState> {
     await sub.unsubscribe();
   }
   return 'off';
+}
+
+/** Shows a notification from the page itself (no server): tells a phone setting problem from a delivery problem. */
+export async function showLocalTest(): Promise<void> {
+  const reg = await navigator.serviceWorker.ready;
+  await reg.showNotification('בדיקה מקומית', { body: 'ההתראה הזו הופקה במכשיר עצמו, בלי שרת.', lang: 'he', dir: 'rtl', tag: 'local-test' });
+}
+
+/** One line per fact about push on this device, to read out when notifications do not appear. */
+export async function pushDiagnostics(): Promise<string[]> {
+  const out: string[] = [];
+  out.push(`הרשאה: ${'Notification' in window ? Notification.permission : 'אין תמיכה'}`);
+  const reg = 'serviceWorker' in navigator ? await navigator.serviceWorker.getRegistration() : undefined;
+  out.push(`רקע האפליקציה: ${reg ? (reg.active ? 'פעיל' : reg.installing ? 'מתקין' : reg.waiting ? 'ממתין לעדכון' : 'לא פעיל') : 'לא רשום'}`);
+  out.push(`מכשיר רשום להתראות: ${(await reg?.pushManager.getSubscription()) ? 'כן' : 'לא'}`);
+  try {
+    const sw = await (await fetch('/sw.js', { cache: 'no-store' })).text();
+    out.push(`קוד ההתראות בגרסה שבאתר: ${sw.includes('push-handler') ? 'קיים' : 'חסר'}`);
+    const h = await fetch('/push-handler.js', { cache: 'no-store' });
+    out.push(`קובץ ההתראות: ${h.ok && (h.headers.get('content-type') ?? '').includes('javascript') ? 'תקין' : `לא תקין (${h.status}, ${h.headers.get('content-type')})`}`);
+  } catch {
+    out.push('לא הצלחתי לבדוק את קובץ ההתראות');
+  }
+  return out;
 }

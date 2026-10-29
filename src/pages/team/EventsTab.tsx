@@ -8,7 +8,7 @@ import { LookupSelect, useLookups } from '../../components/Lookups';
 import { KitAvatar, KitSelect, useTeamKits } from '../../components/Kit';
 import { EquipmentPicker } from '../../components/Equipment';
 import { TransportChip, useTransportTotals } from '../../components/Transport';
-import { isOver } from '../../lib/events';
+import { eventHeading, isOver } from '../../lib/events';
 import type { EventRow } from '../../lib/types';
 import type { TeamTabProps } from './TeamPage';
 
@@ -114,8 +114,8 @@ export default function EventsTab({ team, canManage }: TeamTabProps) {
           return (
             <li key={e.id} className={`row${over ? ' past' : ''}`}>
               <Badge>{typeName(e.type_id)}</Badge>
-              <Link to={`../event/${e.id}`}>{e.title || typeName(e.type_id)}</Link>
-              <small className="muted">{fmtDate(e.starts_at)}{e.opponent ? ` · נגד ${e.opponent}` : ''}</small>
+              <Link to={`../event/${e.id}`}>{eventHeading(e, typeName(e.type_id), team.name)}</Link>
+              <small className="muted">{fmtDate(e.starts_at)}</small>
               {e.our_score !== null && <strong>{e.our_score}:{e.their_score}</strong>}
               <TransportChip total={transport.get(e.id)} />
               <span className="grow" />

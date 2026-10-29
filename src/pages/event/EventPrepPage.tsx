@@ -8,6 +8,7 @@ import { Card, Empty, Loading, PageHero, ScoreRing, StatTiles } from '../../comp
 import { useLookups } from '../../components/Lookups';
 import { PlayerAvatar, ShirtNo, useShirtNumbers } from '../../components/People';
 import { average, defsFor, latestRatings } from '../../lib/scores';
+import { eventHeading } from '../../lib/events';
 import type { AttrDef, AttrValue, EventResponse, EventRow, Player, Team } from '../../lib/types';
 
 const TZ = 'Asia/Jerusalem';
@@ -78,7 +79,7 @@ export default function EventPrepPage() {
     <>
       <PageHero kicker={[typeName, `${fmt(event.starts_at, { weekday: 'long' })} ${fmt(event.starts_at, { hour: '2-digit', minute: '2-digit' })}`, event.location].filter(Boolean).join(' | ')}
         title="הכנה לאירוע">
-        <span className="hero-sub">{event.title || typeName}{event.opponent ? ` נגד ${event.opponent}` : ''} · {team.name}</span>
+        <span className="hero-sub">{eventHeading(event, typeName, team.name)} · {team.name}</span>
       </PageHero>
       <div className="overlap">
         <Card title="הסגל הזמין">

@@ -95,7 +95,7 @@ export default function EventPage() {
   return (
     <>
       <p><Link to={`../team/${team.id}`}>← {team.name}</Link></p>
-      <EventDashboard event={event} typeLabel={typeName(event.type_id)} isMatch={isMatch} kit={kit}
+      <EventDashboard event={event} typeLabel={typeName(event.type_id)} isMatch={isMatch} kit={kit} teamName={team.name}
         attendance={canManage ? { yes: attending, no: absent, pending: players.length - responses.length } : undefined} />
       {canManage && (
         <div className="row wrap">

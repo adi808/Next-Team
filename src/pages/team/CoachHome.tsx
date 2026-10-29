@@ -7,7 +7,7 @@ import { Badge, Empty, Loading, PageHero, StatTiles } from '../../components/ui'
 import { useLookupName, useLookups } from '../../components/Lookups';
 import { KitAvatar } from '../../components/Kit';
 import { TransportChip, useTransportTotals } from '../../components/Transport';
-import { isOver, nextAndOther } from '../../lib/events';
+import { eventHeading, isOver, nextAndOther } from '../../lib/events';
 import type { EventResponse, EventRow, Lookup, Team, TeamKit } from '../../lib/types';
 
 const TZ = 'Asia/Jerusalem';
@@ -83,7 +83,7 @@ export default function CoachHome() {
               {data.later.map((e) => (
                 <li key={e.id} className="row">
                   <Badge>{typeOf(e.type_id)?.name_he ?? ''}</Badge>
-                  <Link to={`../event/${e.id}`}>{e.title || typeOf(e.type_id)?.name_he}{e.opponent ? ` נגד ${e.opponent}` : ''}</Link>
+                  <Link to={`../event/${e.id}`}>{eventHeading(e, typeOf(e.type_id)?.name_he ?? '', team?.name)}</Link>
                   <TransportChip total={transport.get(e.id)} />
                   <span className="grow" />
                   <small className="muted">{fmt(e.starts_at, { weekday: 'short', day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' })}</small>

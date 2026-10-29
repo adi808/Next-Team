@@ -9,7 +9,6 @@ self.addEventListener('push', (event) => {
   event.waitUntil(
     self.registration.showNotification(data.title || 'Next Team', {
       body: data.body || '',
-      icon: '/icon.svg',
       lang: 'he',
       dir: 'rtl',
       data: { url: data.url || '/' },

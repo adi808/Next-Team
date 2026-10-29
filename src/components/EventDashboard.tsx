@@ -3,6 +3,7 @@ import { KitAvatar } from './Kit';
 import { StadiumArt } from './Stadium';
 import { useEquipmentNames } from './Equipment';
 import { isDemo } from '../lib/supabase';
+import { eventHeading } from '../lib/events';
 import type { EventRow, TeamKit } from '../lib/types';
 
 const TZ = 'Asia/Jerusalem';
@@ -98,8 +99,8 @@ function Donut({ yes, no, pending }: { yes: number; no: number; pending: number 
   );
 }
 
-export function EventDashboard({ event, typeLabel, isMatch, kit, attendance }: {
-  event: EventRow; typeLabel: string; isMatch: boolean; kit?: TeamKit;
+export function EventDashboard({ event, typeLabel, isMatch, kit, attendance, teamName }: {
+  event: EventRow; typeLabel: string; isMatch: boolean; kit?: TeamKit; teamName?: string;
   attendance?: { yes: number; no: number; pending: number };
 }) {
   const now = useNow();
@@ -120,7 +121,7 @@ export function EventDashboard({ event, typeLabel, isMatch, kit, attendance }: {
         </div>
         <div className="event-hero-text">
           <span className="event-type">{typeLabel}</span>
-          <h2>{event.title || typeLabel}{event.opponent ? ` נגד ${event.opponent}` : ''}</h2>
+          <h2>{eventHeading(event, typeLabel, teamName)}</h2>
           <span>{time(event.starts_at)}{event.ends_at ? `–${time(event.ends_at)}` : ''}{event.location ? ` · ${event.location}` : ''}</span>
           <span className="countdown">{when}</span>
         </div>
