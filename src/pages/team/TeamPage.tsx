@@ -68,7 +68,7 @@ export default function TeamPage(opts: { teamId?: string; initialTab?: string })
     ...(sport?.slug === 'football' ? [{ id: 'league', label: 'ליגה', render: () => <LeagueTab {...props} /> }] : []),
     ...(canManage ? [{
       id: 'roster', label: 'טבלת הורים',
-      render: () => <Roster clubId={team.club_id} teamId={team.id} title={`שחקנים והורים - ${team.name}`}
+      render: () => <Roster clubId={team.club_id} teamId={team.id} team={team} title={`שחקנים והורים - ${team.name}`}
         isClubAdmin={(acting === 'system_admin' && !!auth.profile?.is_system_admin) || (acting === 'club_admin' && auth.adminClubIds.includes(team.club_id))} />,
     }] : []),
     ...(canManage ? [{ id: 'settings', label: 'הגדרות', render: () => <SettingsTab {...props} /> }] : []),

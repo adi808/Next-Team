@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { rpc, useAction, useLoad, fmtDay, todayISO } from '../lib/db';
+import { normEmail } from '../lib/email';
 import { Card, Empty, ErrorText, Field, Loading } from './ui';
 import { useLookupName } from './Lookups';
 import { fmtPhone } from './Contacts';
@@ -88,12 +89,53 @@ function RowEditor({ row, isClubAdmin, onChanged, onClose }: { row: RosterRow; i
   );
 }
 
+/** Adds a child to a team by hand; the parents are added in the editor that opens for the new row. */
+function AddChild({ teams, teamId, onAdded }: { teams: Team[]; teamId?: string; onAdded: (playerId: string) => void }) {
+  const [team, setTeam] = useState(teamId ?? teams[0]?.id ?? '');
+  const [name, setName] = useState('');
+  const [birth, setBirth] = useState('');
+  const [parentEmail, setParentEmail] = useState('');
+  const act = useAction();
+  const chosen = teams.find((t) => t.id === (teamId ?? team));
+  async function add() {
+    const parent = parentEmail.trim() ? normEmail(parentEmail) : null;
+    if (parentEmail.trim() && !parent) return act.setError('כתובת מייל לא תקינה');
+    if (birth > todayISO()) return act.setError('תאריך הלידה לא יכול להיות בעתיד');
+    await act.run(async () => {
+      const id = await rpc<string>('add_player', { p_team: chosen!.id, p_full_name: name, p_birth_date: birth, p_email: null, p_parent_email: parent });
+      setName(''); setBirth(''); setParentEmail('');
+      onAdded(id);
+    });
+  }
+  return (
+    <details className="roster-add">
+      <summary>+ הוספת ילד ידנית</summary>
+      <div className="stack">
+        {teamId || teams.length < 2 ? (
+          <p className="muted">הילד יתווסף ל<strong>{chosen?.name}</strong>.</p>
+        ) : (
+          <label className="field"><span>קבוצה</span>
+            <select value={team} onChange={(e) => setTeam(e.target.value)}>
+              {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+          </label>
+        )}
+        <Field label="שם מלא"><input value={name} onChange={(e) => setName(e.target.value)} /></Field>
+        <Field label="תאריך לידה"><input type="date" max={todayISO()} value={birth} onChange={(e) => setBirth(e.target.value)} /></Field>
+        <Field label="מייל של ההורה (לא חובה; את שאר פרטי ההורים מוסיפים בעריכה)"><input type="email" dir="ltr" value={parentEmail} onChange={(e) => setParentEmail(e.target.value)} /></Field>
+        <ErrorText error={act.error} />
+        <button disabled={!chosen || !name.trim() || !birth || act.busy} onClick={add}>הוספה ופתיחה לעריכה</button>
+      </div>
+    </details>
+  );
+}
+
 /**
  * Every child with their parents and contact details. Club admins see the whole club and filter by team;
  * a coach sees one team. Edit a row to change the child or the parents; export the filtered table to Excel.
  */
-export function Roster({ clubId, teams, teamId, isClubAdmin, title }: {
-  clubId: string; teams?: Team[]; teamId?: string; isClubAdmin: boolean; title: string;
+export function Roster({ clubId, teams, teamId, isClubAdmin, title, team: ownTeam }: {
+  clubId: string; teams?: Team[]; teamId?: string; isClubAdmin: boolean; title: string; team?: Team;
 }) {
   const [team, setTeam] = useState(teamId ?? '');
   const [search, setSearch] = useState('');
@@ -123,6 +165,9 @@ export function Roster({ clubId, teams, teamId, isClubAdmin, title }: {
         )}
         <input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="חיפוש לפי שם, טלפון או מייל" />
       </div>
+      {(teams?.length || ownTeam) && (
+        <AddChild teams={teams ?? [ownTeam!]} teamId={teamId} onAdded={(id) => { setSearch(''); setTeam(teamId ?? ''); setOpen(id); reload(); }} />
+      )}
       <Loading loading={loading && !data} error={error} />
       {data && !rows.length && <Empty>{term ? 'לא נמצאו תוצאות.' : 'אין עדיין ילדים.'}</Empty>}
       {rows.length > 0 && (

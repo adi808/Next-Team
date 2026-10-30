@@ -564,3 +564,7 @@ table.roster .cell-line.email { white-space: normal; overflow-wrap: anywhere; fo
 .roster-editor h4 { margin: 0 0 0.4rem; }
 .roster-editor-grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); margin-bottom: 0.6rem; }
 .small-link { font-size: 0.85rem; }
+
+.roster-add { margin: 0 0 12px; border: 1px solid var(--line, #dfe3ee); border-radius: 12px; padding: 10px 14px; background: #fff; }
+.roster-add > summary { cursor: pointer; font-weight: 600; color: var(--primary, #2f5bea); }
+.roster-add[open] > summary { margin-bottom: 10px; }
