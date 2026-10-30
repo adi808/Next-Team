@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react';
-import { rpc, useAction } from '../lib/db';
+import { q, rpc, useAction, useLoad } from '../lib/db';
+import { supabase } from '../lib/supabase';
+import { MODE_LABELS } from '../lib/types';
+import { useLookupName } from '../components/Lookups';
 import { uploadImage } from '../lib/images';
 import { useAuth } from '../auth/AuthProvider';
 import { Card, ErrorText, Field, PageHero } from '../components/ui';
@@ -8,6 +11,34 @@ import { Link } from 'react-router-dom';
 import { disablePush, enablePush, pushDiagnostics, pushState, showLocalTest, wantsPush, type PushState } from '../lib/push';
 import { isDemo } from '../lib/supabase';
 import { fmtPhone } from '../components/Contacts';
+
+/** Every role this account holds, so it is clear who is signed in and what each role may do. */
+function RolesCard() {
+  const { profile, modes, memberships, children, me } = useAuth();
+  const staffName = useLookupName('staff_role');
+  const ids = [...new Set(memberships.map((m) => m.team_id).filter((t): t is string => !!t))];
+  const teams = useLoad(() => (ids.length && !isDemo
+    ? q<{ id: string; name: string }[]>(supabase.from('teams').select('id, name').in('id', ids))
+    : Promise.resolve([])), [ids.join(',')]);
+  const teamName = (id: string | null) => teams.data?.find((t) => t.id === id)?.name ?? '';
+  const staff = memberships.filter((m) => m.role === 'coach');
+  const detail: Record<string, string> = {
+    sysadmin: 'כל המועדונים, הרשימות וההגדרות',
+    admin: `ניהול המועדון והקבוצות, אישור בקשות הצטרפות של צוות${memberships.filter((m) => m.role === 'club_admin').length > 1 ? ' (כמה מועדונים)' : ''}`,
+    coach: staff.map((m) => `${staffName(m.staff_role_id) || 'מאמן'} · ${teamName(m.team_id)}`).join('، ') + ' (הסגל, אירועים, הודעות ואישור הורים)',
+    parent: `הורה של ${children.map((c) => c.full_name).join(', ')}: אישורי הגעה ופרטי הילד`,
+    player: `${me?.full_name ?? ''}: הפרופיל, האירועים והמשימות שלי`,
+  };
+  return (
+    <Card title="התפקידים שלי">
+      <small className="muted">מחובר/ת כ־<bdi>{profile?.email}</bdi></small>
+      {!modes.length && <p className="muted">החשבון הזה עדיין לא משויך לאף תפקיד.</p>}
+      <ul className="list compact">
+        {modes.map((m) => <li key={m} className="stack"><strong>{MODE_LABELS[m]}</strong><small className="muted">{detail[m]}</small></li>)}
+      </ul>
+    </Card>
+  );
+}
 
 export default function ProfilePage() {
   const { profile, reload, modes } = useAuth();
@@ -56,6 +87,7 @@ export default function ProfilePage() {
           {saved && <span className="ok">נשמר</span>}
         </div>
       </Card>
+      <RolesCard />
       {!isDemo && <PushCard />}
     </>
   );
