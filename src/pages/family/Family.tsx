@@ -42,19 +42,23 @@ function AddChildCard() {
   const navigate = useNavigate();
   const act = useAction();
   const teams = useLoad(() => (coachTeamIds.length
-    ? q<{ id: string; name: string }[]>(supabase.from('teams').select('id, name').in('id', coachTeamIds))
+    ? q<{ id: string; name: string; clubs: { name: string } | null }[]>(supabase.from('teams').select('id, name, clubs(name)').in('id', coachTeamIds))
     : Promise.resolve([])), [coachTeamIds.join(',')]);
+  const [added, setAdded] = useState('');
   const [team, setTeam] = useState('');
   const [name, setName] = useState('');
   const [birth, setBirth] = useState('');
   const [link, setLink] = useState('');
   const code = parseJoinCode(link);
   const teamId = team || teams.data?.[0]?.id || '';
+  const label = (t: { name: string; clubs: { name: string } | null }) => (t.clubs?.name ? `${t.clubs.name} · ${t.name}` : t.name);
+  const chosen = (() => { const t = teams.data?.find((x) => x.id === teamId); return t ? label(t) : ''; })();
 
   async function add() {
     if (birth > todayISO()) return act.setError('תאריך הלידה לא יכול להיות בעתיד');
     await act.run(async () => {
       await rpc('add_my_child', { p_team: teamId, p_full_name: name, p_birth_date: birth });
+      setAdded(`${name.trim()} נרשם/ה ל${chosen}`);
       setName(''); setBirth(''); reload();
     });
   }
@@ -62,18 +66,21 @@ function AddChildCard() {
   if (teams.data?.length) {
     return (
       <Card title="רישום ילד">
-        <p className="muted">הילד יתווסף לסגל הקבוצה, ואתם תהיו ההורה שלו.</p>
-        {teams.data.length > 1 && (
-          <label className="field"><span>קבוצה</span>
-            <select value={teamId} onChange={(e) => setTeam(e.target.value)}>
-              {teams.data.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+        <p className="muted">הילד יתווסף לסגל הקבוצה שתבחרו, ואתם תהיו ההורה שלו.</p>
+        <label className="field"><span>מועדון וקבוצה</span>
+          {teams.data.length > 1 ? (
+            <select value={teamId} onChange={(e) => { setTeam(e.target.value); setAdded(''); }}>
+              {teams.data.map((t) => <option key={t.id} value={t.id}>{label(t)}</option>)}
             </select>
-          </label>
-        )}
+          ) : (
+            <strong>{chosen}</strong>
+          )}
+        </label>
         <Field label="שם מלא"><input value={name} onChange={(e) => setName(e.target.value)} /></Field>
         <Field label="תאריך לידה"><input type="date" max={todayISO()} value={birth} onChange={(e) => setBirth(e.target.value)} /></Field>
         <ErrorText error={act.error} />
-        <button disabled={!name.trim() || !birth || !teamId || act.busy} onClick={add}>רישום הילד</button>
+        {added && <p className="ok">{added}</p>}
+        <button disabled={!name.trim() || !birth || !teamId || act.busy} onClick={add}>{chosen ? `רישום הילד ל${chosen}` : 'רישום הילד'}</button>
       </Card>
     );
   }
