@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { rpc, useAction, useLoad, fmtDay } from '../lib/db';
+import { rpc, useAction, useLoad, fmtDay, todayISO } from '../lib/db';
 import { Card, Empty, ErrorText, Field, Loading } from './ui';
 import { useLookupName } from './Lookups';
 import { fmtPhone } from './Contacts';
@@ -65,7 +65,7 @@ function RowEditor({ row, isClubAdmin, onChanged, onClose }: { row: RosterRow; i
         <section>
           <h4>פרטי הילד</h4>
           <Field label="שם מלא"><input value={name} onChange={(e) => setName(e.target.value)} /></Field>
-          <Field label="תאריך לידה"><input type="date" value={birth} onChange={(e) => setBirth(e.target.value)} /></Field>
+          <Field label="תאריך לידה"><input type="date" max={todayISO()} value={birth} onChange={(e) => setBirth(e.target.value)} /></Field>
           <Field label="טלפון של הילד"><input type="tel" dir="ltr" value={phone} onChange={(e) => setPhone(e.target.value)} /></Field>
           {row.email && <small className="muted">מייל הכניסה של הילד: <bdi>{row.email}</bdi></small>}
           <div className="row">

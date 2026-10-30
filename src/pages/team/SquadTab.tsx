@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { isDemo, supabase } from '../../lib/supabase';
-import { q, rpc, useAction, useLoad, ageOf } from '../../lib/db';
+import { q, rpc, useAction, useLoad, ageOf, todayISO } from '../../lib/db';
 import { normEmail } from '../../lib/email';
 import { Card, Empty, ErrorText, Field } from '../../components/ui';
 import { PersonAvatar, PlayerAvatar, ShirtNo, useNames, useShirtNumbers } from '../../components/People';
@@ -31,6 +31,7 @@ export default function SquadTab({ team, players, canManage, reload }: TeamTabPr
   async function add() {
     const pEmail = email.trim() ? normEmail(email) : null;
     const parent = parentEmail.trim() ? normEmail(parentEmail) : null;
+    if (birth > todayISO()) return act.setError('תאריך הלידה לא יכול להיות בעתיד');
     if ((email.trim() && !pEmail) || (parentEmail.trim() && !parent)) return act.setError('כתובת מייל לא תקינה');
     await act.run(async () => {
       await rpc('add_player', { p_team: team.id, p_full_name: name, p_birth_date: birth, p_email: pEmail, p_parent_email: parent });
@@ -76,7 +77,7 @@ export default function SquadTab({ team, players, canManage, reload }: TeamTabPr
       {canManage && (
         <Card title="הוספת שחקן">
           <Field label="שם מלא"><input value={name} onChange={(e) => setName(e.target.value)} /></Field>
-          <Field label="תאריך לידה (חובה)"><input type="date" value={birth} onChange={(e) => setBirth(e.target.value)} /></Field>
+          <Field label="תאריך לידה (חובה)"><input type="date" max={todayISO()} value={birth} onChange={(e) => setBirth(e.target.value)} /></Field>
           <Field label="מייל של ההורה (לא חובה)"><input type="email" dir="ltr" value={parentEmail} onChange={(e) => setParentEmail(e.target.value)} placeholder="name@example.com" /></Field>
           <Field label="מייל של השחקן, אם יש לו (לא חובה)"><input type="email" dir="ltr" value={email} onChange={(e) => setEmail(e.target.value)} /></Field>
           <p className="muted">ילד בלי מייל מנוהל על ידי ההורה. הורה שמוזמן כאן מקבל גישה מיד, בלי צורך באישור נוסף.</p>

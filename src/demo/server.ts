@@ -242,6 +242,17 @@ export class DemoServer {
       if (a.p_email) this.rpcs.link_player_email.call(this, { p_player: id, p_email: a.p_email });
       return id;
     },
+    add_my_child(this: DemoServer, a: Row) {
+      const team = this.find('teams', a.p_team);
+      if (!team) throw new PgError('P0002', 'team not found');
+      if (!this.manageTeam(team.id)) this.deny('only team staff can add a child directly; use the team join link');
+      if (!a.p_birth_date) this.bad('birth date is mandatory');
+      const id = this.id('k');
+      this.t.players.push({ id, club_id: team.club_id, full_name: String(a.p_full_name).trim(), birth_date: a.p_birth_date, photo_path: null, photo_consent: false, user_id: null });
+      this.t.team_players.push({ team_id: team.id, player_id: id });
+      this.t.guardianships.push({ id: this.id('g'), parent_id: this.uid, player_id: id, status: 'approved' });
+      return id;
+    },
     add_player_to_team(this: DemoServer, a: Row) { this.t.team_players.push({ team_id: a.p_team, player_id: a.p_player }); },
     remove_player_from_team(this: DemoServer, a: Row) {
       if (!this.manageTeam(a.p_team)) this.deny();

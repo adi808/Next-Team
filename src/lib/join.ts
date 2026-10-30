@@ -14,4 +14,10 @@ export function forgetJoin() {
   try { localStorage.removeItem(KEY); } catch { /* storage may be unavailable */ }
 }
 
+/** The code from a pasted join link, or from the bare code. */
+export function parseJoinCode(text: string): string | null {
+  const m = text.trim().match(/(?:\/join\/)?([A-Za-z0-9]{8,})\/?(?:[?#].*)?$/);
+  return m ? m[1] : null;
+}
+
 export const joinUrl = (code: string) => `${window.location.origin}/join/${code}`;

@@ -25,6 +25,8 @@ export interface Profile {
   email: string | null;
   full_name: string;
   is_system_admin: boolean;
+  /** parent mode is open even before a child is linked */
+  is_parent?: boolean;
   avatar_path: string | null;
 }
 

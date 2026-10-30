@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { Celebrate } from '../../components/Celebrate';
-import { q, rpc, useAction, useLoad, fmtDate, ageOf } from '../../lib/db';
+import { q, rpc, useAction, useLoad, fmtDate, ageOf, todayISO } from '../../lib/db';
+import { parseJoinCode } from '../../lib/join';
 import { teamAllowsPlayerAnswers } from '../../lib/team';
 import { normEmail } from '../../lib/email';
 import { useAuth } from '../../auth/AuthProvider';
@@ -35,6 +36,56 @@ function useKids() {
   return { kids, asParent, links: teams.data?.links ?? [], teams: teams.data?.teams ?? [], loading: teams.loading, error: teams.error };
 }
 
+/** A parent registers a child: staff of a team add the child to their squad; anyone else uses the team's join link. */
+function AddChildCard() {
+  const { coachTeamIds, reload } = useAuth();
+  const navigate = useNavigate();
+  const act = useAction();
+  const teams = useLoad(() => (coachTeamIds.length
+    ? q<{ id: string; name: string }[]>(supabase.from('teams').select('id, name').in('id', coachTeamIds))
+    : Promise.resolve([])), [coachTeamIds.join(',')]);
+  const [team, setTeam] = useState('');
+  const [name, setName] = useState('');
+  const [birth, setBirth] = useState('');
+  const [link, setLink] = useState('');
+  const code = parseJoinCode(link);
+  const teamId = team || teams.data?.[0]?.id || '';
+
+  async function add() {
+    if (birth > todayISO()) return act.setError('תאריך הלידה לא יכול להיות בעתיד');
+    await act.run(async () => {
+      await rpc('add_my_child', { p_team: teamId, p_full_name: name, p_birth_date: birth });
+      setName(''); setBirth(''); reload();
+    });
+  }
+
+  if (teams.data?.length) {
+    return (
+      <Card title="רישום ילד">
+        <p className="muted">הילד יתווסף לסגל הקבוצה, ואתם תהיו ההורה שלו.</p>
+        {teams.data.length > 1 && (
+          <label className="field"><span>קבוצה</span>
+            <select value={teamId} onChange={(e) => setTeam(e.target.value)}>
+              {teams.data.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+          </label>
+        )}
+        <Field label="שם מלא"><input value={name} onChange={(e) => setName(e.target.value)} /></Field>
+        <Field label="תאריך לידה"><input type="date" max={todayISO()} value={birth} onChange={(e) => setBirth(e.target.value)} /></Field>
+        <ErrorText error={act.error} />
+        <button disabled={!name.trim() || !birth || !teamId || act.busy} onClick={add}>רישום הילד</button>
+      </Card>
+    );
+  }
+  return (
+    <Card title="רישום ילד">
+      <p className="muted">הדביקו את קישור ההצטרפות של הקבוצה. תמלאו את פרטי הילד, והבקשה תמתין לאישור הצוות.</p>
+      <Field label="קישור או קוד הצטרפות"><input dir="ltr" value={link} onChange={(e) => setLink(e.target.value)} placeholder="https://…/join/…" /></Field>
+      <button disabled={!code} onClick={() => navigate(`/join/${code}`)}>המשך</button>
+    </Card>
+  );
+}
+
 export function FamilyHome() {
   const { reload } = useAuth();
   const { kids, asParent, links, teams, loading, error } = useKids();
@@ -58,6 +109,7 @@ export function FamilyHome() {
       <PageHero kicker={asParent ? 'הורה' : 'שחקן'} title={asParent ? 'הילדים שלי' : 'הפרופיל שלי'} />
       <Loading loading={loading} error={error} />
       {!kids.length && !loading && <Empty>עדיין אין ילדים מקושרים.</Empty>}
+      {asParent && !loading && <AddChildCard />}
       <ul className="list">
         {kids.map((k) => (
           <li key={k.id} className="row">

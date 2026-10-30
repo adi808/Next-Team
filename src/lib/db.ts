@@ -13,6 +13,7 @@ const BY_CODE: Record<string, string> = {
 
 export function friendlyError(e: unknown): string {
   const err = e as PgError;
+  if (err?.message?.includes('birth_date_check')) return 'תאריך הלידה לא יכול להיות בעתיד';
   if (err?.message?.includes('phone number belongs')) return 'מספר הטלפון כבר שייך לחשבון אחר';
   if (err?.code && BY_CODE[err.code]) return BY_CODE[err.code];
   if (err?.code === '22023') return `הנתונים שהוזנו אינם תקינים (${err.message})`;
@@ -81,6 +82,12 @@ export const fmtDate = (iso: string | null | undefined) =>
 
 export const fmtDay = (iso: string | null | undefined) =>
   iso ? new Date(iso).toLocaleDateString('he-IL') : '';
+
+// Today as yyyy-mm-dd in local time: the max for birth-date inputs.
+export function todayISO(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
 
 export function ageOf(birth: string | null): number | null {
   if (!birth) return null;

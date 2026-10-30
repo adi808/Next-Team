@@ -81,7 +81,7 @@ export function AuthProvider({ children: kids }: { children: ReactNode }) {
     if (profile?.is_system_admin) modes.push('sysadmin');
     if (adminClubIds.length) modes.push('admin');
     if (coachTeamIds.length) modes.push('coach');
-    if (children.length) modes.push('parent');
+    if (children.length || profile?.is_parent) modes.push('parent');
     if (me) modes.push('player');
     return {
       loading, session, profile, memberships, children, me, modes, adminClubIds, coachTeamIds, reload,

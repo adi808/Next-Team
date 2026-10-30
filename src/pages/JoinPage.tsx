@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider';
-import { rpc, useAction, useLoad } from '../lib/db';
+import { rpc, useAction, useLoad, todayISO } from '../lib/db';
 import { normEmail } from '../lib/email';
 import { forgetJoin } from '../lib/join';
 import { LookupSelect, useLookups } from '../components/Lookups';
@@ -132,7 +132,7 @@ export default function JoinPage() {
                     {kids.length > 1 && <button className="small secondary" onClick={() => setKids(kids.filter((_, m) => m !== n))}>הסרה</button>}
                   </div>
                   <Field label="שם מלא"><input value={k.full_name} onChange={(e) => set({ full_name: e.target.value })} /></Field>
-                  <Field label="תאריך לידה"><input type="date" value={k.birth_date} onChange={(e) => set({ birth_date: e.target.value })} /></Field>
+                  <Field label="תאריך לידה"><input type="date" max={todayISO()} value={k.birth_date} onChange={(e) => set({ birth_date: e.target.value })} /></Field>
                   <Field label="מייל של הילד (לא חובה, לכניסה עצמאית)"><input type="email" dir="ltr" value={k.email} onChange={(e) => set({ email: e.target.value })} /></Field>
                   <Field label="טלפון של הילד (לא חובה)"><input type="tel" dir="ltr" value={k.phone} onChange={(e) => set({ phone: e.target.value })} /></Field>
                 </div>

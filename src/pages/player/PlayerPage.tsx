@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
-import { q, rpc, useAction, useLoad, ageOf, fmtDate, fmtDay } from '../../lib/db';
+import { q, rpc, useAction, useLoad, ageOf, fmtDate, fmtDay, todayISO } from '../../lib/db';
 import { normEmail } from '../../lib/email';
 import { useAuth } from '../../auth/AuthProvider';
 import { useActingRole } from '../../auth/acting';
@@ -80,7 +80,7 @@ export default function PlayerPage() {
       {(manage || isParent) && (
         <Card title="פרטי שחקן">
           <Field label="שם מלא"><input value={name ?? player.full_name} onChange={(e) => setName(e.target.value)} /></Field>
-          <Field label="תאריך לידה"><input type="date" value={birth ?? player.birth_date ?? ''} onChange={(e) => setBirth(e.target.value)} /></Field>
+          <Field label="תאריך לידה"><input type="date" max={todayISO()} value={birth ?? player.birth_date ?? ''} onChange={(e) => setBirth(e.target.value)} /></Field>
           <Field label="טלפון של השחקן (לא חובה, גלוי לחברי הקבוצה)">
             <input type="tel" dir="ltr" inputMode="tel" placeholder="050-1234567"
               value={phone ?? (details?.phone ? fmtPhone(details.phone) : '')} onChange={(e) => setPhone(e.target.value)} />
