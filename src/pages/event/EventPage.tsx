@@ -15,6 +15,7 @@ import { KitSelect } from '../../components/Kit';
 import { EquipmentPicker } from '../../components/Equipment';
 import { TransportCard } from '../../components/Transport';
 import { BulkEventEdit } from '../../components/BulkEventEdit';
+import { ShareEvent } from '../../components/ShareEvent';
 import { dayName, israelDow, isOver } from '../../lib/events';
 import type { EntityRole, EventResponse, EventRow, EventStat, Player, Team, TeamKit } from '../../lib/types';
 
@@ -32,6 +33,7 @@ export default function EventPage() {
   const reasonName = useLookupName('absence_reason');
   const statName = useLookupName('stat_type');
   const types = useLookups('event_type', { includeInactive: true });
+  const equipmentList = useLookups('equipment', { includeInactive: true });
   const sports = useSports();
   const [lineupKey, setLineupKey] = useState(0);
   const { data, loading, error, reload } = useLoad(async () => {
@@ -49,6 +51,7 @@ export default function EventPage() {
   const acting = useActingRole();
   const [edit, setEdit] = useState(false);
   const [bulk, setBulk] = useState(false);
+  const [share, setShare] = useState(false);
   const [f, setF] = useState({ type: null as string | null, title: '', starts: '', ends: '', location: '', notes: '', opponent: '', our: '', their: '', kit: null as string | null, equipment: [] as string[] });
   const [statPlayer, setStatPlayer] = useState('');
   const [statType, setStatType] = useState<string | null>(null);
@@ -104,8 +107,17 @@ export default function EventPage() {
         <div className="row wrap">
           <Link className="button-link grow" to={`../event/${event.id}/prep`}>הכנה לאירוע ←</Link>
           {!edit && <button className="secondary" onClick={startEdit}>✏️ עריכת פרטי האירוע</button>}
+          <button className="secondary" onClick={() => setShare(!share)}>📣 שיתוף בוואטסאפ</button>
           {!isOver(event) && <button className="secondary" onClick={() => setBulk(!bulk)}>🔁 עריכה לכל ה{typeName(event.type_id)} בימי {dayName(israelDow(event.starts_at))}</button>}
         </div>
+      )}
+      {canManage && share && (
+        <ShareEvent onClose={() => setShare(false)} link={`${window.location.origin}/m/parent/event/${event.id}`}
+          data={{
+            teamName: team.name, typeLabel: typeName(event.type_id), isMatch, opponent: event.opponent ?? '', startsAt: event.starts_at, endsAt: event.ends_at,
+            location: event.location ?? '', notes: event.notes ?? '', kit: kit ? { name: kit.name, shirt: kit.shirt, shorts: kit.shorts, socks: kit.socks } : null,
+            items: (event.equipment ?? []).map((id) => equipmentList.find((l) => l.id === id)?.name_he ?? '').filter(Boolean),
+          }} />
       )}
       {canManage && bulk && (
         <BulkEventEdit event={event} kits={kits} typeLabel={typeName(event.type_id)}

@@ -571,3 +571,5 @@ table.roster .cell-line.email { white-space: normal; overflow-wrap: anywhere; fo
 
 .notice { background: #fff8e1; border: 1px solid #f1d68a; border-radius: 12px; padding: 12px 14px; margin-bottom: 14px; }
 .notice p { margin: 6px 0 10px; }
+
+.share-preview { width: 100%; max-width: 420px; height: auto; border-radius: 14px; border: 1px solid #dfe3ee; display: block; margin: 10px auto; }
