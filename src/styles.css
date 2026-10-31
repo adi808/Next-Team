@@ -568,3 +568,6 @@ table.roster .cell-line.email { white-space: normal; overflow-wrap: anywhere; fo
 .roster-add { margin: 0 0 12px; border: 1px solid var(--line, #dfe3ee); border-radius: 12px; padding: 10px 14px; background: #fff; }
 .roster-add > summary { cursor: pointer; font-weight: 600; color: var(--primary, #2f5bea); }
 .roster-add[open] > summary { margin-bottom: 10px; }
+
+.notice { background: #fff8e1; border: 1px solid #f1d68a; border-radius: 12px; padding: 12px 14px; margin-bottom: 14px; }
+.notice p { margin: 6px 0 10px; }
