@@ -255,16 +255,16 @@ export function drawBanner(canvas: HTMLCanvasElement, d: ShareData, template: Sh
   const L = km
     ? { hy: 318, sy: 362, bar: 280, tag: 410, crestY: 640, crestR: 85, nameY: 790, y0m: 840, y0: 560, tsize: 170, tdy: 205, locdy: 290, cancel: 130 }
     : { hy: 138, sy: 182, bar: 100, tag: 330, crestY: 600, crestR: 100, nameY: 760, y0m: 800, y0: 560, tsize: 210, tdy: 235, locdy: 335, cancel: 150 };
-  const bg = ctx.createLinearGradient(0, 0, W * 0.4, H); bg.addColorStop(0, '#101c42'); bg.addColorStop(1, '#070d24');
+  const bg = ctx.createLinearGradient(0, 0, W * 0.4, H); bg.addColorStop(0, '#3d68cf'); bg.addColorStop(1, '#2447a8');
   ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
-  ctx.fillStyle = accent; ctx.globalAlpha = 0.22; ctx.beginPath(); ctx.moveTo(W, 0); ctx.lineTo(W, 760); ctx.lineTo(W * 0.35, 0); ctx.fill(); ctx.globalAlpha = 1;
-  pitch(ctx, 70, 640, W - 140, 640, '#fff', 0.06);
+  ctx.fillStyle = '#fff'; ctx.globalAlpha = 0.1; ctx.beginPath(); ctx.moveTo(W, 0); ctx.lineTo(W, 760); ctx.lineTo(W * 0.35, 0); ctx.fill(); ctx.globalAlpha = 1;
+  pitch(ctx, 70, 640, W - 140, 640, '#fff', 0.1);
   if (km) {
     ctx.save(); panels(ctx, kids, 400);
-    const g = ctx.createLinearGradient(0, 180, 0, 405); g.addColorStop(0, 'rgba(7,13,36,0)'); g.addColorStop(1, '#070d24');
+    const g = ctx.createLinearGradient(0, 180, 0, 405); g.addColorStop(0, 'rgba(53,92,189,0)'); g.addColorStop(1, '#355cbd');
     ctx.fillStyle = g; ctx.fillRect(0, 180, W, 225); ctx.restore();
   } else if (hero) {
-    ctx.save(); heroCover(ctx, hero, 560); const g = ctx.createLinearGradient(0, 260, 0, 580); g.addColorStop(0, 'rgba(7,13,36,0)'); g.addColorStop(1, '#070d24'); ctx.fillStyle = g; ctx.fillRect(0, 260, W, 320); ctx.restore();
+    ctx.save(); heroCover(ctx, hero, 560); const g = ctx.createLinearGradient(0, 260, 0, 580); g.addColorStop(0, 'rgba(53,92,189,0)'); g.addColorStop(1, '#355cbd'); ctx.fillStyle = g; ctx.fillRect(0, 260, W, 320); ctx.restore();
   }
   ctx.fillStyle = accent; ctx.fillRect(W - 110, L.bar, 6, 70);
   ctx.textAlign = 'right'; ctx.fillStyle = '#fff'; fit(ctx, d.teamName, 780, 54, 800); ctx.fillText(d.teamName, W - 135, L.hy);
