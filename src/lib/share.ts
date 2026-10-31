@@ -66,17 +66,25 @@ export function shareText(d: ShareData, template: ShareTemplate, link: string | 
 }
 
 const NAVY = '#1a1a8c';
+const FONT = 'system-ui, -apple-system, "Segoe UI", "Heebo", "Arial", sans-serif';
 
-const TITLES: Record<ShareTemplate, (d: ShareData) => string> = {
-  invite: (d) => (d.isMatch ? 'MATCH DAY' : 'TRAINING DAY'),
-  reminder: (d) => (d.isMatch ? 'MATCH DAY' : 'TRAINING DAY'),
-  change: () => 'UPDATE',
-  cancel: () => 'CANCELLED',
+export type BannerStyle = 'dark' | 'color' | 'classic';
+export const BANNER_STYLES: { id: BannerStyle; label: string }[] = [
+  { id: 'dark', label: 'כהה' },
+  { id: 'color', label: 'צבע הקבוצה' },
+  { id: 'classic', label: 'קלאסי' },
+];
+
+const HEBREW_TITLES: Record<ShareTemplate, (d: ShareData) => string> = {
+  invite: (d) => (d.isMatch ? 'יום משחק' : d.typeLabel),
+  reminder: (d) => `תזכורת: ${d.isMatch ? 'משחק' : d.typeLabel}`,
+  change: (d) => `עדכון: ${d.isMatch ? 'משחק' : d.typeLabel}`,
+  cancel: (d) => `בוטל: ${d.isMatch ? 'משחק' : d.typeLabel}`,
 };
 
-function fit(ctx: CanvasRenderingContext2D, text: string, maxW: number, size: number, weight = 800, family = 'system-ui, -apple-system, "Segoe UI", "Heebo", sans-serif') {
+function fit(ctx: CanvasRenderingContext2D, text: string, maxW: number, size: number, weight = 800, italic = false) {
   let s = size;
-  do { ctx.font = `${weight} ${s}px ${family}`; s -= 2; } while (ctx.measureText(text).width > maxW && s > 18);
+  do { ctx.font = `${italic ? 'italic ' : ''}${weight} ${s}px ${FONT}`; s -= 2; } while (ctx.measureText(text).width > maxW && s > 16);
 }
 
 const initials = (name: string) => {
@@ -84,79 +92,178 @@ const initials = (name: string) => {
   return (words.length > 1 ? words.slice(0, 2).map((w) => w[0]).join('') : (words[0] ?? '?').slice(0, 2)).toUpperCase();
 };
 
-/** A round crest stand-in: the club colour with the name's initials. */
-function crest(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number, fill: string, text: string, ink: string) {
-  ctx.fillStyle = fill; ctx.strokeStyle = NAVY; ctx.lineWidth = 8;
+const lum = (hex: string) => {
+  const n = parseInt(hex.replace('#', '').padEnd(6, '0').slice(0, 6), 16);
+  return 0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255);
+};
+const inkOn = (hex: string) => (lum(hex) > 150 ? '#0b1535' : '#ffffff');
+
+function rrect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+/** A drawn football (no emoji): white ball, dark centre patch and five panels. */
+function ball(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number, alpha = 1) {
+  ctx.save(); ctx.globalAlpha = alpha;
+  ctx.fillStyle = '#fff'; ctx.strokeStyle = '#1b2440'; ctx.lineWidth = r * 0.05;
   ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-  ctx.fillStyle = ink; fit(ctx, text, r * 1.3, r * 0.9, 900); ctx.fillText(text, cx, cy + r * 0.3);
+  const pent = (x: number, y: number, rr: number, rot: number) => {
+    ctx.beginPath();
+    for (let i = 0; i < 5; i++) { const a = rot + (i * 2 * Math.PI) / 5; const px = x + rr * Math.cos(a); const py = y + rr * Math.sin(a); if (i) ctx.lineTo(px, py); else ctx.moveTo(px, py); }
+    ctx.closePath(); ctx.fillStyle = '#1b2440'; ctx.fill();
+  };
+  ctx.save(); ctx.beginPath(); ctx.arc(cx, cy, r - r * 0.025, 0, Math.PI * 2); ctx.clip();
+  pent(cx, cy, r * 0.34, -Math.PI / 2);
+  for (let i = 0; i < 5; i++) {
+    const a = -Math.PI / 2 + (i * 2 * Math.PI) / 5;
+    ctx.strokeStyle = '#1b2440'; ctx.lineWidth = r * 0.04;
+    ctx.beginPath(); ctx.moveTo(cx + r * 0.34 * Math.cos(a), cy + r * 0.34 * Math.sin(a)); ctx.lineTo(cx + r * 0.66 * Math.cos(a), cy + r * 0.66 * Math.sin(a)); ctx.stroke();
+    pent(cx + r * 0.9 * Math.cos(a), cy + r * 0.9 * Math.sin(a), r * 0.26, a + Math.PI / 2);
+  }
+  ctx.restore();
+  ctx.restore();
+}
+
+/** Pitch markings as faint line art. */
+function pitch(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, color: string, alpha: number) {
+  ctx.save(); ctx.strokeStyle = color; ctx.globalAlpha = alpha; ctx.lineWidth = 5;
+  ctx.strokeRect(x, y, w, h);
+  ctx.beginPath(); ctx.moveTo(x, y + h / 2); ctx.lineTo(x + w, y + h / 2); ctx.stroke();
+  ctx.beginPath(); ctx.arc(x + w / 2, y + h / 2, h * 0.14, 0, Math.PI * 2); ctx.stroke();
+  ctx.strokeRect(x + w * 0.25, y, w * 0.5, h * 0.16); ctx.strokeRect(x + w * 0.25, y + h * 0.84, w * 0.5, h * 0.16);
+  ctx.restore();
+}
+
+/** A crest stand-in: a ring in `ring` around the club colour with the name's initials. */
+function crest(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number, fill: string, ring: string, text: string) {
+  ctx.fillStyle = ring; ctx.beginPath(); ctx.arc(cx, cy, r + 9, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = fill; ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = inkOn(fill); fit(ctx, text, r * 1.25, r * 0.85, 900); ctx.fillText(text, cx, cy + r * 0.29);
+}
+
+/** A map pin drawn with paths. */
+function pin(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, color: string) {
+  ctx.save(); ctx.fillStyle = color;
+  ctx.beginPath(); ctx.arc(x, y - size * 0.35, size * 0.5, Math.PI, 0); ctx.quadraticCurveTo(x + size * 0.5, y + size * 0.1, x, y + size * 0.62);
+  ctx.quadraticCurveTo(x - size * 0.5, y + size * 0.1, x - size * 0.5, y - size * 0.35); ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(x, y - size * 0.35, size * 0.18, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
 }
 
 export const BANNER_W = 1080;
 export const BANNER_H = 1350;
 
-/**
- * Draws the event poster (4:5) in the "match day" style: white with stripes in the team colour, an optional photo
- * on top, a big title, and a row with the team, the time and place, and the opponent.
- */
-export function drawBanner(canvas: HTMLCanvasElement, d: ShareData, template: ShareTemplate, hero?: CanvasImageSource | null) {
+function heroCover(ctx: CanvasRenderingContext2D, hero: CanvasImageSource, h: number) {
+  const w = (hero as HTMLImageElement).naturalWidth ?? BANNER_W;
+  const ih = (hero as HTMLImageElement).naturalHeight ?? h;
+  const scale = Math.max(BANNER_W / w, h / ih);
+  ctx.drawImage(hero, (BANNER_W - w * scale) / 2, 0, w * scale, ih * scale);
+}
+
+/** Draws the event poster (4:5) in one of three styles. */
+export function drawBanner(canvas: HTMLCanvasElement, d: ShareData, template: ShareTemplate, hero?: CanvasImageSource | null, style: BannerStyle = 'dark') {
   canvas.width = BANNER_W; canvas.height = BANNER_H;
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
-  const mid = BANNER_W / 2;
-  const color = d.kit?.shirt ?? '#2563eb';
-  const accent = template === 'cancel' ? '#b91c1c' : template === 'change' ? '#c2410c' : NAVY;
-  ctx.direction = 'rtl';
-  ctx.textAlign = 'center';
-
-  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, BANNER_W, BANNER_H);
-  ctx.fillStyle = color; ctx.globalAlpha = 0.35;
-  for (let x = 40; x < BANNER_W; x += 62) ctx.fillRect(x, 0, 5, BANNER_H);
-  ctx.globalAlpha = 1;
-
-  // photo (cover, fading into the white) or a big ball
-  const heroH = 700;
-  if (hero) {
-    const w = (hero as HTMLImageElement).naturalWidth ?? BANNER_W;
-    const h = (hero as HTMLImageElement).naturalHeight ?? heroH;
-    const scale = Math.max(BANNER_W / w, heroH / h);
-    ctx.drawImage(hero, (BANNER_W - w * scale) / 2, 0, w * scale, h * scale);
-    const fade = ctx.createLinearGradient(0, heroH - 260, 0, heroH + 40);
-    fade.addColorStop(0, 'rgba(255,255,255,0)'); fade.addColorStop(1, '#fff');
-    ctx.fillStyle = fade; ctx.fillRect(0, heroH - 260, BANNER_W, 300);
-  } else {
-    ctx.font = '430px system-ui, sans-serif'; ctx.globalAlpha = 0.9;
-    ctx.fillText(d.isMatch ? '🏆' : '⚽', mid, 570);
-    ctx.globalAlpha = 1;
-  }
-  ctx.fillStyle = accent; fit(ctx, d.teamName, 940, 64, 800); ctx.fillText(d.teamName, mid, 82);
-
-  // title
-  const title = TITLES[template](d);
-  ctx.fillStyle = accent; ctx.direction = 'ltr';
-  fit(ctx, title, 900, 190, 900, 'Georgia, "Times New Roman", serif');
-  const lines = title.length > 10 && ctx.measureText(title).width > 700 ? title.split(' ') : [title];
-  lines.forEach((ln, i) => { ctx.fillText(ln, mid, 790 + i * 150); });
-  ctx.direction = 'rtl';
-  const rowY = 790 + (lines.length - 1) * 150 + 130;
-  if (template === 'cancel') { ctx.fillStyle = '#b91c1c'; ctx.fillRect(160, 740, BANNER_W - 320, 12); }
-
-  // row: our team | time and place | opponent
-  const x1 = BANNER_W - 190; const x2 = 190;
-  const light = (() => { const n = parseInt(color.replace('#', '').padEnd(6, '0').slice(0, 6), 16); return (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) > 150; })();
-  crest(ctx, x1, rowY + 90, 95, color, initials(d.teamName), light ? NAVY : '#fff');
-  if (d.isMatch && d.opponent) crest(ctx, x2, rowY + 90, 95, '#fff', initials(d.opponent), NAVY);
-  else { ctx.fillStyle = '#fff'; ctx.strokeStyle = NAVY; ctx.lineWidth = 8; ctx.beginPath(); ctx.arc(x2, rowY + 90, 95, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); ctx.font = '110px system-ui, sans-serif'; ctx.fillText('⚽', x2, rowY + 128); }
+  ctx.direction = 'rtl'; ctx.textAlign = 'center';
+  const W = BANNER_W; const H = BANNER_H; const mid = W / 2;
+  const team = d.kit?.shirt ?? '#2563eb';
+  const warn = template === 'cancel' ? '#ef4444' : template === 'change' ? '#f59e0b' : null;
+  const accent = warn ?? (lum(team) > 200 ? '#2563eb' : team);
+  const isMatch = d.isMatch && !!d.opponent;
   const day = when(d.startsAt) || dateLabel(d.startsAt);
-  ctx.fillStyle = accent;
-  fit(ctx, day, 420, 56, 800); ctx.fillText(day, mid, rowY + 40);
-  ctx.direction = 'ltr'; fit(ctx, timeLabel(d), 420, 76, 900); ctx.fillText(timeLabel(d), mid, rowY + 120); ctx.direction = 'rtl';
-  if (d.location.trim()) { fit(ctx, d.location.trim(), 420, 48, 800); ctx.fillText(d.location.trim(), mid, rowY + 185); }
-  if (d.isMatch && d.opponent) { ctx.fillStyle = '#44506f'; fit(ctx, d.opponent, 250, 30, 700); ctx.fillText(d.opponent, x2, rowY + 235); }
+  const time = timeLabel(d);
+  const title = HEBREW_TITLES[template](d);
 
-  // kit and things to bring
-  const extra = [d.kit && template !== 'cancel' ? `👕 ${d.kit.name}` : '', d.items.length && template !== 'cancel' ? `🎒 ${d.items.join(', ')}` : ''].filter(Boolean).join('   ');
-  if (extra) { ctx.fillStyle = '#44506f'; fit(ctx, extra, 940, 38, 700); ctx.fillText(extra, mid, rowY + 300); }
-  ctx.fillStyle = 'rgba(26,26,140,0.55)'; ctx.font = '700 30px system-ui, sans-serif'; ctx.fillText('Next Team', mid, BANNER_H - 36);
+  if (style === 'classic') {
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = team; ctx.globalAlpha = 0.3;
+    for (let x = 40; x < W; x += 62) ctx.fillRect(x, 0, 5, H);
+    ctx.globalAlpha = 1;
+    if (hero) {
+      ctx.save(); heroCover(ctx, hero, 700);
+      const fade = ctx.createLinearGradient(0, 440, 0, 740); fade.addColorStop(0, 'rgba(255,255,255,0)'); fade.addColorStop(1, '#fff');
+      ctx.fillStyle = fade; ctx.fillRect(0, 440, W, 300); ctx.restore();
+    } else ball(ctx, mid, 400, 250);
+    const ink = warn ?? NAVY;
+    ctx.fillStyle = ink; fit(ctx, d.teamName, 940, 64, 800); ctx.fillText(d.teamName, mid, 90);
+    ctx.direction = 'ltr'; ctx.fillStyle = ink;
+    const t = template === 'change' ? 'UPDATE' : template === 'cancel' ? 'CANCELLED' : d.isMatch ? 'MATCH DAY' : 'TRAINING';
+    fit(ctx, t, 900, 190, 900, true); ctx.fillText(t, mid, 800); ctx.direction = 'rtl';
+    const rowY = 900;
+    crest(ctx, W - 190, rowY + 90, 88, team, NAVY, initials(d.teamName));
+    if (isMatch) crest(ctx, 190, rowY + 90, 88, '#fff', NAVY, initials(d.opponent)); else ball(ctx, 190, rowY + 90, 90);
+    ctx.fillStyle = ink; fit(ctx, day, 420, 56, 800); ctx.fillText(day, mid, rowY + 40);
+    ctx.direction = 'ltr'; fit(ctx, time, 420, 84, 900); ctx.fillText(time, mid, rowY + 125); ctx.direction = 'rtl';
+    if (d.location.trim()) { fit(ctx, d.location.trim(), 420, 46, 700); ctx.fillText(d.location.trim(), mid, rowY + 190); }
+    footer(ctx, d, template, rowY + 280, '#44506f', W);
+    return;
+  }
+
+  if (style === 'color') {
+    const base = team; const inkC = inkOn(base);
+    ctx.fillStyle = base; ctx.fillRect(0, 0, W, H);
+    // darker diagonal blocks for depth
+    ctx.fillStyle = 'rgba(0,0,0,0.16)'; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(W * 0.72, 0); ctx.lineTo(W * 0.32, H); ctx.lineTo(0, H); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.08)'; ctx.beginPath(); ctx.moveTo(W, H * 0.45); ctx.lineTo(W, H); ctx.lineTo(W * 0.5, H); ctx.fill();
+    pitch(ctx, 80, 80, W - 160, H - 160, inkC, 0.12);
+    if (hero) { ctx.save(); ctx.globalAlpha = 0.9; heroCover(ctx, hero, 640); ctx.restore(); const g = ctx.createLinearGradient(0, 400, 0, 680); g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, base); ctx.fillStyle = g; ctx.fillRect(0, 400, W, 300); }
+    else ball(ctx, mid, 330, 190, 0.95);
+    ctx.fillStyle = inkC; fit(ctx, d.teamName, 900, 56, 700); ctx.fillText(d.teamName, mid, 110);
+    fit(ctx, title, 940, 150, 900); ctx.fillText(title, mid, 800);
+    if (isMatch) { fit(ctx, `נגד ${d.opponent}`, 900, 64, 700); ctx.fillText(`נגד ${d.opponent}`, mid, 885); }
+    ctx.fillStyle = inkC; ctx.fillRect(mid - 70, 925, 140, 8);
+    fit(ctx, day, 900, 62, 700); ctx.fillText(day, mid, 1020);
+    ctx.direction = 'ltr'; fit(ctx, time, 900, 170, 900); ctx.fillText(time, mid, 1170); ctx.direction = 'rtl';
+    if (d.location.trim()) { fit(ctx, d.location.trim(), 760, 46, 600); const lw = ctx.measureText(d.location.trim()).width; pin(ctx, mid + lw / 2 + 50, 1262, 40, inkC); ctx.fillStyle = inkC; ctx.fillText(d.location.trim(), mid - 10, 1275); }
+    return;
+  }
+
+  // dark
+  const bg = ctx.createLinearGradient(0, 0, W * 0.4, H); bg.addColorStop(0, '#101c42'); bg.addColorStop(1, '#070d24');
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = accent; ctx.globalAlpha = 0.22; ctx.beginPath(); ctx.moveTo(W, 0); ctx.lineTo(W, 760); ctx.lineTo(W * 0.35, 0); ctx.fill(); ctx.globalAlpha = 1;
+  pitch(ctx, 70, 640, W - 140, 640, '#fff', 0.06);
+  if (hero) { ctx.save(); heroCover(ctx, hero, 560); const g = ctx.createLinearGradient(0, 260, 0, 580); g.addColorStop(0, 'rgba(7,13,36,0)'); g.addColorStop(1, '#070d24'); ctx.fillStyle = g; ctx.fillRect(0, 260, W, 320); ctx.restore(); }
+  ctx.fillStyle = accent; ctx.fillRect(W - 110, 100, 6, 70);
+  ctx.textAlign = 'right'; ctx.fillStyle = '#fff'; fit(ctx, d.teamName, 780, 54, 800); ctx.fillText(d.teamName, W - 135, 138);
+  ctx.fillStyle = 'rgba(255,255,255,0.6)'; fit(ctx, `${d.typeLabel}${d.isMatch ? '' : ''}`, 600, 34, 600); ctx.fillText(d.typeLabel, W - 135, 182);
+  ctx.textAlign = 'center';
+  if (!hero) ball(ctx, 190, 190, 80, 0.16);
+
+  const tagW = 520;
+  ctx.fillStyle = accent; rrect(ctx, mid - tagW / 2, 330, tagW, 96, 48); ctx.fill();
+  ctx.fillStyle = inkOn(accent); fit(ctx, title, tagW - 60, 52, 900); ctx.fillText(title, mid, 396);
+
+  if (isMatch) {
+    crest(ctx, W - 260, 600, 100, team, '#fff', initials(d.teamName));
+    crest(ctx, 260, 600, 100, '#e5e7eb', 'rgba(255,255,255,0.4)', initials(d.opponent));
+    ctx.fillStyle = '#fff'; fit(ctx, 'VS', 200, 70, 900, true); ctx.direction = 'ltr'; ctx.fillText('VS', mid, 625); ctx.direction = 'rtl';
+    ctx.fillStyle = 'rgba(255,255,255,0.85)'; fit(ctx, d.teamName, 300, 32, 700); ctx.fillText(d.teamName, W - 260, 760);
+    fit(ctx, d.opponent, 300, 32, 700); ctx.fillText(d.opponent, 260, 760);
+  }
+  const y0 = isMatch ? 800 : 560;
+  ctx.fillStyle = accent; fit(ctx, day, 900, 64, 800); ctx.fillText(day, mid, y0 + 40);
+  ctx.fillStyle = '#fff'; ctx.direction = 'ltr'; fit(ctx, time, 920, 210, 900); ctx.fillText(time, mid, y0 + 235); ctx.direction = 'rtl';
+  if (template === 'cancel') { ctx.fillStyle = '#ef4444'; ctx.fillRect(140, y0 + 150, W - 280, 12); }
+  if (d.location.trim()) {
+    fit(ctx, d.location.trim(), 760, 48, 600); const lw = ctx.measureText(d.location.trim()).width;
+    pin(ctx, mid + lw / 2 + 50, y0 + 320, 40, accent); ctx.fillStyle = 'rgba(255,255,255,0.92)'; ctx.fillText(d.location.trim(), mid - 10, y0 + 335);
+  }
+  footer(ctx, d, template, H - 125, 'rgba(255,255,255,0.75)', W);
+}
+
+/** Kit colours and what to bring, as one quiet line near the bottom. */
+function footer(ctx: CanvasRenderingContext2D, d: ShareData, template: ShareTemplate, y: number, ink: string, W: number) {
+  const parts: string[] = [];
+  if (d.kit && template !== 'cancel') parts.push(`תלבושת: ${d.kit.name}`);
+  if (d.items.length && template !== 'cancel') parts.push(`להביא: ${d.items.join(', ')}`);
+  if (parts.length) { ctx.fillStyle = ink; fit(ctx, parts.join('   |   '), 940, 38, 600); ctx.fillText(parts.join('   |   '), W / 2, y); }
+  ctx.fillStyle = ink; ctx.globalAlpha = 0.6; ctx.font = `700 28px ${FONT}`; ctx.fillText('Next Team', W / 2, BANNER_H - 44); ctx.globalAlpha = 1;
 }
 
 export const canvasBlob = (canvas: HTMLCanvasElement) =>

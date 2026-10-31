@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Card, ErrorText, Field } from './ui';
-import { BANNER_H, BANNER_W, TEMPLATES, canvasBlob, drawBanner, shareText, type ShareData, type ShareTemplate } from '../lib/share';
+import { BANNER_H, BANNER_STYLES, BANNER_W, TEMPLATES, canvasBlob, drawBanner, shareText, type BannerStyle, type ShareData, type ShareTemplate } from '../lib/share';
 
 /**
  * A ready-made WhatsApp post for an event: a poster image (optionally with the team photo on top) and a formatted
@@ -9,6 +9,7 @@ import { BANNER_H, BANNER_W, TEMPLATES, canvasBlob, drawBanner, shareText, type 
  */
 export function ShareEvent({ data, link, onClose }: { data: ShareData; link: string; onClose: () => void }) {
   const [template, setTemplate] = useState<ShareTemplate>('invite');
+  const [style, setStyle] = useState<BannerStyle>('dark');
   const [withLink, setWithLink] = useState(false);
   const [text, setText] = useState(() => shareText(data, 'invite', null));
   const [hero, setHero] = useState<HTMLImageElement | null>(null);
@@ -21,9 +22,9 @@ export function ShareEvent({ data, link, onClose }: { data: ShareData; link: str
   useEffect(() => { setText(shareText(data, template, withLink ? link : null)); }, [data, template, withLink, link]);
   useEffect(() => {
     const c = canvas.current ?? (canvas.current = document.createElement('canvas'));
-    drawBanner(c, data, template, hero);
+    drawBanner(c, data, template, hero, style);
     setPreview(c.toDataURL('image/png'));
-  }, [data, template, hero]);
+  }, [data, template, hero, style]);
 
   function pickPhoto(file: File | undefined) {
     if (!file) return;
@@ -65,6 +66,12 @@ export function ShareEvent({ data, link, onClose }: { data: ShareData; link: str
       <div className="row wrap">
         {TEMPLATES.map((t) => (
           <button key={t.id} className={`small ${template === t.id ? '' : 'secondary'}`} aria-pressed={template === t.id} onClick={() => setTemplate(t.id)}>{t.label}</button>
+        ))}
+      </div>
+      <div className="row wrap">
+        <span className="muted">עיצוב:</span>
+        {BANNER_STYLES.map((t) => (
+          <button key={t.id} className={`small ${style === t.id ? '' : 'secondary'}`} aria-pressed={style === t.id} onClick={() => setStyle(t.id)}>{t.label}</button>
         ))}
       </div>
       {preview && <img className="share-preview" src={preview} width={BANNER_W} height={BANNER_H} alt="תצוגה מקדימה של הבאנר" />}
