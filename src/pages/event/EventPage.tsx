@@ -14,6 +14,8 @@ import { EventDashboard } from '../../components/EventDashboard';
 import { KitSelect } from '../../components/Kit';
 import { EquipmentPicker } from '../../components/Equipment';
 import { TransportCard } from '../../components/Transport';
+import { BulkEventEdit } from '../../components/BulkEventEdit';
+import { dayName, israelDow, isOver } from '../../lib/events';
 import type { EntityRole, EventResponse, EventRow, EventStat, Player, Team, TeamKit } from '../../lib/types';
 
 // ISO time -> the value a datetime-local input expects, in the viewer's local time.
@@ -46,6 +48,7 @@ export default function EventPage() {
   const act = useAction();
   const acting = useActingRole();
   const [edit, setEdit] = useState(false);
+  const [bulk, setBulk] = useState(false);
   const [f, setF] = useState({ type: null as string | null, title: '', starts: '', ends: '', location: '', notes: '', opponent: '', our: '', their: '', kit: null as string | null, equipment: [] as string[] });
   const [statPlayer, setStatPlayer] = useState('');
   const [statType, setStatType] = useState<string | null>(null);
@@ -101,7 +104,12 @@ export default function EventPage() {
         <div className="row wrap">
           <Link className="button-link grow" to={`../event/${event.id}/prep`}>הכנה לאירוע ←</Link>
           {!edit && <button className="secondary" onClick={startEdit}>✏️ עריכת פרטי האירוע</button>}
+          {!isOver(event) && <button className="secondary" onClick={() => setBulk(!bulk)}>🔁 עריכה לכל ה{typeName(event.type_id)} בימי {dayName(israelDow(event.starts_at))}</button>}
         </div>
+      )}
+      {canManage && bulk && (
+        <BulkEventEdit event={event} kits={kits} typeLabel={typeName(event.type_id)}
+          onClose={() => setBulk(false)} onDone={() => { setBulk(false); reload(); }} />
       )}
       {!isDemo && (
         <TransportCard event={event} players={players} responses={responses} canManage={canManage} myId={auth.profile?.id ?? ''}

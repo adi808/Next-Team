@@ -360,6 +360,26 @@ export class DemoServer {
       }
       return n;
     },
+    update_events_bulk(this: DemoServer, a: Row) {
+      const base = this.find('events', a.p_event);
+      if (!base || !this.manageTeam(base.team_id)) this.deny();
+      const c = a.p_changes ?? {};
+      if (!Object.keys(c).length) this.bad('nothing to change');
+      const dow = new Date(base.starts_at).getDay();
+      const rows = this.t.events.filter((e) => e.team_id === base.team_id && e.type_id === base.type_id && e.starts_at >= base.starts_at && new Date(e.starts_at).getDay() === dow);
+      for (const e of rows) {
+        const oldStart = new Date(e.starts_at).getTime();
+        const length = e.ends_at ? new Date(e.ends_at).getTime() - oldStart : null;
+        let start = oldStart;
+        if (c.start) { const [h, m] = String(c.start).split(':').map(Number); const d = new Date(e.starts_at); d.setHours(h, m, 0, 0); start = d.getTime(); e.starts_at = d.toISOString(); }
+        if (c.duration_min !== undefined) e.ends_at = new Date(start + c.duration_min * 60_000).toISOString();
+        else if (c.start && length !== null) e.ends_at = new Date(start + length).toISOString();
+        if (c.location !== undefined) e.location = String(c.location ?? '').trim();
+        if (c.notes !== undefined) e.notes = c.notes ?? '';
+        if (c.kit !== undefined) e.kit_id = c.kit || null;
+      }
+      return rows.length;
+    },
     update_event(this: DemoServer, a: Row) {
       const e = this.find('events', a.p_event);
       if (!e || !this.manageTeam(e.team_id)) this.deny();
