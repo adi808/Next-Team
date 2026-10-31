@@ -12,7 +12,12 @@
    * **Google:** ב־Google Cloud Console ← APIs & Services ← Credentials ← Create Credentials ← OAuth client ID ← Web application. ב־Authorized redirect URIs הדביקו את ה־Callback URL שמופיע ב־Supabase ← Authentication ← Sign In / Providers ← Google. העתיקו את Client ID ו־Client Secret ל־Supabase, הפעילו את Google ושמרו.
    * **קוד במייל:** Email מופעל כברירת מחדל. ב־Authentication ← Emails ← Templates ← Magic Link הוסיפו לתבנית את `{{ .Token }}` כדי שהמייל יכלול גם קוד (הקישור במייל עובד גם בלעדיו).
    * **Apple:** לא נתמך בשלב זה. כניסה עם Apple מחייבת חשבון Apple Developer בתשלום (99$ לשנה). משתמשי אייפון נכנסים עם Google או עם קוד במייל.
-   * **שליחת מיילים בחינם:** שירות המייל המובנה של Supabase מוגבל לכמה מיילים בשעה. לשימוש אמיתי: Authentication ← Emails ← SMTP Settings, עם שרת SMTP חינמי (למשל Brevo, עד 300 מיילים ביום, או Gmail עם App Password).
+   * **שליחת מיילים בחינם (חובה לפני השקה):** שירות המייל המובנה של Supabase מוגבל לכמה מיילים בשעה. מגדירים את Brevo (חינם, עד 300 מיילים ביום):
+     1. נרשמים ב־brevo.com. ב־Senders, Domains & Dedicated IPs ← Domains מוסיפים את הדומיין של המועדון ומעתיקים אליו את רשומות ה־DNS שמופיעות (קוד Brevo, DKIM ו־DMARC), ואז מאמתים. שולחים מכתובת על הדומיין (למשל `no-reply@הדומיין`), ולא מכתובת Gmail, אחרת המיילים יגיעו לספאם.
+     2. ב־Brevo ← SMTP & API ← SMTP: מעתיקים את שרת ה־SMTP (`smtp-relay.brevo.com`, פורט 587) ואת שם המשתמש, ויוצרים מפתח SMTP.
+     3. ב־Supabase ← Authentication ← Emails ← SMTP Settings: מפעילים Custom SMTP ומזינים כתובת שולח, שם שולח (Next Team), השרת, הפורט, שם המשתמש והמפתח כסיסמה.
+     4. ב־Authentication ← Emails ← Templates מוסיפים `{{ .Token }}` גם לתבנית Magic Link וגם לתבנית Confirm signup (משתמש חדש מקבל את השנייה).
+     5. ב־Authentication ← Rate Limits מעלים את מגבלת המיילים לשעה.
 5. Authentication ← URL Configuration: הכניסו את כתובת האתר (אחרי שלב 2) ב־Site URL וגם ב־Redirect URLs.
 
 ## 2. Cloudflare Pages

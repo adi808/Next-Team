@@ -28,7 +28,9 @@ export default function PlayerPage() {
     const stats = await q<EventStat[]>(supabase.from('event_stats').select('*').eq('player_id', playerId));
     // Contact details, for staff, the player's parents and the player (empty for anyone else).
     const [details] = await rpc<Details[]>('player_details', { p_player: playerId });
-    return { player, teams, stats, details: details ?? null };
+    // The login email that is waiting for the player to sign in (staff and parents only).
+    const invited = await rpc<string | null>('player_email_invite', { p_player: playerId }).catch(() => null);
+    return { player, teams, stats, details: details ?? null, invited };
   }, [playerId]);
   const shirt = useShirtNumbers(playerId ? [playerId] : []);
   const act = useAction();
@@ -38,7 +40,7 @@ export default function PlayerPage() {
   const [accountEmail, setAccountEmail] = useState('');
 
   if (!data) return <Loading loading={loading} error={error} />; // on reload, keep showing the page (and its open tab)
-  const { player, teams, stats, details } = data;
+  const { player, teams, stats, details, invited } = data;
   const isSys = acting === 'system_admin' && !!auth.profile?.is_system_admin;
   const isAdmin = acting === 'club_admin' && auth.adminClubIds.includes(player.club_id);
   const isCoach = acting === 'coach' && teams.some((t) => auth.coachTeamIds.includes(t.id));
@@ -116,12 +118,19 @@ export default function PlayerPage() {
         <ParentsEditor playerId={player.id} canManage={manage} canAdd={manage || isParent} myId={auth.profile?.id} />
       </Card>
       {((manage || isParent) || player.has_account) && <Card title="כניסה עצמאית לשחקן">
+        {(manage || isParent) && !player.has_account && invited && (
+          <div className="stack">
+            <p className="ok">נשמר. המייל <bdi dir="ltr">{invited}</bdi> ממתין: כשהשחקן ייכנס לאפליקציה עם המייל הזה, החשבון שלו יקושר אוטומטית לפרופיל.</p>
+            <button className="small secondary" disabled={act.busy}
+              onClick={() => act.run(async () => { await rpc('cancel_player_email_invite', { p_player: player.id }); reload(); })}>ביטול המייל</button>
+          </div>
+        )}
         {(manage || isParent) && !player.has_account && (
-          <Field label="מייל של השחקן (לא חובה)">
+          <Field label={invited ? 'החלפת המייל של השחקן' : 'מייל של השחקן (לא חובה)'}>
             <div className="row">
               <input type="email" dir="ltr" value={accountEmail} onChange={(e) => setAccountEmail(e.target.value)} />
               <button className="small" disabled={!normEmail(accountEmail) || act.busy}
-                onClick={() => act.run(async () => { await rpc('link_player_email', { p_player: player.id, p_email: normEmail(accountEmail) }); setAccountEmail(''); reload(); })}>חיבור</button>
+                onClick={() => act.run(async () => { await rpc('link_player_email', { p_player: player.id, p_email: normEmail(accountEmail) }); setAccountEmail(''); reload(); })}>{invited ? 'החלפה' : 'חיבור'}</button>
             </div>
           </Field>
         )}

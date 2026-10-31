@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { BrowserRouter, MemoryRouter, Navigate, Route, Routes, useParams } from 'react-router-dom';
+import { BrowserRouter, MemoryRouter, Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom';
 import { isDemo } from './lib/supabase';
 import { AuthProvider, useAuth } from './auth/AuthProvider';
 import Login from './pages/Login';
@@ -18,7 +18,7 @@ import ProfilePage from './pages/ProfilePage';
 import JoinPage from './pages/JoinPage';
 import RequestsPage from './pages/RequestsPage';
 import NotificationsPage from './pages/NotificationsPage';
-import { pendingJoin, rememberJoin } from './lib/join';
+import { forgetPath, pendingJoin, pendingPath, rememberJoin, rememberPath } from './lib/join';
 import { recentPlace } from './lib/place';
 import type { Mode } from './lib/types';
 import { FamilyChat, FamilyEvents, FamilyHome, FamilySurveys, FamilyTasks } from './pages/family/Family';
@@ -30,12 +30,30 @@ function JoinLater() {
   return <Navigate to="/login" replace />;
 }
 
+// Signed out: keep the link into the app (an event shared on WhatsApp) for after sign-in.
+function PathLater() {
+  const { pathname } = useLocation();
+  rememberPath(pathname);
+  return <Navigate to="/login" replace />;
+}
+
 // After sign-in, a join link opened before it wins over the usual entry screen.
 function Home() {
-  const { session } = useAuth();
+  const { session, modes } = useAuth();
   const [code] = useState(pendingJoin);
+  const [path] = useState(() => {
+    const p = pendingPath();
+    forgetPath();
+    return p;
+  });
   const [place] = useState(() => recentPlace(session?.user.id));
   if (code) return <Navigate to={`/join/${code}`} replace />;
+  // the shared link works in the mode it names, or in the account's only mode
+  const linked = path?.match(/^\/m\/([a-z]+)\/(.+)$/);
+  if (linked) {
+    const mode = modes.includes(linked[1] as Mode) ? linked[1] : modes.length === 1 ? modes[0] : null;
+    if (mode) return <Navigate to={`/m/${mode}/${linked[2]}`} replace />;
+  }
   return place ? <Navigate to={place} replace /> : <ModePicker auto />;
 }
 
@@ -54,6 +72,7 @@ function Gate() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/join/:code" element={<JoinLater />} />
+        <Route path="/m/*" element={<PathLater />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     );

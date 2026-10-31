@@ -20,4 +20,19 @@ export function parseJoinCode(text: string): string | null {
   return m ? m[1] : null;
 }
 
+// A link into the app (for example an event shared on WhatsApp) opened while signed out: kept the same way.
+const PATH_KEY = 'pendingPath';
+
+export function rememberPath(path: string) {
+  try { localStorage.setItem(PATH_KEY, path); } catch { /* storage may be unavailable */ }
+}
+
+export function pendingPath(): string | null {
+  try { return localStorage.getItem(PATH_KEY); } catch { return null; }
+}
+
+export function forgetPath() {
+  try { localStorage.removeItem(PATH_KEY); } catch { /* storage may be unavailable */ }
+}
+
 export const joinUrl = (code: string) => `${window.location.origin}/join/${code}`;

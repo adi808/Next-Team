@@ -568,3 +568,35 @@ table.roster .cell-line.email { white-space: normal; overflow-wrap: anywhere; fo
 .roster-add { margin: 0 0 12px; border: 1px solid var(--line, #dfe3ee); border-radius: 12px; padding: 10px 14px; background: #fff; }
 .roster-add > summary { cursor: pointer; font-weight: 600; color: var(--primary, #2f5bea); }
 .roster-add[open] > summary { margin-bottom: 10px; }
+
+.notice { background: #fff8e1; border: 1px solid #f1d68a; border-radius: 12px; padding: 12px 14px; margin-bottom: 14px; }
+.notice p { margin: 6px 0 10px; }
+
+.share-preview { width: 100%; max-width: 420px; height: auto; border-radius: 14px; border: 1px solid #dfe3ee; display: block; margin: 10px auto; }
+
+/* ---- event poster: the shareable banner's look, on the event pages and home screens ---- */
+.poster {
+  --team: #2563eb; position: relative; overflow: hidden; border-radius: 22px; padding: 1.1rem 1.2rem 1.3rem; color: #fff; text-align: center;
+  background: linear-gradient(160deg, #101c42, #070d24); box-shadow: 0 12px 32px rgba(7, 13, 36, 0.35); display: flex; flex-direction: column; align-items: center; gap: 0.55rem;
+}
+.poster::before {
+  content: ''; position: absolute; inset-inline-start: -30%; top: -30%; width: 90%; height: 90%; background: var(--team); opacity: 0.22;
+  clip-path: polygon(0 0, 100% 0, 0 100%); transform: scaleX(-1);
+}
+.poster > * { position: relative; }
+.poster-top { width: 100%; display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem; text-align: start; }
+.poster-top > div { border-inline-start: 4px solid var(--team); padding-inline-start: 0.6rem; display: flex; flex-direction: column; min-width: 0; }
+.poster-team { font-size: 1.15rem; font-weight: 800; }
+.poster-top small { opacity: 0.65; font-size: 0.8rem; }
+.poster-count { flex: none; padding: 0.2rem 0.7rem; border-radius: 999px; background: rgba(255, 255, 255, 0.14); font-size: 0.8rem; font-weight: 700; }
+.poster-tag { padding: 0.3rem 1.4rem; border-radius: 999px; background: var(--team); color: #fff; font-weight: 800; font-size: 1.05rem; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35); }
+.poster-vs { width: 100%; display: flex; align-items: center; justify-content: space-around; margin-top: 0.2rem; }
+.poster-vs > div { display: flex; flex-direction: column; align-items: center; gap: 0.3rem; width: 38%; }
+.poster-vs small { font-size: 0.8rem; opacity: 0.85; line-height: 1.2; }
+.poster-vs b { font-size: 1.6rem; font-style: italic; font-weight: 900; }
+.crest { display: inline-flex; align-items: center; justify-content: center; width: 3.6rem; height: 3.6rem; border-radius: 50%; border: 3px solid #fff; font-style: normal; font-weight: 900; font-size: 1.2rem; color: #fff; }
+.crest.light { background: #e5e7eb; color: #0b1535; border-color: rgba(255, 255, 255, 0.5); }
+.poster-day { color: var(--team); font-weight: 800; font-size: 1.15rem; filter: brightness(1.35); margin-top: 0.2rem; }
+.poster-time { font-size: 3.6rem; line-height: 1; font-weight: 900; letter-spacing: 0.01em; }
+.poster-loc { display: inline-flex; align-items: center; gap: 0.4rem; font-weight: 600; opacity: 0.92; }
+.poster-loc svg { color: var(--team); filter: brightness(1.3); }
