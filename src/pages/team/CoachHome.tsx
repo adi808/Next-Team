@@ -4,6 +4,7 @@ import { q, useLoad } from '../../lib/db';
 import { useAuth } from '../../auth/AuthProvider';
 import { useCoachTeam } from '../../auth/coachTeam';
 import { Badge, Empty, Loading, PageHero, StatTiles } from '../../components/ui';
+import { EventPoster } from '../../components/EventDashboard';
 import { useLookupName, useLookups } from '../../components/Lookups';
 import { KitAvatar } from '../../components/Kit';
 import { TransportChip, useTransportTotals } from '../../components/Transport';
@@ -106,24 +107,10 @@ function NextEventCard({ event, heading, teamName, type, kit, squad, responses, 
   const no = responses.filter((r) => r.status === 'not_attending').length;
   const isMatch = !!type?.meta?.is_match;
   return (
-    <section className="card next-event">
-      <div className="card-head">
-        <h3>{heading}</h3>
-        <Badge>{type?.name_he ?? ''}</Badge>
-      </div>
-      <div className="next-event-title">
-        {isMatch && event.opponent ? (
-          <><strong>{teamName}</strong><span className="vs">VS</span><strong>{event.opponent}</strong></>
-        ) : (
-          <strong>{event.title || type?.name_he}</strong>
-        )}
-      </div>
-      <div className="meta-row">
-        {kit && <span className="row"><KitAvatar kit={kit} size={26} />{kit.name}</span>}
-        <span>{fmt(event.starts_at, { hour: '2-digit', minute: '2-digit' })}</span>
-        <span>{fmt(event.starts_at, { weekday: 'long', day: 'numeric', month: 'numeric' })}</span>
-      </div>
-      {event.location && <small className="muted">{event.location}</small>}
+    <section className="stack next-event">
+      <EventPoster event={event} typeLabel={type?.name_he ?? ''} isMatch={isMatch} teamName={teamName} kit={kit} heading={heading} />
+      <div className="card">
+      {kit && <span className="row"><KitAvatar kit={kit} size={26} />תלבושת: {kit.name}</span>}
       <StatTiles items={[
         { label: 'מגיעים', value: yes, tone: 'ok' },
         { label: 'לא מגיעים', value: no, tone: 'bad' },
@@ -135,6 +122,7 @@ function NextEventCard({ event, heading, teamName, type, kit, squad, responses, 
       <div className="row wrap">
         <Link className="button-link grow" to={`../event/${event.id}/prep`}>הכנה לאירוע ←</Link>
         <Link className="button-link soft" to={`../event/${event.id}`}>לפרטי האירוע</Link>
+      </div>
       </div>
     </section>
   );
