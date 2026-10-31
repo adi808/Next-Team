@@ -70,7 +70,7 @@ const FONT = 'system-ui, -apple-system, "Segoe UI", "Heebo", "Arial", sans-serif
 
 export type BannerStyle = 'dark' | 'color' | 'classic';
 export const BANNER_STYLES: { id: BannerStyle; label: string }[] = [
-  { id: 'dark', label: 'כהה' },
+  { id: 'dark', label: 'כחול' },
   { id: 'color', label: 'צבע הקבוצה' },
   { id: 'classic', label: 'קלאסי' },
 ];
@@ -157,15 +157,33 @@ function pin(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, 
 export const BANNER_W = 1080;
 export const BANNER_H = 1350;
 
+const sizeOf = (img: CanvasImageSource) => {
+  const i = img as HTMLImageElement & ImageBitmap;
+  return { w: i.naturalWidth || i.width || 0, h: i.naturalHeight || i.height || 0 };
+};
+
 function heroCover(ctx: CanvasRenderingContext2D, hero: CanvasImageSource, h: number) {
-  const w = (hero as HTMLImageElement).naturalWidth ?? BANNER_W;
-  const ih = (hero as HTMLImageElement).naturalHeight ?? h;
+  const w = sizeOf(hero).w || BANNER_W;
+  const ih = sizeOf(hero).h || h;
   const scale = Math.max(BANNER_W / w, h / ih);
   ctx.drawImage(hero, (BANNER_W - w * scale) / 2, 0, w * scale, ih * scale);
 }
 
 /** Draws the event poster (4:5) in one of three styles. */
-export function drawBanner(canvas: HTMLCanvasElement, d: ShareData, template: ShareTemplate, hero?: CanvasImageSource | null, style: BannerStyle = 'dark') {
+/** Panels side by side (the kids), each cropped to fill its slot, the faces kept toward the top. */
+function panels(ctx: CanvasRenderingContext2D, imgs: CanvasImageSource[], h: number) {
+  const gap = 6;
+  const w = (BANNER_W - gap * (imgs.length - 1)) / imgs.length;
+  imgs.forEach((img, i) => {
+    const iw = sizeOf(img).w || w;
+    const ih = sizeOf(img).h || h;
+    const scale = Math.max(w / iw, h / ih);
+    const sw = w / scale; const sh = h / scale;
+    ctx.drawImage(img, (iw - sw) / 2, (ih - sh) * 0.15, sw, sh, i * (w + gap), 0, w, h);
+  });
+}
+
+export function drawBanner(canvas: HTMLCanvasElement, d: ShareData, template: ShareTemplate, hero?: CanvasImageSource | null, style: BannerStyle = 'dark', kids: CanvasImageSource[] = []) {
   canvas.width = BANNER_W; canvas.height = BANNER_H;
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
@@ -184,13 +202,19 @@ export function drawBanner(canvas: HTMLCanvasElement, d: ShareData, template: Sh
     ctx.fillStyle = team; ctx.globalAlpha = 0.3;
     for (let x = 40; x < W; x += 62) ctx.fillRect(x, 0, 5, H);
     ctx.globalAlpha = 1;
-    if (hero) {
+    if (kids.length) {
+      ctx.save(); panels(ctx, kids, 700);
+      const fade = ctx.createLinearGradient(0, 440, 0, 740); fade.addColorStop(0, 'rgba(255,255,255,0)'); fade.addColorStop(1, '#fff');
+      ctx.fillStyle = fade; ctx.fillRect(0, 440, W, 300); ctx.restore();
+    } else if (hero) {
       ctx.save(); heroCover(ctx, hero, 700);
       const fade = ctx.createLinearGradient(0, 440, 0, 740); fade.addColorStop(0, 'rgba(255,255,255,0)'); fade.addColorStop(1, '#fff');
       ctx.fillStyle = fade; ctx.fillRect(0, 440, W, 300); ctx.restore();
     } else ball(ctx, mid, 400, 250);
     const ink = warn ?? NAVY;
-    ctx.fillStyle = ink; fit(ctx, d.teamName, 940, 64, 800); ctx.fillText(d.teamName, mid, 90);
+    fit(ctx, d.teamName, 880, 64, 800);
+    if (kids.length || hero) { const tw = Math.min(ctx.measureText(d.teamName).width + 80, 960); ctx.fillStyle = '#fff'; ctx.globalAlpha = 0.92; rrect(ctx, mid - tw / 2, 28, tw, 100, 50); ctx.fill(); ctx.globalAlpha = 1; }
+    ctx.fillStyle = ink; ctx.fillText(d.teamName, mid, 96);
     ctx.direction = 'ltr'; ctx.fillStyle = ink;
     const t = template === 'change' ? 'UPDATE' : template === 'cancel' ? 'CANCELLED' : d.isMatch ? 'MATCH DAY' : 'TRAINING';
     fit(ctx, t, 900, 190, 900, true); ctx.fillText(t, mid, 800); ctx.direction = 'rtl';
@@ -211,9 +235,12 @@ export function drawBanner(canvas: HTMLCanvasElement, d: ShareData, template: Sh
     ctx.fillStyle = 'rgba(0,0,0,0.16)'; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(W * 0.72, 0); ctx.lineTo(W * 0.32, H); ctx.lineTo(0, H); ctx.fill();
     ctx.fillStyle = 'rgba(255,255,255,0.08)'; ctx.beginPath(); ctx.moveTo(W, H * 0.45); ctx.lineTo(W, H); ctx.lineTo(W * 0.5, H); ctx.fill();
     pitch(ctx, 80, 80, W - 160, H - 160, inkC, 0.12);
-    if (hero) { ctx.save(); ctx.globalAlpha = 0.9; heroCover(ctx, hero, 640); ctx.restore(); const g = ctx.createLinearGradient(0, 400, 0, 680); g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, base); ctx.fillStyle = g; ctx.fillRect(0, 400, W, 300); }
+    if (kids.length) { ctx.save(); panels(ctx, kids, 640); const g = ctx.createLinearGradient(0, 400, 0, 680); g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, base); ctx.fillStyle = g; ctx.fillRect(0, 400, W, 300); ctx.restore(); }
+    else if (hero) { ctx.save(); ctx.globalAlpha = 0.9; heroCover(ctx, hero, 640); ctx.restore(); const g = ctx.createLinearGradient(0, 400, 0, 680); g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, base); ctx.fillStyle = g; ctx.fillRect(0, 400, W, 300); }
     else ball(ctx, mid, 330, 190, 0.95);
-    ctx.fillStyle = inkC; fit(ctx, d.teamName, 900, 56, 700); ctx.fillText(d.teamName, mid, 110);
+    fit(ctx, d.teamName, 880, 56, 700);
+    if (kids.length || hero) { const tw = Math.min(ctx.measureText(d.teamName).width + 80, 960); ctx.fillStyle = base; ctx.globalAlpha = 0.92; rrect(ctx, mid - tw / 2, 50, tw, 90, 45); ctx.fill(); ctx.globalAlpha = 1; }
+    ctx.fillStyle = inkC; ctx.fillText(d.teamName, mid, 110);
     fit(ctx, title, 940, 150, 900); ctx.fillText(title, mid, 800);
     if (isMatch) { fit(ctx, `נגד ${d.opponent}`, 900, 64, 700); ctx.fillText(`נגד ${d.opponent}`, mid, 885); }
     ctx.fillStyle = inkC; ctx.fillRect(mid - 70, 925, 140, 8);
@@ -224,35 +251,45 @@ export function drawBanner(canvas: HTMLCanvasElement, d: ShareData, template: Sh
   }
 
   // dark
+  const km = kids.length > 0;
+  const L = km
+    ? { hy: 318, sy: 362, bar: 280, tag: 410, crestY: 640, crestR: 85, nameY: 790, y0m: 840, y0: 560, tsize: 170, tdy: 205, locdy: 290, cancel: 130 }
+    : { hy: 138, sy: 182, bar: 100, tag: 330, crestY: 600, crestR: 100, nameY: 760, y0m: 800, y0: 560, tsize: 210, tdy: 235, locdy: 335, cancel: 150 };
   const bg = ctx.createLinearGradient(0, 0, W * 0.4, H); bg.addColorStop(0, '#101c42'); bg.addColorStop(1, '#070d24');
   ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
   ctx.fillStyle = accent; ctx.globalAlpha = 0.22; ctx.beginPath(); ctx.moveTo(W, 0); ctx.lineTo(W, 760); ctx.lineTo(W * 0.35, 0); ctx.fill(); ctx.globalAlpha = 1;
   pitch(ctx, 70, 640, W - 140, 640, '#fff', 0.06);
-  if (hero) { ctx.save(); heroCover(ctx, hero, 560); const g = ctx.createLinearGradient(0, 260, 0, 580); g.addColorStop(0, 'rgba(7,13,36,0)'); g.addColorStop(1, '#070d24'); ctx.fillStyle = g; ctx.fillRect(0, 260, W, 320); ctx.restore(); }
-  ctx.fillStyle = accent; ctx.fillRect(W - 110, 100, 6, 70);
-  ctx.textAlign = 'right'; ctx.fillStyle = '#fff'; fit(ctx, d.teamName, 780, 54, 800); ctx.fillText(d.teamName, W - 135, 138);
-  ctx.fillStyle = 'rgba(255,255,255,0.6)'; fit(ctx, `${d.typeLabel}${d.isMatch ? '' : ''}`, 600, 34, 600); ctx.fillText(d.typeLabel, W - 135, 182);
+  if (km) {
+    ctx.save(); panels(ctx, kids, 400);
+    const g = ctx.createLinearGradient(0, 180, 0, 405); g.addColorStop(0, 'rgba(7,13,36,0)'); g.addColorStop(1, '#070d24');
+    ctx.fillStyle = g; ctx.fillRect(0, 180, W, 225); ctx.restore();
+  } else if (hero) {
+    ctx.save(); heroCover(ctx, hero, 560); const g = ctx.createLinearGradient(0, 260, 0, 580); g.addColorStop(0, 'rgba(7,13,36,0)'); g.addColorStop(1, '#070d24'); ctx.fillStyle = g; ctx.fillRect(0, 260, W, 320); ctx.restore();
+  }
+  ctx.fillStyle = accent; ctx.fillRect(W - 110, L.bar, 6, 70);
+  ctx.textAlign = 'right'; ctx.fillStyle = '#fff'; fit(ctx, d.teamName, 780, 54, 800); ctx.fillText(d.teamName, W - 135, L.hy);
+  ctx.fillStyle = 'rgba(255,255,255,0.6)'; fit(ctx, d.typeLabel, 600, 34, 600); ctx.fillText(d.typeLabel, W - 135, L.sy);
   ctx.textAlign = 'center';
-  if (!hero) ball(ctx, 190, 190, 80, 0.16);
+  if (!hero && !km) ball(ctx, 190, 190, 80, 0.16);
 
   const tagW = 520;
-  ctx.fillStyle = accent; rrect(ctx, mid - tagW / 2, 330, tagW, 96, 48); ctx.fill();
-  ctx.fillStyle = inkOn(accent); fit(ctx, title, tagW - 60, 52, 900); ctx.fillText(title, mid, 396);
+  ctx.fillStyle = accent; rrect(ctx, mid - tagW / 2, L.tag, tagW, 96, 48); ctx.fill();
+  ctx.fillStyle = inkOn(accent); fit(ctx, title, tagW - 60, 52, 900); ctx.fillText(title, mid, L.tag + 66);
 
   if (isMatch) {
-    crest(ctx, W - 260, 600, 100, team, '#fff', initials(d.teamName));
-    crest(ctx, 260, 600, 100, '#e5e7eb', 'rgba(255,255,255,0.4)', initials(d.opponent));
-    ctx.fillStyle = '#fff'; fit(ctx, 'VS', 200, 70, 900, true); ctx.direction = 'ltr'; ctx.fillText('VS', mid, 625); ctx.direction = 'rtl';
-    ctx.fillStyle = 'rgba(255,255,255,0.85)'; fit(ctx, d.teamName, 300, 32, 700); ctx.fillText(d.teamName, W - 260, 760);
-    fit(ctx, d.opponent, 300, 32, 700); ctx.fillText(d.opponent, 260, 760);
+    crest(ctx, W - 260, L.crestY, L.crestR, team, '#fff', initials(d.teamName));
+    crest(ctx, 260, L.crestY, L.crestR, '#e5e7eb', 'rgba(255,255,255,0.4)', initials(d.opponent));
+    ctx.fillStyle = '#fff'; fit(ctx, 'VS', 200, 70, 900, true); ctx.direction = 'ltr'; ctx.fillText('VS', mid, L.crestY + 25); ctx.direction = 'rtl';
+    ctx.fillStyle = 'rgba(255,255,255,0.85)'; fit(ctx, d.teamName, 300, 32, 700); ctx.fillText(d.teamName, W - 260, L.nameY);
+    fit(ctx, d.opponent, 300, 32, 700); ctx.fillText(d.opponent, 260, L.nameY);
   }
-  const y0 = isMatch ? 800 : 560;
+  const y0 = isMatch ? L.y0m : L.y0;
   ctx.fillStyle = accent; fit(ctx, day, 900, 64, 800); ctx.fillText(day, mid, y0 + 40);
-  ctx.fillStyle = '#fff'; ctx.direction = 'ltr'; fit(ctx, time, 920, 210, 900); ctx.fillText(time, mid, y0 + 235); ctx.direction = 'rtl';
-  if (template === 'cancel') { ctx.fillStyle = '#ef4444'; ctx.fillRect(140, y0 + 150, W - 280, 12); }
+  ctx.fillStyle = '#fff'; ctx.direction = 'ltr'; fit(ctx, time, 920, L.tsize, 900); ctx.fillText(time, mid, y0 + L.tdy); ctx.direction = 'rtl';
+  if (template === 'cancel') { ctx.fillStyle = '#ef4444'; ctx.fillRect(140, y0 + L.cancel, W - 280, 12); }
   if (d.location.trim()) {
     fit(ctx, d.location.trim(), 760, 48, 600); const lw = ctx.measureText(d.location.trim()).width;
-    pin(ctx, mid + lw / 2 + 50, y0 + 320, 40, accent); ctx.fillStyle = 'rgba(255,255,255,0.92)'; ctx.fillText(d.location.trim(), mid - 10, y0 + 335);
+    pin(ctx, mid + lw / 2 + 50, y0 + L.locdy - 15, 40, accent); ctx.fillStyle = 'rgba(255,255,255,0.92)'; ctx.fillText(d.location.trim(), mid - 10, y0 + L.locdy);
   }
   footer(ctx, d, template, H - 125, 'rgba(255,255,255,0.75)', W);
 }
