@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { KitAvatar } from './Kit';
 import { useEquipmentNames } from './Equipment';
-import { isDemo } from '../lib/supabase';
+import { isDemo, supabase } from '../lib/supabase';
+import { q, useLoad } from '../lib/db';
+import { useSignedUrl } from './Picture';
 import { dayName, israelDow, israelTime } from '../lib/events';
 import type { EventRow, TeamKit } from '../lib/types';
 
@@ -103,6 +105,30 @@ const initials = (name: string) => {
   return (words.length > 1 ? words.slice(0, 2).map((w) => w[0]).join('') : (words[0] ?? '?').slice(0, 2)).toUpperCase();
 };
 
+/** Up to three random players of the team whose parents allowed showing their photo, as a strip on top of the poster. */
+function PosterKids({ teamId }: { teamId: string }) {
+  const pool = useLoad(async () => {
+    const links = await q<{ player_id: string }[]>(supabase.from('team_players').select('player_id').eq('team_id', teamId));
+    const ids = links.map((l) => l.player_id);
+    if (!ids.length) return [];
+    const rows = await q<{ id: string; full_name: string; photo_path: string | null; photo_consent: boolean }[]>(
+      supabase.from('v_players').select('id, full_name, photo_path, photo_consent').in('id', ids));
+    return rows.filter((r) => r.photo_consent && r.photo_path);
+  }, [teamId]);
+  const picked = useMemo(() => [...(pool.data ?? [])].sort(() => Math.random() - 0.5).slice(0, 3), [pool.data]);
+  if (!picked.length) return null;
+  return (
+    <div className="poster-kids">
+      {picked.map((k) => <KidPhoto key={k.id} path={k.photo_path as string} name={k.full_name} />)}
+    </div>
+  );
+}
+
+function KidPhoto({ path, name }: { path: string; name: string }) {
+  const url = useSignedUrl('player-photos', path);
+  return url ? <img src={url} alt={name} /> : <span />;
+}
+
 /** "היום", "מחר", or "יום ראשון, 2.11". */
 function dayLabel(iso: string): string {
   const ymd = (d: Date) => d.toLocaleDateString('en-CA', { timeZone: TZ });
@@ -130,6 +156,7 @@ export function EventPoster({ event, typeLabel, isMatch, teamName, kit, heading 
   const name = teamName || typeLabel;
   return (
     <section className="poster" style={{ ['--team' as string]: team }}>
+      {!isDemo && <PosterKids teamId={event.team_id} />}
       <div className="poster-top">
         <div>
           <strong className="poster-team">{name}</strong>
