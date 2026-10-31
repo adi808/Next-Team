@@ -577,10 +577,10 @@ table.roster .cell-line.email { white-space: normal; overflow-wrap: anywhere; fo
 /* ---- event poster: the shareable banner's look, on the event pages and home screens ---- */
 .poster {
   --team: #2563eb; position: relative; overflow: hidden; border-radius: 22px; padding: 1.1rem 1.2rem 1.3rem; color: #fff; text-align: center;
-  background: linear-gradient(160deg, #101c42, #070d24); box-shadow: 0 12px 32px rgba(7, 13, 36, 0.35); display: flex; flex-direction: column; align-items: center; gap: 0.55rem;
+  background: linear-gradient(160deg, #3d68cf, #2447a8); box-shadow: 0 12px 30px rgba(36, 71, 168, 0.3); display: flex; flex-direction: column; align-items: center; gap: 0.55rem;
 }
 .poster::before {
-  content: ''; position: absolute; inset-inline-start: -30%; top: -30%; width: 90%; height: 90%; background: var(--team); opacity: 0.22;
+  content: ''; position: absolute; inset-inline-start: -30%; top: -30%; width: 90%; height: 90%; background: #fff; opacity: 0.1;
   clip-path: polygon(0 0, 100% 0, 0 100%); transform: scaleX(-1);
 }
 .poster > * { position: relative; }
