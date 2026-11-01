@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider';
 import { MODE_LABELS, type Mode } from '../lib/types';
@@ -7,6 +7,7 @@ import { Icon, type IconName } from '../components/Icon';
 import { PageHero } from '../components/ui';
 import { useLookupName } from '../components/Lookups';
 import { parseJoinCode } from '../lib/join';
+import { entered } from '../lib/entry';
 
 const HINTS: Record<Mode, string> = {
   sysadmin: 'מועדונים, רשימות והגדרות מערכת',
@@ -39,6 +40,7 @@ export default function ModePicker({ auto }: { auto?: boolean }) {
   const staffName = useLookupName('staff_role');
   // The team staff card carries the staff type (e.g. team manager) when all the user's teams agree on it.
   const types = [...new Set(memberships.filter((m) => m.role === 'coach').map((m) => staffName(m.staff_role_id)))];
+  useEffect(() => { entered(); }, []);
   const label = (m: Mode) => (m === 'coach' && types.length === 1 && types[0] ? types[0] : MODE_LABELS[m]);
   if (loading) return <p className="center">טוען…</p>;
 

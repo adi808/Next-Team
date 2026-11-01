@@ -20,6 +20,7 @@ import RequestsPage from './pages/RequestsPage';
 import NotificationsPage from './pages/NotificationsPage';
 import { forgetPath, pendingJoin, pendingPath, rememberJoin, rememberPath } from './lib/join';
 import { recentPlace } from './lib/place';
+import { entered } from './lib/entry';
 import type { Mode } from './lib/types';
 import { FamilyChat, FamilyEvents, FamilyHome, FamilySurveys, FamilyTasks } from './pages/family/Family';
 
@@ -47,6 +48,7 @@ function Home() {
     return p;
   });
   const [place] = useState(() => recentPlace(session?.user.id));
+  useState(entered); // this start was decided here (picker, join link, shared link or resume)
   if (code) return <Navigate to={`/join/${code}`} replace />;
   // the shared link works in the mode it names, or in the account's only mode
   const linked = path?.match(/^\/m\/([a-z]+)\/(.+)$/);
