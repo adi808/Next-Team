@@ -1,3 +1,4 @@
+import { CancelledBadge } from '../../components/Cancelled';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
@@ -178,7 +179,7 @@ export function FamilyEvents() {
   }, [tids]);
   const [next, other] = nextAndOther(data?.events ?? []);
   const rest = (data?.events ?? []).filter((e) => e !== next && e !== other);
-  const answers = (e: EventRow) => kids.filter((k) => links.some((l) => l.team_id === e.team_id && l.player_id === k.id)).map((k) => (
+  const answers = (e: EventRow) => e.cancelled_at ? <p key="c" className="muted">האירוע בוטל, אין צורך לאשר הגעה.</p> : kids.filter((k) => links.some((l) => l.team_id === e.team_id && l.player_id === k.id)).map((k) => (
     <KidAttendance key={k.id} event={e} kid={k} asParent={asParent} response={data?.responses.find((r) => r.event_id === e.id && r.player_id === k.id)} onSaved={reload} />
   ));
   const dashboard = (e: EventRow, heading: string) => (
@@ -208,7 +209,7 @@ export function FamilyEvents() {
       {rest.map((e) => (
         <Card key={e.id} title={eventHeading(e, typeName(e.type_id), teams.find((t) => t.id === e.team_id)?.name)}>
           <p>
-            <Badge>{typeName(e.type_id)}</Badge> {fmtDate(e.starts_at)} {e.location && `· ${e.location}`}
+            <CancelledBadge event={e} /> <Badge>{typeName(e.type_id)}</Badge> {fmtDate(e.starts_at)} {e.location && `· ${e.location}`}
             <small className="muted">· {teams.find((t) => t.id === e.team_id)?.name}</small>
           </p>
           <Link to={`../event/${e.id}`}>פרטים</Link>

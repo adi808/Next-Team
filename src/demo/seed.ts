@@ -19,6 +19,8 @@ export function seed(): Tables {
     lk('lk_train', 'event_type', 'אימון', 1), lk('lk_match', 'event_type', 'משחק', 2, { meta: { is_match: true } }), lk('lk_build', 'event_type', 'גיבוש', 3),
     lk('r_ill', 'absence_reason', 'מחלה', 1), lk('r_inj', 'absence_reason', 'פציעה', 2), lk('r_vac', 'absence_reason', 'חופשה', 3),
     lk('r_sch', 'absence_reason', 'לימודים', 4), lk('r_fam', 'absence_reason', 'אירוע משפחתי', 5), lk('r_oth', 'absence_reason', 'אחר', 6, { meta: { note_required: true } }),
+    lk('c_weather', 'cancel_reason', 'מזג אוויר', 1), lk('c_field', 'cancel_reason', 'המגרש לא זמין', 2), lk('c_players', 'cancel_reason', 'אין מספיק שחקנים', 3),
+    lk('c_coach', 'cancel_reason', 'המאמן לא זמין', 4), lk('c_other', 'cancel_reason', 'אחר', 5, { meta: { note_required: true } }),
     lk('fm11', 'match_format', '11 על 11', 1, { sport_id: 'sp_fb' }), lk('fm9', 'match_format', '9 על 9', 2, { sport_id: 'sp_fb' }),
     lk('fm7', 'match_format', '7 על 7', 3, { sport_id: 'sp_fb' }), lk('fm5', 'match_format', '5 על 5', 4, { sport_id: 'sp_fb' }),
     lk('bm5', 'match_format', '5 על 5', 1, { sport_id: 'sp_bb' }), lk('bm3', 'match_format', '3 על 3', 2, { sport_id: 'sp_bb' }),

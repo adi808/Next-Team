@@ -16,6 +16,7 @@ import { EquipmentPicker } from '../../components/Equipment';
 import { TransportCard } from '../../components/Transport';
 import { BulkEventEdit } from '../../components/BulkEventEdit';
 import { ShareEvent } from '../../components/ShareEvent';
+import { CancelEventBox, isCancelled } from '../../components/Cancelled';
 import { dayName, israelDow, isOver } from '../../lib/events';
 import type { EntityRole, EventResponse, EventRow, EventStat, Player, Team, TeamKit } from '../../lib/types';
 
@@ -52,6 +53,7 @@ export default function EventPage() {
   const [edit, setEdit] = useState(false);
   const [bulk, setBulk] = useState(false);
   const [share, setShare] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const [f, setF] = useState({ type: null as string | null, title: '', starts: '', ends: '', location: '', notes: '', opponent: '', our: '', their: '', kit: null as string | null, equipment: [] as string[] });
   const [statPlayer, setStatPlayer] = useState('');
   const [statType, setStatType] = useState<string | null>(null);
@@ -102,14 +104,19 @@ export default function EventPage() {
     <>
       <p><Link to={`../team/${team.id}`}>← {team.name}</Link></p>
       <EventDashboard event={event} typeLabel={typeName(event.type_id)} isMatch={isMatch} kit={kit} teamName={team.name}
-        attendance={canManage ? { yes: attending, no: absent, pending: players.length - responses.length } : undefined} />
+        attendance={canManage && !isCancelled(event) ? { yes: attending, no: absent, pending: players.length - responses.length } : undefined}
+        canManage={canManage} onChanged={reload} />
       {canManage && (
         <div className="row wrap">
           <Link className="button-link grow" to={`../event/${event.id}/prep`}>הכנה לאירוע ←</Link>
           {!edit && <button className="secondary" onClick={startEdit}>✏️ עריכת פרטי האירוע</button>}
           <button className="secondary" onClick={() => setShare(!share)}>📣 שיתוף בוואטסאפ</button>
+          {!isOver(event) && !isCancelled(event) && <button className="danger" onClick={() => setCancelling(!cancelling)}>❌ ביטול האירוע</button>}
           {!isOver(event) && <button className="secondary" onClick={() => setBulk(!bulk)}>🔁 עריכה לכל ה{typeName(event.type_id)} בימי {dayName(israelDow(event.starts_at))}</button>}
         </div>
+      )}
+      {canManage && cancelling && !isCancelled(event) && (
+        <CancelEventBox event={event} onClose={() => setCancelling(false)} onDone={() => { setCancelling(false); reload(); }} />
       )}
       {canManage && share && (
         <ShareEvent onClose={() => setShare(false)} kidPool={players.filter((p) => p.photo_consent && p.photo_path).map((p) => ({ path: p.photo_path as string, name: p.full_name }))} link={`${window.location.origin}/m/parent/event/${event.id}`}
@@ -131,7 +138,7 @@ export default function EventPage() {
       {(canManage || event.notes) && <Card title="פרטים" actions={canManage && (
         <div className="row">
           {!edit && <button className="small secondary" onClick={startEdit}>עריכה</button>}
-          <button className="small secondary" onClick={() => { if (confirm('למחוק את האירוע?')) act.run(async () => { await rpc('delete_event', { p_event: event.id }); navigate(`../team/${team.id}`); }); }}>מחיקה</button>
+          <button className="small secondary" onClick={() => { if (confirm(isCancelled(event) ? 'למחוק את האירוע לגמרי?' : 'למחוק את האירוע? כדי שההורים יקבלו הודעה, עדיף "ביטול האירוע". מחיקה מיועדת לתיקון טעות.')) act.run(async () => { await rpc('delete_event', { p_event: event.id }); navigate(`../team/${team.id}`); }); }}>מחיקה</button>
         </div>
       )}>
         {event.notes ? <p>{event.notes}</p> : !edit && <p className="muted">אין הערות.</p>}
@@ -174,7 +181,8 @@ export default function EventPage() {
       )}
 
       <Card title="אישורי הגעה">
-        {myKids.map((k) => (
+        {isCancelled(event) && <p className="muted">האירוע בוטל, אין צורך לאשר הגעה.</p>}
+        {!isCancelled(event) && myKids.map((k) => (
           <KidAnswer key={k.id} event={event} kid={k} response={resp(k.id)} asParent={auth.children.some((c) => c.id === k.id)} onSaved={reload} />
         ))}
         {canManage && (

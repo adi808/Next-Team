@@ -12,7 +12,7 @@ Built: everything in the business spec except features marked "proposed" there.
 | Install | banner inviting browser users to add the app to the home screen: one-tap install on Android Chrome, Share → Add to Home Screen steps on iPhone; hidden once installed, or for a month after closing |
 | Clubs / teams | system admin creates clubs; club admin creates teams (with a sport) and invites staff by email |
 | Players | first-class: name, birth date (mandatory), photo (parent consent per child). A child may have no email: the parent manages the profile |
-| Events | type from a table (training / match / team building ...), attendance answers with a reason from a table and a note, last answer wins, no time limit |
+| Events | type from a table (training / match / team building ...), attendance answers with a reason from a table and a note, last answer wins, no time limit. Staff cancel an event with a reason (list `cancel_reason`): it stays on the board marked cancelled, answers close, and the team is told; a cancelled event can be restored |
 | Match | opponent, result, format and formation (defaults from the team), goals / assists / cards (types per sport, in a table) |
 | Parameters | generic, dynamic, with history and per-role visibility: ratings 1-10, medical info, team settings (minimum age to answer, ...) |
 | Tasks | coach assigns to the squad or to individual players, and to parents; everyone sees only their own |
@@ -27,7 +27,7 @@ Built: everything in the business spec except features marked "proposed" there.
 | Parents | both parents of a child with relation (mom / dad / guardian), phone and email. A parent or the staff add the second parent (also in the join form); without an account they are kept as a contact (`guardian_contacts`), and signing in with that email links them to the child |
 | Roster | club admins (whole club, filter by team) and coaches (their team) see a table of every child with parents and contact details; search, edit a child and its parents, unlink a parent, delete a child (club admin), export to Excel (CSV) (`club_roster`) |
 | Join link | one link per team (`join_links`); a signed-in member is recognised, anyone else picks coach / team manager / parent (with children) and sends a request; the club admin decides staff, the team's staff decide parents (`join_requests`, Requests screen) |
-| Notifications | in-app list, Web Push (`send-push`) and, for join requests and their answers, email through Brevo (`send-email`) |
+| Notifications | in-app list, Web Push (`send-push`) and email through Brevo (`send-email`). Join requests and their answers always go by email; event notices (cancelled, restored, a changed time or place, bulk edits, reminders) go by email only to people with no push subscription. Reminder: every 15 minutes (`pg_cron`, `send_event_reminders`) the parents of children with no answer, and players who answer for themselves, get one reminder per event, `reminder_hours` before it (team parameter, default 24, 0 = off); the staff get a count of missing answers |
 
 ### Generic by design
 * `lookups` - every "choose from a list" value (event types, absence reasons, match formats, formations, stat types). New values and new lists need no code (`upsert_lookup`, Lists screen). Dependent lists use `parent_id`; sport- and club-specific values use `sport_id` / `club_id`.
@@ -35,10 +35,10 @@ Built: everything in the business spec except features marked "proposed" there.
 * `sports` - table with an icon per sport.
 
 ### Demo
-`npm run build:demo` writes `dist-demo/next-team-demo.html`: one self-contained page with the real UI and an in-browser sample backend (`src/demo/`), with a person picker. It is excluded from the production bundle. `node tests/demo-e2e.cjs` drives it (65 checks).
+`npm run build:demo` writes `dist-demo/next-team-demo.html`: one self-contained page with the real UI and an in-browser sample backend (`src/demo/`), with a person picker. It is excluded from the production bundle. `node tests/demo-e2e.cjs` drives it (77 checks).
 
 ### Verified
-* `supabase/tests/scenario.sql`: 192 role-by-role checks on Postgres 16 (against a stub `auth` schema). Run it with `supabase/tests/stub_auth.sql` first, then the migrations, then the scenario.
+* `supabase/tests/scenario.sql`: 212 role-by-role checks on Postgres 16 (against a stub `auth` schema). Run it with `supabase/tests/stub_auth.sql` first, then the migrations, then the scenario.
 * `tests/api-integration.cjs`: 29 checks over HTTP through a real PostgREST 12 with signed JWTs per role: table and function exposure, grants, RLS, RPCs with named parameters, error responses.
 * `tests/ui-e2e.cjs`: 44 checks with the built UI in a real browser against that PostgREST and database, one session per role (coach, parent, player, club admin, system admin, outsider), including saving an attendance answer and posting a message.
 * `tests/ui-smoke.cjs`: the same screens against a mocked API (this found and fixed a reload loop).

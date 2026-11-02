@@ -29,7 +29,7 @@ const out = (ok, label, extra) => { if (!ok) fails++; console.log(`${ok ? 'PASS'
 
   // coach
   await p.click('button:has-text("אבי כץ")'); await wait(1500);
-  await has('coach lands on home with the next event', 'שלום, אבי', 'האירוע הבא', 'אימון קבוצתי', 'מגיעים', 'טרם השיבו', 'הכנה לאירוע'); await shot('coach-home');
+  await has('coach lands on home with the next event', 'שלום, אבי', 'האירוע הבא', 'אימון מחר', 'מגיעים', 'טרם השיבו', 'הכנה לאירוע'); await shot('coach-home');
   await has('coach home also shows the next event of another type', 'המשחק הקרוב', 'הפועל');
   await has('coach home shows the staff type', 'מאמן ראשי · ילדים ב׳');
   await hasNot('coach does not see the other coach team', 'נוער כדורסל');
@@ -94,7 +94,7 @@ const out = (ok, label, extra) => { if (!ok) fails++; console.log(`${ok ? 'PASS'
   // parent
   await pick('שרה כהן');
   await has('parent lands on events', 'אירועים קרובים', 'דני כהן'); await hasNot('parent sees only their child', 'רוני לוי', 'נועה מזרחי');
-  await has('parent dashboard: next event and the next match', 'האירוע הבא', 'אימון קבוצתי', 'המשחק הקרוב', 'משחק ליגה נגד הפועל', 'בעוד', 'תלבושת', 'בהמשך'); await shot('parent-dashboard');
+  await has('parent dashboard: next event and the next match', 'האירוע הבא', 'אימון מחר', 'המשחק הקרוב', 'הפועל', 'בעוד', 'תלבושת', 'בהמשך'); await shot('parent-dashboard');
   await p.click('role=navigation >> text=הילדים'); await wait(800);
   await has('parent home links to the league', 'הקבוצות והליגה', 'טבלה וקבוצות בליגה');
   await p.click('text=דני כהן'); await wait(1000);
@@ -125,10 +125,24 @@ const out = (ok, label, extra) => { if (!ok) fails++; console.log(`${ok ? 'PASS'
   await pick('אבי כץ'); await p.click('.bottom-nav >> text=אירועים'); await wait(1000); await p.click('text=גיבוש סוף עונה'); await wait(900);
   await has('coach sees the parent\'s answer', 'דני כהן', 'מגיעים 1');
 
+  // the coach cancels the event with a reason; it stays, marked, and parents can no longer answer
+  await p.click('button:has-text("❌ ביטול האירוע")'); await wait(500);
+  await card('ביטול האירוע').locator('select').selectOption({ label: 'מזג אוויר' });
+  await card('ביטול האירוע').locator('input').fill('גשם כבד');
+  await p.click('button:has-text("ביטול האירוע ושליחת הודעה")'); await wait(900);
+  await has('a cancelled event shows its reason', 'האירוע בוטל', 'מזג אוויר', 'גשם כבד', 'אין צורך לאשר הגעה'); await shot('cancelled');
+  await pick('שרה כהן'); await p.click('role=navigation >> text=אירועים'); await wait(900);
+  await has('the parent sees the event as cancelled', 'גיבוש סוף עונה', 'בוטל', 'אין צורך לאשר הגעה');
+  await pick('אבי כץ'); await p.click('.bottom-nav >> text=אירועים'); await wait(1000);
+  await has('the team\'s event list marks it cancelled', 'גיבוש סוף עונה', 'בוטל');
+  await p.click('text=גיבוש סוף עונה'); await wait(900);
+  await p.click('button:has-text("ביטול הביטול")'); await wait(900);
+  await hasNot('restoring brings the event back', 'האירוע בוטל');
+
   // player
   await pick('רוני לוי');
   await has('player lands on events', 'אירועים קרובים', 'רוני לוי');
-  await p.click('role=navigation >> text=אירועים'); await wait(800); await has('player events with attendance buttons (team allows it)', 'אימון קבוצתי', 'לימודים');
+  await p.click('role=navigation >> text=אירועים'); await wait(800); await has('player events with attendance buttons (team allows it)', 'אימון מחר', 'לימודים');
   await p.click('role=navigation >> text=משימות'); await wait(700); await has('player tasks: a done task earns a medal', '100 הרמות כדור', 'קיבלת מדליה', '🏅'); await shot('medal'); await hasNot('player does not see parent tasks', 'משימה להורה');
 
   // club admin who is also a parent: mode picker

@@ -1,3 +1,4 @@
+import { CancelledBanner } from './Cancelled';
 import { useEffect, useState } from 'react';
 import { KitAvatar } from './Kit';
 import { useEquipmentNames } from './Equipment';
@@ -157,9 +158,11 @@ export function EventPoster({ event, typeLabel, isMatch, teamName, kit, heading 
   );
 }
 
-export function EventDashboard({ event, typeLabel, isMatch, kit, attendance, teamName }: {
+export function EventDashboard({ event, typeLabel, isMatch, kit, attendance, teamName, canManage, onChanged }: {
   event: EventRow; typeLabel: string; isMatch: boolean; kit?: TeamKit; teamName?: string;
   attendance?: { yes: number; no: number; pending: number };
+  /** staff: the cancelled banner offers to restore the event */
+  canManage?: boolean; onChanged?: () => void;
 }) {
   const equipment = useEquipmentNames()(event.equipment);
   const weather = useWeather(event.location, event.starts_at);
@@ -167,6 +170,7 @@ export function EventDashboard({ event, typeLabel, isMatch, kit, attendance, tea
   const [icon, label] = weather ? describe(weather.code).slice(1) as [string, string] : ['', ''];
   return (
     <section className={`event-hero ${isMatch ? 'match' : ''}`}>
+      <CancelledBanner event={event} canManage={canManage} onChanged={onChanged} />
       <EventPoster event={event} typeLabel={typeLabel} isMatch={isMatch} teamName={teamName} kit={kit} />
       <div className="event-tiles">
         {attendance && <div className="tile"><h4>הגעה</h4><Donut {...attendance} /></div>}

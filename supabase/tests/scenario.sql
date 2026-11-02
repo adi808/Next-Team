@@ -671,6 +671,87 @@ reset role;
 select t.check('the club admin deletes a child with its parents'' links', not exists (select 1 from players where id = t.id('jkid2'))
   and not exists (select 1 from guardianships where player_id = t.id('jkid2')));
 
+-- ---------------------------------------------------------------- event notifications (0032)
+reset role;
+create function t.notes(n text, p_url text) returns bigint language sql stable as
+  $$ select count(*) from notifications where user_id = t.id(n) and url = p_url $$;
+grant execute on function t.notes(text, text) to authenticated;
+set role authenticated;
+select t.as_user('JM');
+insert into t.ctx select 'E_rem', create_event(t.id('JT'), t.lk('event_type', 'training'), 'אימון תזכורת', now() + interval '3 hours', null, 'מגרש 1');
+insert into t.ctx select 'E_rem2', create_event(t.id('JT'), t.lk('event_type', 'training'), 'אימון שענו עליו', now() + interval '4 hours', null, 'מגרש 1');
+select t.as_user('JP');
+select respond_event(t.id('E_rem2'), t.id('jkid'), 'attending');
+reset role;
+select t.check('reminders handle the due events', send_event_reminders() >= 2);
+select t.check('a parent who did not answer gets a reminder linking to the event in parent mode',
+  t.notes('JP', '/m/parent/event/' || t.id('E_rem')) = 1);
+select t.check('a parent who already answered for every child gets no reminder',
+  t.notes('JP', '/m/parent/event/' || t.id('E_rem2')) = 0);
+select t.check('the staff get a summary of missing answers',
+  exists (select 1 from notifications where user_id = t.id('JM') and url = '/m/coach/event/' || t.id('E_rem') and body like '%תזכורת%'));
+select t.check('without push the reminder also goes by email',
+  (select bool_and(email) from notifications where user_id = t.id('JP') and url = '/m/parent/event/' || t.id('E_rem')));
+select send_event_reminders();
+select t.check('an event is reminded only once', t.notes('JP', '/m/parent/event/' || t.id('E_rem')) = 1);
+
+set role authenticated;
+select t.as_user('JM');
+select set_attribute((select id from attribute_defs where scope='team' and key='reminder_hours'), t.id('JT'), '0'::jsonb);
+insert into t.ctx select 'E_off', create_event(t.id('JT'), t.lk('event_type', 'training'), 'בלי תזכורת', now() + interval '1 hour');
+reset role;
+select send_event_reminders();
+select t.check('reminder_hours 0 turns reminders off', t.notes('JP', '/m/parent/event/' || t.id('E_off')) = 0);
+
+-- change of time / place
+set role authenticated;
+select t.as_user('JP');
+select save_push_subscription('https://push.test/p1', 'k', 'a');
+select t.as_user('JM');
+select save_event_details(t.id('E_rem'), t.lk('event_type', 'training'), 'אימון תזכורת', now() + interval '6 hours', null, 'מגרש 2');
+reset role;
+select t.check('a changed time and place notifies the parents',
+  exists (select 1 from notifications where user_id = t.id('JP') and url = '/m/parent/event/' || t.id('E_rem') and title like '🔄%'
+          and body like '%מגרש 2%'));
+select t.check('with push the change is not emailed',
+  not (select email from notifications where user_id = t.id('JP') and title like '🔄%' order by created_at desc limit 1));
+select t.check('a new time lets the reminder go out again', (select reminder_sent_at from events where id = t.id('E_rem')) is null);
+select t.check('the one who made the change is not notified',
+  not exists (select 1 from notifications where user_id = t.id('JM') and title like '🔄%'));
+
+-- cancel / restore
+set role authenticated;
+select t.as_user('JP');
+select t.denied('a parent cannot cancel an event', $$select cancel_event(t.id('E_rem'), t.lk('cancel_reason', 'weather'))$$);
+select t.as_user('JM');
+select t.denied('cancelling needs a reason from the list', $$select cancel_event(t.id('E_rem'), t.lk('absence_reason', 'illness'))$$);
+select cancel_event(t.id('E_rem'), t.lk('cancel_reason', 'weather'), 'גשם כבד');
+select t.check('the cancelled event stays, marked with its reason',
+  (select cancelled_at is not null and cancel_reason_id = t.lk('cancel_reason', 'weather') and cancel_note = 'גשם כבד'
+   from events where id = t.id('E_rem')));
+select t.as_user('JP');
+select t.denied('no answers on a cancelled event', $$select respond_event(t.id('E_rem'), t.id('jkid'), 'attending')$$);
+reset role;
+select t.check('the parents are told about the cancellation with the reason',
+  exists (select 1 from notifications where user_id = t.id('JP') and title like '❌%' and body like '%מזג אוויר%גשם כבד%'));
+select t.check('a parent with push gets the cancellation without email',
+  not (select email from notifications where user_id = t.id('JP') and title like '❌%' limit 1));
+update events set reminder_sent_at = null where id = t.id('E_rem');
+select send_event_reminders();
+select t.check('a cancelled event gets no reminder',
+  not exists (select 1 from notifications where user_id = t.id('JP') and url = '/m/parent/event/' || t.id('E_rem')
+              and title like '⏰%' and created_at > (select cancelled_at from events where id = t.id('E_rem'))));
+set role authenticated;
+select t.as_user('JM');
+select restore_event(t.id('E_rem'));
+reset role;
+select t.check('restoring clears the cancellation and tells the team',
+  (select cancelled_at is null from events where id = t.id('E_rem'))
+  and exists (select 1 from notifications where user_id = t.id('JP') and title like '✅%'));
+select t.check('internal notification helpers are not callable by users',
+  not has_function_privilege('authenticated', 'send_event_reminders()', 'execute')
+  and not has_function_privilege('authenticated', 'notify_team_event(uuid, text, text, uuid)', 'execute'));
+
 -- ---------------------------------------------------------------- summary
 reset role;
 select case when count(*) filter (where not ok) = 0

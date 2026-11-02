@@ -557,9 +557,22 @@ export class DemoServer {
       this.t.event_responses = this.t.event_responses.filter((x) => x.event_id !== a.p_event);
       this.t.event_stats = this.t.event_stats.filter((x) => x.event_id !== a.p_event);
     },
+    cancel_event(this: DemoServer, a: Row) {
+      const e = this.find('events', a.p_event);
+      if (!e || !this.manageTeam(e.team_id)) this.deny();
+      if (e.cancelled_at) this.bad('already cancelled');
+      if (this.find('lookups', a.p_reason)?.domain !== 'cancel_reason') this.bad('a cancel reason is required');
+      Object.assign(e, { cancelled_at: new Date().toISOString(), cancel_reason_id: a.p_reason, cancel_note: String(a.p_note ?? '').trim() });
+    },
+    restore_event(this: DemoServer, a: Row) {
+      const e = this.find('events', a.p_event);
+      if (!e || !this.manageTeam(e.team_id)) this.deny();
+      Object.assign(e, { cancelled_at: null, cancel_reason_id: null, cancel_note: '' });
+    },
     respond_event(this: DemoServer, a: Row) {
       const e = this.find('events', a.p_event);
       if (!e) throw new PgError('P0002', 'event not found');
+      if (e.cancelled_at) this.bad('the event was cancelled');
       let allowed = this.parentOf(a.p_player);
       if (!allowed && this.selfPlayer(a.p_player)) {
         allowed = this.teamParam(e.team_id, 'players_can_respond') === true
