@@ -4,6 +4,7 @@ import { isDemo } from './lib/supabase';
 import { AuthProvider, useAuth } from './auth/AuthProvider';
 import Login from './pages/Login';
 import ModePicker from './pages/ModePicker';
+import CompleteProfile from './pages/CompleteProfile';
 import Shell from './components/Shell';
 import ClubsPage from './pages/admin/ClubsPage';
 import ClubPage from './pages/admin/ClubPage';
@@ -39,7 +40,7 @@ function PathLater() {
 
 // After sign-in, a join link opened before it wins over the usual entry screen.
 function Home() {
-  const { session, modes } = useAuth();
+  const { session, modes, profile } = useAuth();
   const [code] = useState(pendingJoin);
   const [path] = useState(() => {
     const p = pendingPath();
@@ -48,6 +49,9 @@ function Home() {
   });
   const [place] = useState(() => recentPlace(session?.user.id));
   if (code) return <Navigate to={`/join/${code}`} replace />;
+  // No name yet (signed in by emailed code, added ahead by email): ask once. Home stays mounted meanwhile,
+  // so a shared link kept above still opens afterwards. A join link asks for the name itself.
+  if (profile && !profile.full_name.trim()) return <CompleteProfile />;
   // the shared link works in the mode it names, or in the account's only mode
   const linked = path?.match(/^\/m\/([a-z]+)\/(.+)$/);
   if (linked) {
