@@ -39,6 +39,8 @@ export function AuthProvider({ children: kids }: { children: ReactNode }) {
     });
     const { data: sub } = supabase.auth.onAuthStateChange((_e, next) => {
       setSession(next);
+      // Signed in (by code, emailed link or Google): forget the address the login screen was waiting on.
+      if (next) { try { localStorage.removeItem('nt-login-pending'); } catch { /* storage blocked */ } }
       if (!next) {
         setProfile(null); setMemberships([]); setChildren([]); setMe(null); loadedOnce.current = false; setLoading(false);
       }

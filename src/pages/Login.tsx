@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { supabase } from '../lib/supabase';
 import { normEmail } from '../lib/email';
 
@@ -57,14 +57,69 @@ function inAppBrowser(): boolean {
   return ios && !standalone && !/Safari|CriOS|FxiOS|EdgiOS/.test(ua);
 }
 
+// The address a code was sent to, kept so that switching to the mail app (which can reload the page on a phone)
+// lands back on the code screen. Supabase's codes expire after an hour, so an older entry is dropped.
+const PENDING_KEY = 'nt-login-pending';
+const PENDING_TTL_MS = 60 * 60 * 1000;
+// Supabase lets one address request a new code once a minute.
+const RESEND_SECONDS = 60;
+
+function loadPending(): { email: string; at: number } | null {
+  try {
+    const raw = localStorage.getItem(PENDING_KEY);
+    if (!raw) return null;
+    const p = JSON.parse(raw) as { email?: string; at?: number };
+    if (!p.email || !p.at || Date.now() - p.at > PENDING_TTL_MS) return null;
+    return { email: p.email, at: p.at };
+  } catch { return null; }
+}
+function savePending(email: string | null) {
+  try {
+    if (email) localStorage.setItem(PENDING_KEY, JSON.stringify({ email, at: Date.now() }));
+    else localStorage.removeItem(PENDING_KEY);
+  } catch { /* storage blocked: the code screen just won't survive a reload */ }
+}
+
+function secondsLeft(at: number | null): number {
+  if (!at) return 0;
+  return Math.max(0, RESEND_SECONDS - Math.floor((Date.now() - at) / 1000));
+}
+
+/** Hebrew message for a failed send, telling a rate limit (wait) apart from a delivery failure. */
+function sendError(err: { status?: number; code?: string; message?: string }): string {
+  const msg = err.message ?? '';
+  if (err.status === 429 || err.code === 'over_email_send_rate_limit' || /rate limit|security purposes/i.test(msg)) {
+    const m = msg.match(/after (\d+) seconds?/i);
+    return m ? `נשלחו יותר מדי בקשות. נסו שוב בעוד ${m[1]} שניות.` : 'נשלחו יותר מדי בקשות. נסו שוב בעוד כמה דקות.';
+  }
+  if (/signups? not allowed/i.test(msg)) return 'הרשמה של משתמשים חדשים סגורה כרגע.';
+  return 'שליחת הקוד נכשלה. נסו שוב בעוד דקה.';
+}
+
 export default function Login() {
-  const [email, setEmail] = useState('');
+  const pending = loadPending();
+  const [email, setEmail] = useState(pending?.email ?? '');
   const [code, setCode] = useState('');
-  const [sentTo, setSentTo] = useState<string | null>(null);
+  const [sentTo, setSentTo] = useState<string | null>(pending?.email ?? null);
+  const [sentAt, setSentAt] = useState<number | null>(pending?.at ?? null);
+  const [wait, setWait] = useState(() => secondsLeft(pending?.at ?? null));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const embedded = inAppBrowser();
+
+  // Countdown until "send again" is allowed.
+  useEffect(() => {
+    if (!sentAt) return;
+    setWait(secondsLeft(sentAt));
+    const t = window.setInterval(() => {
+      const left = secondsLeft(sentAt);
+      setWait(left);
+      if (left === 0) window.clearInterval(t);
+    }, 1000);
+    return () => window.clearInterval(t);
+  }, [sentAt]);
 
   async function copyLink() {
     try { await navigator.clipboard.writeText(window.location.href); setCopied(true); } catch { setError('לא הצלחנו להעתיק. סמנו את הכתובת והעתיקו ידנית.'); }
@@ -83,30 +138,58 @@ export default function Login() {
     }
   }
 
+  // The email carries a code and a sign-in link; either one works. A new address gets a sign-up email,
+  // an existing one a magic-link email; both carry the code, and verifyOtp type 'email' accepts both.
+  async function requestCode(addr: string): Promise<boolean> {
+    setBusy(true);
+    setError(null);
+    setInfo(null);
+    const { error: err } = await supabase.auth.signInWithOtp({
+      email: addr,
+      options: { emailRedirectTo: window.location.origin, shouldCreateUser: true },
+    });
+    setBusy(false);
+    if (err) { setError(sendError(err)); return false; }
+    setSentTo(addr);
+    setSentAt(Date.now());
+    savePending(addr);
+    return true;
+  }
+
   async function sendCode(e: FormEvent) {
     e.preventDefault();
     const addr = normEmail(email);
     if (!addr) return setError('כתובת מייל לא תקינה');
-    setBusy(true);
+    await requestCode(addr);
+  }
+
+  async function resend() {
+    if (!sentTo || wait > 0) return;
+    setCode('');
+    if (await requestCode(sentTo)) setInfo('שלחנו קוד חדש. הקוד הקודם כבר לא תקף.');
+  }
+
+  function changeAddress() {
+    setSentTo(null);
+    setSentAt(null);
+    setCode('');
     setError(null);
-    // The email carries a code and a sign-in link; either one works.
-    const { error: err } = await supabase.auth.signInWithOtp({
-      email: addr,
-      options: { emailRedirectTo: window.location.origin },
-    });
-    setBusy(false);
-    if (err) return setError('שליחת הקוד נכשלה. נסו שוב בעוד דקה.');
-    setSentTo(addr);
+    setInfo(null);
+    savePending(null);
   }
 
   async function verify(e: FormEvent) {
     e.preventDefault();
     if (!sentTo) return;
+    const token = code.replace(/\D/g, '');
+    if (token.length < 6) return setError('הקוד מורכב מ־6 ספרות לפחות');
     setBusy(true);
     setError(null);
-    const { error: err } = await supabase.auth.verifyOtp({ email: sentTo, token: code.trim(), type: 'email' });
+    setInfo(null);
+    const { error: err } = await supabase.auth.verifyOtp({ email: sentTo, token, type: 'email' });
     setBusy(false);
-    if (err) setError('הקוד שגוי או שפג תוקפו');
+    if (err) return setError(err.status === 429 ? 'יותר מדי ניסיונות. חכו כמה דקות ונסו שוב.' : 'הקוד שגוי או שפג תוקפו. אפשר לבקש קוד חדש.');
+    savePending(null);
   }
 
   return (
@@ -150,23 +233,30 @@ export default function Login() {
         </>
       ) : (
         <form onSubmit={verify}>
-          <label htmlFor="code">הקוד שנשלח אל <bdi>{sentTo}</bdi></label>
+          <p className="muted hint">שלחנו מייל מ־Next Team אל <bdi dir="ltr">{sentTo}</bdi>. הזינו את הקוד שבמייל, או לחצו על הקישור שבו.</p>
+          <label htmlFor="code">קוד אימות</label>
           <input
             id="code"
             inputMode="numeric"
             autoComplete="one-time-code"
+            autoFocus
             dir="ltr"
             maxLength={10}
+            placeholder="123456"
             value={code}
-            onChange={(e) => setCode(e.target.value)}
+            onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
           />
-          <button disabled={busy}>כניסה</button>
-          <p className="muted hint">לא הגיע? בדקו בתיקיית הספאם. אפשר גם ללחוץ על הקישור שבמייל.</p>
-          <button type="button" className="link" onClick={() => { setSentTo(null); setCode(''); }}>
+          <button disabled={busy || code.length < 6}>כניסה</button>
+          <p className="muted hint">לא הגיע תוך דקה? בדקו בתיקיות ספאם, קידומי מכירות ועדכונים.</p>
+          <button type="button" className="link" disabled={busy || wait > 0} onClick={resend}>
+            {wait > 0 ? `שליחת קוד חדש (${wait})` : 'שליחת קוד חדש'}
+          </button>
+          <button type="button" className="link" onClick={changeAddress}>
             החלפת כתובת
           </button>
         </form>
       )}
+      {info && <p role="status" className="muted">{info}</p>}
       {error && <p role="alert" className="error">{error}</p>}
     </main>
     </div>
