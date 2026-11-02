@@ -18,6 +18,7 @@
      3. ב־Supabase ← Authentication ← Emails ← SMTP Settings: מפעילים Custom SMTP ומזינים כתובת שולח, שם שולח (Next Team), השרת, הפורט, שם המשתמש והמפתח כסיסמה.
      4. ב־Authentication ← Emails ← Templates מוסיפים `{{ .Token }}` גם לתבנית Magic Link וגם לתבנית Confirm signup (משתמש חדש מקבל את השנייה).
      5. ב־Authentication ← Rate Limits מעלים את מגבלת המיילים לשעה.
+   * **חלופה: שליחה דרך Gmail.** ב־SMTP Settings: שרת `smtp.gmail.com`, פורט 465, שם משתמש כתובת ה־Gmail, וסיסמה היא App Password (חשבון Google ← אבטחה ← אימות דו־שלבי ← סיסמאות לאפליקציות), לא סיסמת החשבון. כתובת השולח חייבת להיות אותה כתובת Gmail. Gmail מוגבל לכ־500 מיילים ביום. גם כאן מוסיפים `{{ .Token }}` לשתי התבניות (Magic Link ו־Confirm signup), אחרת המייל יכלול רק קישור.
 5. Authentication ← URL Configuration: הכניסו את כתובת האתר (אחרי שלב 2) ב־Site URL וגם ב־Redirect URLs.
 
 ## 2. Cloudflare Pages
