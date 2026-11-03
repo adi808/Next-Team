@@ -47,45 +47,80 @@ function lookupNames(ctx: Ctx, domain: string): Promise<Map<string, string>> {
 const israel = (iso: string | null) =>
   iso ? new Date(iso).toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem', weekday: 'long', day: 'numeric', month: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : null;
 
+/** A Hebrew name for a kit colour (#rrggbb), the nearest of a small palette. */
+const COLORS: [string, number, number, number][] = [
+  ['לבן', 255, 255, 255], ['שחור', 0, 0, 0], ['אפור', 128, 128, 128], ['אדום', 220, 30, 40], ['בורדו', 120, 20, 40],
+  ['כתום', 245, 130, 20], ['צהוב', 250, 215, 30], ['ירוק', 30, 150, 60], ['ירוק בהיר', 140, 210, 80], ['תכלת', 110, 180, 235],
+  ['כחול', 30, 80, 200], ['כחול כהה', 15, 30, 90], ['סגול', 120, 50, 160], ['ורוד', 240, 120, 170], ['חום', 120, 75, 40],
+];
+export function colorName(hex: string): string {
+  const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex ?? '');
+  if (!m) return hex;
+  const [r, g, b] = [1, 2, 3].map((i) => parseInt(m[i], 16));
+  let best = COLORS[0], bestD = Infinity;
+  for (const c of COLORS) {
+    const d = (c[1] - r) ** 2 + (c[2] - g) ** 2 + (c[3] - b) ** 2;
+    if (d < bestD) { best = c; bestD = d; }
+  }
+  return best[0];
+}
+
+/** How to use the app: returned by the app_help tool only when asked, so it does not weigh on every request. */
+const APP_HELP = `- כניסה: עם Google או עם קוד שנשלח במייל. מי שיש לו כמה תפקידים (למשל הורה וגם מאמן) בוחר מצב, ואפשר להחליף מצב מהפרופיל.
+- הורה: בלשונית "אירועים" רואים את האירועים של הילדים ומאשרים הגעה לכל ילד. "הילדים" מציג את פרופיל הילד. יש גם "משימות", "סקרים" ו"הודעות".
+- אישור הגעה: בכרטיס האירוע לוחצים "מגיע" או "לא מגיע". לא מגיע מחייב סיבה מהרשימה. התשובה האחרונה קובעת ואפשר לשנות בכל זמן. באירוע שבוטל אי אפשר לענות.
+- לבוש וציוד: בכרטיס האירוע מופיעים הערכה (חולצה, מכנסיים, גרביים) והציוד להביא, אם הצוות הגדיר אותם.
+- הסעה: אם הצוות הפעיל הסעה לאירוע, ההורה בוחר בכרטיס האירוע "לא מעוניין" או מספר נוסעים.
+- הוספת ילד: הורה מוסיף ילד מ"הילדים", או מצטרף לקבוצה דרך קישור ההצטרפות שהמאמן שולח; הצוות מאשר את הבקשה.
+- הורה שני: מוסיפים מפרופיל הילד (בן או בת זוג, עם קשר, טלפון ומייל). כשהוא נכנס עם אותו מייל הוא מקושר לילד.
+- מאמן: "בית" מציג את האירוע הקרוב. "אירועים" ליצירה ועריכה של אירועים (גם סדרה שבועית ועריכה מרוכזת), ביטול עם סיבה, ציוד, ערכה והסעה. "סגל" לשחקנים, להורים ולצוות. "הודעות" לערוץ הקבוצה ולשיחות אישיות. בהגדרות הקבוצה: קישור הצטרפות, ליגה, תזכורות וגיל מינימלי לאישור הגעה.
+- הודעות: בערוץ הקבוצה כותבים הצוות וההורים, והשחקנים קוראים. שיחה אישית היא בין מאמן לשחקן, וההורים רואים אותה.
+- התראות: הפעמון למעלה. אפשר להפעיל התראות Push מהפרופיל. תזכורת לאישור הגעה נשלחת לפני האירוע.
+- התקנה בטלפון: באנדרואיד לוחצים "התקנה" בבאנר; באייפון שיתוף ואז "הוספה למסך הבית".
+- מנהל מועדון: יוצר קבוצות, מזמין צוות במייל, ורואה את טבלת השחקנים וההורים של המועדון עם ייצוא לאקסל.`;
+
 // ---------- definitions ----------
 
 const LISTS = ['event_type', 'absence_reason', 'cancel_reason'] as const;
 
 export const TOOLS: ToolDef[] = [
-  def('list_events', 'Events (trainings, matches, ...) of the person\'s teams, sorted by start time. Use it for "when is the next training", "what is on this week" and to find an event id before any other event tool.', {
+  def('list_events', 'Upcoming events of the person\'s teams (default: next 21 days), with ids.', {
     type: 'object',
     properties: {
-      team_id: { type: 'string', description: 'Only this team. Omit for all of the person\'s teams.' },
-      from: { type: 'string', description: 'ISO date or date-time to start from. Default: now.' },
-      to: { type: 'string', description: 'ISO date or date-time to end at. Default: 21 days after from.' },
+      team_id: { type: 'string' },
+      from: { type: 'string', description: 'ISO date' },
+      to: { type: 'string', description: 'ISO date' },
     },
     additionalProperties: false,
   }),
-  def('event_details', 'One event in full: place, notes, equipment, match details, who answered attending / not attending / not yet, and transport. Use it for "who is coming", "did my child answer", "is there transport".', {
+  def('event_details', 'One event in full: place, notes, kit to wear, equipment to bring, attendance answers, transport.', {
     type: 'object',
     properties: { event_id: { type: 'string' } },
     required: ['event_id'],
     additionalProperties: false,
   }),
-  def('list_tasks', 'Tasks assigned to the person, to their children, or (for staff) to their team, with the assignment id needed to mark one done.', {
+  def('list_tasks', 'Open tasks of the person, their children or their team, with assignment ids.', {
     type: 'object',
     properties: { include_done: { type: 'boolean', description: 'Also tasks already done. Default false.' } },
     additionalProperties: false,
   }),
-  def('list_options', 'Values of a list kept in the database: event types, absence reasons, cancel reasons. Use it to get the id to pass to a writing tool.', {
+  def('list_options', 'Ids and names of a list: event types, absence reasons, cancel reasons.', {
     type: 'object',
     properties: { list: { type: 'string', enum: [...LISTS] } },
     required: ['list'],
     additionalProperties: false,
   }),
-  def('team_contacts', 'Contact details (phone, email) of the club, the staff, the parents and the players of a team.', {
+  def('team_contacts', 'Phones and emails of a team\'s club, staff, parents and players.', {
     type: 'object',
     properties: { team_id: { type: 'string' } },
     required: ['team_id'],
     additionalProperties: false,
   }),
+  def('app_help', 'How to do things in the app (screens, buttons, joining, installing). Use for how-to questions.', {
+    type: 'object', properties: {}, additionalProperties: false,
+  }),
   // writing tools: the person confirms each one in the app before it runs
-  def('respond_event', 'Answer attendance for a player (a child of the person, or the person as a player): attending or not attending. Not attending needs a reason id from list_options("absence_reason"). The person confirms in the app before it is saved.', {
+  def('respond_event', 'Answer attendance for a player. not_attending needs reason_id (absence_reason). The person confirms in the app.', {
     type: 'object',
     properties: {
       event_id: { type: 'string' },
@@ -97,7 +132,7 @@ export const TOOLS: ToolDef[] = [
     required: ['event_id', 'player_id', 'status'],
     additionalProperties: false,
   }),
-  def('set_transport_seats', 'Ask for seats on an event\'s transport: for a child (player_id), or for a staff member themself (no player_id). 0 means not interested. Only on events with transport. The person confirms in the app.', {
+  def('set_transport_seats', 'Transport seats for a child (player_id) or for staff themself. 0 = not interested. The person confirms in the app.', {
     type: 'object',
     properties: {
       event_id: { type: 'string' },
@@ -107,13 +142,13 @@ export const TOOLS: ToolDef[] = [
     required: ['event_id', 'seats'],
     additionalProperties: false,
   }),
-  def('complete_task', 'Mark a task assignment done (or not done). The person confirms in the app.', {
+  def('complete_task', 'Mark a task assignment done or not. The person confirms in the app.', {
     type: 'object',
     properties: { assignment_id: { type: 'string' }, done: { type: 'boolean' } },
     required: ['assignment_id', 'done'],
     additionalProperties: false,
   }),
-  def('create_event', 'Staff only: create one event for a team. type_id from list_options("event_type"). Times are ISO date-times with the Israel offset (+02:00 or +03:00). The person confirms in the app.', {
+  def('create_event', 'Staff: create an event. Times are ISO with the Israel offset. The person confirms in the app.', {
     type: 'object',
     properties: {
       team_id: { type: 'string' },
@@ -128,7 +163,7 @@ export const TOOLS: ToolDef[] = [
     required: ['team_id', 'type_id', 'title', 'starts_at'],
     additionalProperties: false,
   }),
-  def('cancel_event', 'Staff only: cancel an event. reason_id from list_options("cancel_reason"). The team is notified. The person confirms in the app.', {
+  def('cancel_event', 'Staff: cancel an event (reason_id from cancel_reason). The person confirms in the app.', {
     type: 'object',
     properties: { event_id: { type: 'string' }, reason_id: { type: 'string' }, note: { type: 'string' } },
     required: ['event_id', 'reason_id'],
@@ -150,7 +185,7 @@ async function listEvents(ctx: Ctx, a: Input) {
     q<Record<string, unknown>[]>(ctx.db.from('events')
       .select('id, team_id, type_id, title, starts_at, ends_at, location, opponent, our_score, their_score, has_transport, cancelled_at')
       .in('team_id', teams).gte('starts_at', from.toISOString()).lte('starts_at', to.toISOString())
-      .order('starts_at').limit(40)),
+      .order('starts_at').limit(15)),
     lookupNames(ctx, 'event_type'),
     q<{ id: string; name: string }[]>(ctx.db.from('teams').select('id, name').in('id', teams)),
   ]);
@@ -158,18 +193,15 @@ async function listEvents(ctx: Ctx, a: Input) {
   return {
     events: rows.map((e) => ({
       id: e.id,
-      team: teamName.get(e.team_id as string),
-      team_id: e.team_id,
+      team: teams.length > 1 ? teamName.get(e.team_id as string) : undefined,
       type: types.get(e.type_id as string),
       title: e.title,
       starts: israel(e.starts_at as string),
-      starts_at: e.starts_at,
-      ends: israel(e.ends_at as string | null),
-      location: e.location || null,
-      opponent: e.opponent,
-      score: e.our_score != null ? `${e.our_score}-${e.their_score}` : null,
-      transport: e.has_transport,
-      cancelled: !!e.cancelled_at,
+      location: e.location || undefined,
+      opponent: e.opponent || undefined,
+      score: e.our_score != null ? `${e.our_score}-${e.their_score}` : undefined,
+      transport: e.has_transport || undefined,
+      cancelled: e.cancelled_at ? true : undefined,
     })),
   };
 }
@@ -178,7 +210,7 @@ async function eventDetails(ctx: Ctx, a: Input) {
   const id = uuid(a.event_id);
   const e = await q<Record<string, unknown> | null>(ctx.db.from('events').select('*').eq('id', id).maybeSingle());
   if (!e) throw new Error('האירוע לא נמצא או שאין הרשאה לראות אותו');
-  const [types, reasons, cancelReasons, roster, answers, team] = await Promise.all([
+  const [types, reasons, cancelReasons, roster, answers, team, equipmentNames, kit] = await Promise.all([
     lookupNames(ctx, 'event_type'),
     lookupNames(ctx, 'absence_reason'),
     lookupNames(ctx, 'cancel_reason'),
@@ -186,6 +218,11 @@ async function eventDetails(ctx: Ctx, a: Input) {
     q<{ player_id: string; status: string; reason_id: string | null; note: string }[]>(
       ctx.db.from('event_responses').select('player_id, status, reason_id, note').eq('event_id', id)),
     q<{ name: string } | null>(ctx.db.from('teams').select('name').eq('id', e.team_id as string).maybeSingle()),
+    lookupNames(ctx, 'equipment'),
+    e.kit_id
+      ? q<{ name: string; shirt: string; shorts: string; socks: string } | null>(
+        ctx.db.from('team_kits').select('name, shirt, shorts, socks').eq('id', e.kit_id as string).maybeSingle())
+      : Promise.resolve(null),
   ]);
   const ids = roster.map((r) => r.player_id);
   const players = ids.length
@@ -220,7 +257,9 @@ async function eventDetails(ctx: Ctx, a: Input) {
     ends: israel(e.ends_at as string | null),
     location: e.location || null,
     notes: e.notes || null,
-    equipment: (e.equipment as string[] | null)?.length ? e.equipment : null,
+    // what to wear and bring: only what the staff set; null means they set nothing
+    kit: kit ? { name: kit.name, shirt: colorName(kit.shirt), shorts: colorName(kit.shorts), socks: colorName(kit.socks) } : null,
+    equipment: ((e.equipment as string[] | null) ?? []).map((id) => equipmentNames.get(id)).filter(Boolean),
     opponent: e.opponent,
     score: e.our_score != null ? `${e.our_score}-${e.their_score}` : null,
     cancelled: e.cancelled_at ? { reason: cancelReasons.get(e.cancel_reason_id as string), note: e.cancel_note || null } : false,
@@ -373,6 +412,7 @@ export async function runTool(ctx: Ctx, block: { id: string; name: string; input
       case 'list_tasks': out = await listTasks(ctx, a); break;
       case 'list_options': out = await listOptions(ctx, a); break;
       case 'team_contacts': out = await teamContacts(ctx, a); break;
+      case 'app_help': out = APP_HELP; break;
       default:
         if (!WRITE_TOOLS.has(block.name)) throw new Error(`כלי לא מוכר: ${block.name}`);
         out = await runWrite(ctx, block.name, a);
