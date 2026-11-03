@@ -7,7 +7,8 @@
 //           { mode, messages, pending, decision }          the person confirmed or declined the prepared action
 // Response: { messages, reply, pending? }                  the client keeps `messages` and sends it back next time
 //
-// Secrets (Supabase -> Edge Functions -> Secrets): GROQ_API_KEY; optional GROQ_MODEL to change the model.
+// Secrets (Supabase -> Edge Functions -> Secrets): GROQ_API_KEY; optional GROQ_MODEL to change the model and
+// GROQ_FALLBACK_MODELS (comma separated) for when its per-minute quota is used up.
 import { createClient } from 'npm:@supabase/supabase-js@2.45.4';
 import { describeWrite, runTool, TOOLS, WRITE_TOOLS, type Ctx, type ToolMessage } from './tools.ts';
 
@@ -15,6 +16,22 @@ const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const DEFAULT_MODEL = 'openai/gpt-oss-120b';
 const MAX_ROUNDS = 8; // model calls per request
 const MAX_MESSAGES = 60; // the client starts a new conversation beyond this
+const KEEP_TURNS = 3; // the model sees the last questions of the conversation only (free-tier token quota)
+const FALLBACK_MODELS = ['llama-3.3-70b-versatile']; // tried when the main model's per-minute quota is used up
+
+/** The tail of the conversation the model sees: from the KEEP_TURNS-th last typed question on, so tool calls stay paired. */
+function recent(messages: Message[]): Message[] {
+  let seen = 0;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i];
+    if (m.role === 'user' && typeof m.content === 'string' && ++seen === KEEP_TURNS) return messages.slice(i);
+  }
+  return messages;
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+/** Seconds Groq asks to wait in a 429 ("Please try again in 2.6s"), or null. */
+const retryAfter = (msg: string) => { const m = /try again in ([\d.]+)s/.exec(msg); return m ? Number(m[1]) : null; };
 
 interface ToolCall { id: string; type: 'function'; function: { name: string; arguments: string } }
 type Message =
@@ -24,7 +41,28 @@ type Message =
 
 class GroqError extends Error { constructor(public status: number, msg: string) { super(msg); } }
 
-async function complete(apiKey: string, model: string, system: string, messages: Message[]) {
+/** One model call; on a per-minute quota it waits a little, then tries the fallback models. */
+async function complete(apiKey: string, models: string[], system: string, messages: Message[]): Promise<Message> {
+  let last: unknown;
+  for (const model of models) {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        return await completeOnce(apiKey, model, system, messages);
+      } catch (e) {
+        last = e;
+        if (!(e instanceof GroqError)) throw e;
+        if (e.status === 404 || (e.status === 400 && /model/i.test(e.message) && /not exist|decommission|not found/i.test(e.message))) break; // model gone: next
+        if (e.status !== 429) throw e;
+        const wait = retryAfter(e.message);
+        if (attempt === 0 && wait != null && wait <= 12) { await sleep(wait * 1000 + 300); continue; }
+        break; // a long wait: try the next model
+      }
+    }
+  }
+  throw last;
+}
+
+async function completeOnce(apiKey: string, model: string, system: string, messages: Message[]) {
   const res = await fetch(GROQ_URL, {
     method: 'POST',
     headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
@@ -34,7 +72,7 @@ async function complete(apiKey: string, model: string, system: string, messages:
       tools: TOOLS,
       tool_choice: 'auto',
       temperature: 0.3,
-      max_completion_tokens: 2000,
+      max_completion_tokens: 800, // counts against the per-minute quota even when unused
     }),
     signal: AbortSignal.timeout(45_000),
   });
@@ -65,37 +103,17 @@ const MODES: Record<string, string> = {
   sysadmin: 'מנהל מערכת', admin: 'מנהל מועדון', coach: 'מאמן / איש צוות', parent: 'הורה', player: 'שחקן',
 };
 
-// Stable part of the system prompt (cached). The per-person part follows it.
-const SYSTEM = `את/ה העוזר של Next Team, אפליקציה לניהול קבוצות ספורט של ילדים במועדונים. עונים בעברית, בקצרה ובשפה פשוטה.
-
-מה העוזר עושה:
-1. עונה על שאלות מהנתונים בעזרת הכלים: אירועים (אימונים, משחקים ועוד), מי מגיע, הסעות, משימות, אנשי קשר.
-2. מבצע פעולות בשם המשתמש: אישור הגעה או אי־הגעה, מקומות בהסעה, סימון משימה כבוצעה, ולצוות גם יצירת אירוע וביטול אירוע.
-3. מסביר איך עושים דברים באפליקציה.
-
+// The instructions. The app guide is a tool (app_help), so it is sent only when someone asks how to do something:
+// on Groq's free tier every token counts against a per-minute quota.
+const SYSTEM = `את/ה העוזר של Next Team, אפליקציה לניהול קבוצות ספורט של ילדים. עונים בעברית בלבד, בקצרה ובשפה פשוטה, כטקסט פשוט בלי Markdown. רשימה: שורות שמתחילות ב־"• ".
 כללים:
-- התשובה מוצגת כטקסט פשוט בחלון צ'אט קטן בטלפון: בלי Markdown (בלי כוכביות, כותרות או טבלאות). רשימה כותבים בשורות שמתחילות ב־"• ".
-- מידע על נתונים לוקחים רק מהכלים, אף פעם לא מנחשים. אם כלי מחזיר שגיאה או ריק, אומרים זאת.
-- הכלים רואים רק מה שמותר למשתמש לראות. אם משהו לא נמצא, ייתכן שאין הרשאה.
-- לפני פעולה צריך מזהים: מוצאים את האירוע עם list_events, את הילד ברשימת הילדים שלמטה או ב־event_details, ואת הסיבה או הסוג עם list_options. אם חסר פרט (איזה ילד, איזה אירוע, סיבה), שואלים את המשתמש.
-- אי־הגעה מחייבת סיבה מהרשימה. אם לסיבה מסומן note_required, מבקשים גם הערה.
-- כל פעולה מוצגת למשתמש לאישור באפליקציה לפני שהיא מתבצעת. אחרי שהכלי מחזיר ok, מאשרים בקצרה שבוצע. אם המשתמש ביטל, לא מנסים שוב אלא שואלים מה לשנות.
-- מציגים תאריכים ושעות כפי שהכלים מחזירים אותם (שעון ישראל). לא מציגים מזהים (uuid) למשתמש.
-- לא עונים על נושאים שאינם קשורים לקבוצה, למועדון או לאפליקציה; מפנים בנימוס.
-- מידע רפואי ופרטי ילדים הם רגישים: מוסרים רק את מה שהכלים מחזירים ורק כשנשאלים.
-
-איך משתמשים באפליקציה (להסברים):
-- כניסה: עם Google או עם קוד שנשלח במייל. מי שיש לו כמה תפקידים (למשל הורה וגם מאמן) בוחר מצב, ואפשר להחליף מצב מהפרופיל.
-- הורה: בלשונית "אירועים" רואים את האירועים של הילדים ומאשרים הגעה לכל ילד. "הילדים" מציג את פרופיל הילד. יש גם "משימות", "סקרים" ו"הודעות".
-- אישור הגעה: בכרטיס האירוע לוחצים "מגיע" או "לא מגיע". לא מגיע מחייב סיבה מהרשימה. התשובה האחרונה קובעת ואפשר לשנות בכל זמן. באירוע שבוטל אי אפשר לענות.
-- הסעה: אם הצוות הפעיל הסעה לאירוע, ההורה בוחר בכרטיס האירוע "לא מעוניין" או מספר נוסעים.
-- הוספת ילד: הורה מוסיף ילד מ"הילדים", או מצטרף לקבוצה דרך קישור ההצטרפות שהמאמן שולח; הצוות מאשר את הבקשה.
-- הורה שני: מוסיפים מפרופיל הילד (בן או בת זוג, עם קשר, טלפון ומייל). כשהוא נכנס עם אותו מייל הוא מקושר לילד.
-- מאמן: "בית" מציג את האירוע הקרוב. "אירועים" ליצירה ועריכה של אירועים (גם סדרה שבועית ועריכה מרוכזת), ביטול עם סיבה, ציוד, ערכה והסעה. "סגל" לשחקנים, להורים ולצוות. "הודעות" לערוץ הקבוצה ולשיחות אישיות. בהגדרות הקבוצה: קישור הצטרפות, ליגה, תזכורות וגיל מינימלי לאישור הגעה.
-- הודעות: בערוץ הקבוצה כותבים הצוות וההורים, והשחקנים קוראים. שיחה אישית היא בין מאמן לשחקן, וההורים רואים אותה.
-- התראות: הפעמון למעלה. אפשר להפעיל התראות Push מהפרופיל. תזכורת לאישור הגעה נשלחת לפני האירוע.
-- התקנה בטלפון: באנדרואיד לוחצים "התקנה" בבאנר; באייפון שיתוף ואז "הוספה למסך הבית".
-- מנהל מועדון: יוצר קבוצות, מזמין צוות במייל, ורואה את טבלת השחקנים וההורים של המועדון עם ייצוא לאקסל.`;
+- כל עובדה על אירועים, לבוש, ציוד, הגעה, הסעות, משימות ואנשי קשר לוקחים רק מהכלים. לא ממציאים ולא נותנים עצות כלליות. אם הכלי לא מחזיר את המידע (למשל kit או equipment ריקים), אומרים שהצוות לא הגדיר את זה ומציעים לשאול את המאמן.
+- "מה ללבוש" / "מה להביא": event_details של האירוע (kit, equipment).
+- שאלות "איך עושים" באפליקציה: app_help.
+- לפני פעולה מוצאים מזהים: אירוע עם list_events, ילד מרשימת הילדים למטה, סיבה או סוג עם list_options. חסר פרט? שואלים.
+- כל פעולה מוצגת למשתמש לאישור. אחרי ok מאשרים בקצרה. אם המשתמש ביטל, שואלים מה לשנות.
+- לא מציגים מזהים (uuid). מציגים תאריכים כפי שהכלים מחזירים.
+- נושאים שלא קשורים לקבוצה או לאפליקציה: מפנים בנימוס.`;
 
 interface PendingAction { id: string; name: string; input: Record<string, unknown>; summary: string }
 interface Pending { results: ToolMessage[]; actions: PendingAction[] }
@@ -160,7 +178,8 @@ Deno.serve(async (req) => {
 
   const apiKey = Deno.env.get('GROQ_API_KEY');
   if (!apiKey) return json(503, { error: 'העוזר עדיין לא הוגדר (חסר GROQ_API_KEY)' });
-  const model = Deno.env.get('GROQ_MODEL') || DEFAULT_MODEL;
+  const models = [...new Set([Deno.env.get('GROQ_MODEL') || DEFAULT_MODEL,
+    ...(Deno.env.get('GROQ_FALLBACK_MODELS')?.split(',').map((m) => m.trim()).filter(Boolean) ?? FALLBACK_MODELS)])];
 
   const auth = req.headers.get('Authorization') ?? '';
   const db = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, {
@@ -204,7 +223,9 @@ Deno.serve(async (req) => {
   const system = `${SYSTEM}\n\n${person.text}`;
   try {
     for (let round = 0; round < MAX_ROUNDS; round++) {
-      const reply = await complete(apiKey, model, system, messages);
+      const reply = await complete(apiKey, models, system, recent(messages));
+      // models sometimes slip in a stray character from another script; the answer is Hebrew
+      if (reply.role === 'assistant' && reply.content) reply.content = reply.content.replace(/[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af]/g, '');
       messages.push(reply);
       const calls = reply.role === 'assistant' ? reply.tool_calls ?? [] : [];
       if (!calls.length) {
