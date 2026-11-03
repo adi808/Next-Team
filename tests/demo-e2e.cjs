@@ -169,6 +169,27 @@ const out = (ok, label, extra) => { if (!ok) fails++; console.log(`${ok ? 'PASS'
   await p.click('text=החלפת תפקיד'); await wait(700); await has('back on the entry screen', 'איך נכנסים היום?');
   await p.click('.role-card:has-text("הורה")'); await wait(900); await has('switched to parent mode', 'נועה מזרחי');
 
+  // several roles: coming back after a long break asks again how to enter (needs storage, so a served page)
+  {
+    const q = await ctx.newPage();
+    await q.route('http://demo.test/', (r) => r.fulfill({ contentType: 'text/html', body: page_html }));
+    await q.goto('http://demo.test/'); await q.waitForTimeout(1500);
+    await q.click('button:has-text("רונית מזרחי")'); await q.waitForTimeout(1200);
+    await q.click('.role-card:has-text("הורה")'); await q.waitForTimeout(900);
+    const comeBack = async (minutes) => {
+      await q.evaluate((m) => {
+        const show = (v) => { Object.defineProperty(document, 'visibilityState', { value: v, configurable: true }); document.dispatchEvent(new Event('visibilitychange')); };
+        show('hidden'); localStorage.setItem('lastSeen', String(Date.now() - m * 60_000)); show('visible');
+      }, minutes);
+      await q.waitForTimeout(700);
+      return (await q.locator('body').innerText()).replace(/\s+/g, ' ');
+    };
+    out(!(await comeBack(5)).includes('איך נכנסים היום?'), 'a short break keeps the screen');
+    const t = await comeBack(45);
+    out(t.includes('איך נכנסים היום?') && t.includes('מנהל מועדון'), 'back after a long break: asked again how to enter', t.slice(0, 200));
+    await q.close();
+  }
+
   // system admin
   await pick('יוסי אברהם');
   await has('system admin sees clubs and the creation form', 'מועדון חדש', 'מכבי הצפון');

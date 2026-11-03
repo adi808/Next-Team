@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Link, Navigate, NavLink, Outlet, useLocation, useParams } from 'react-router-dom';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Link, Navigate, NavLink, Outlet, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Picture } from './Picture';
 import { Icon, type IconName } from './Icon';
 import { useAuth } from '../auth/AuthProvider';
 import { rememberPlace } from '../lib/place';
+import { startNeedsPick, touch, wasAway } from '../lib/entry';
 import { isDemo, supabase } from '../lib/supabase';
 import type { Mode } from '../lib/types';
 import { PendingRequestsBanner } from '../pages/RequestsPage';
@@ -59,7 +60,29 @@ export default function Shell() {
     if (valid) try { localStorage.setItem('mode', m); } catch { /* storage may be unavailable */ }
   }, [valid, m]);
 
-  if (!valid) return <Navigate to="/pick" replace />;
+  // several roles: a return after a break asks again how to enter, also when it lands on an inner screen
+  const navigate = useNavigate();
+  const [pickOnStart] = useState(() => modes.length > 1 && startNeedsPick());
+  const several = useRef(modes.length > 1);
+  several.current = modes.length > 1;
+  useEffect(() => {
+    const beat = setInterval(() => { if (document.visibilityState === 'visible') touch(); }, 60_000);
+    const onVisible = () => {
+      if (document.visibilityState === 'hidden') { touch(); return; }
+      const back = wasAway();
+      touch();
+      if (back && several.current) navigate('/pick');
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('pagehide', touch);
+    return () => {
+      clearInterval(beat);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('pagehide', touch);
+    };
+  }, [navigate]);
+
+  if (!valid || pickOnStart) return <Navigate to="/pick" replace />;
   return (
     <div className="shell">
       <header className="topbar">
