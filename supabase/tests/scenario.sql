@@ -678,7 +678,7 @@ create function t.notes(n text, p_url text) returns bigint language sql stable a
 grant execute on function t.notes(text, text) to authenticated;
 set role authenticated;
 select t.as_user('JM');
-insert into t.ctx select 'E_rem', create_event(t.id('JT'), t.lk('event_type', 'training'), 'אימון תזכורת', now() + interval '3 hours', null, 'מגרש 1');
+insert into t.ctx select 'E_rem', create_event(t.id('JT'), t.lk('event_type', 'match'), 'אימון תזכורת', now() + interval '3 hours', null, 'מגרש 1');
 insert into t.ctx select 'E_rem2', create_event(t.id('JT'), t.lk('event_type', 'training'), 'אימון שענו עליו', now() + interval '4 hours', null, 'מגרש 1');
 select t.as_user('JP');
 select respond_event(t.id('E_rem2'), t.id('jkid'), 'attending');
@@ -703,12 +703,37 @@ reset role;
 select send_event_reminders();
 select t.check('reminder_hours 0 turns reminders off', t.notes('JP', '/m/parent/event/' || t.id('E_off')) = 0);
 
+-- control by event type and per event (0033)
+set role authenticated;
+select t.as_user('JM');
+select set_attribute((select id from attribute_defs where scope='team' and key='reminder_hours'), t.id('JT'), '24'::jsonb);
+insert into t.ctx select 'E_tr', create_event(t.id('JT'), t.lk('event_type', 'training'), 'אימון שגרתי', now() + interval '5 hours');
+insert into t.ctx select 'E_tr2', create_event(t.id('JT'), t.lk('event_type', 'training'), 'אימון חשוב', now() + interval '5 hours');
+select set_event_email(t.id('E_tr2'), true);
+select t.as_user('JP');
+select t.denied('a parent cannot set an event''s email switch', $$select set_event_email(t.id('E_tr'), false)$$);
+reset role;
+insert into lookups (domain, slug, name_he, meta) values ('event_type', 'quiet_test', 'מפגש שקט', '{"remind": false}');
+set role authenticated;
+select t.as_user('JM');
+insert into t.ctx select 'E_q', create_event(t.id('JT'), t.lk('event_type', 'quiet_test'), 'מפגש', now() + interval '5 hours');
+reset role;
+select send_event_reminders();
+select t.check('a training reminder goes by push only (type setting: no email)',
+  t.notes('JP', '/m/parent/event/' || t.id('E_tr')) = 1
+  and not (select email from notifications where user_id = t.id('JP') and url = '/m/parent/event/' || t.id('E_tr')));
+select t.check('the event''s own switch sends a training reminder by email',
+  (select email from notifications where user_id = t.id('JP') and url = '/m/parent/event/' || t.id('E_tr2')));
+select t.check('an event type without reminders gets none, and is not retried',
+  t.notes('JP', '/m/parent/event/' || t.id('E_q')) = 0 and (select reminder_sent_at is not null from events where id = t.id('E_q')));
+select t.check('the match type sends email by default', event_wants_email(t.id('E_rem')) and not event_wants_email(t.id('E_tr')));
+
 -- change of time / place
 set role authenticated;
 select t.as_user('JP');
 select save_push_subscription('https://push.test/p1', 'k', 'a');
 select t.as_user('JM');
-select save_event_details(t.id('E_rem'), t.lk('event_type', 'training'), 'אימון תזכורת', now() + interval '6 hours', null, 'מגרש 2');
+select save_event_details(t.id('E_rem'), t.lk('event_type', 'match'), 'אימון תזכורת', now() + interval '6 hours', null, 'מגרש 2');
 reset role;
 select t.check('a changed time and place notifies the parents',
   exists (select 1 from notifications where user_id = t.id('JP') and url = '/m/parent/event/' || t.id('E_rem') and title like '🔄%'
@@ -750,7 +775,7 @@ select t.check('restoring clears the cancellation and tells the team',
   and exists (select 1 from notifications where user_id = t.id('JP') and title like '✅%'));
 select t.check('internal notification helpers are not callable by users',
   not has_function_privilege('authenticated', 'send_event_reminders()', 'execute')
-  and not has_function_privilege('authenticated', 'notify_team_event(uuid, text, text, uuid)', 'execute'));
+  and not has_function_privilege('authenticated', 'notify_team_event(uuid, text, text, uuid, boolean)', 'execute'));
 
 -- ---------------------------------------------------------------- summary
 reset role;

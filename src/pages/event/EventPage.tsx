@@ -142,6 +142,18 @@ export default function EventPage() {
         </div>
       )}>
         {event.notes ? <p>{event.notes}</p> : !edit && <p className="muted">אין הערות.</p>}
+        {canManage && !isOver(event) && !isCancelled(event) && (
+          <label className="field email-switch"><span>תזכורות ושינויים גם במייל (למי שלא הפעיל התראות)</span>
+            <select value={event.send_email === null || event.send_email === undefined ? 'type' : event.send_email ? 'on' : 'off'} disabled={act.busy}
+              onChange={(e) => act.run(async () => {
+                const v = e.target.value; await rpc('set_event_email', { p_event: event.id, p_send: v === 'type' ? null : v === 'on' }); reload();
+              })}>
+              <option value="type">לפי סוג האירוע ({types.find((t) => t.id === event.type_id)?.meta?.email === true ? 'כן' : 'לא'})</option>
+              <option value="on">כן, לאירוע הזה</option>
+              <option value="off">לא, לאירוע הזה</option>
+            </select>
+          </label>
+        )}
         {edit && (
           <div className="stack">
             <Field label="סוג"><LookupSelect domain="event_type" value={f.type} onChange={(v) => setF({ ...f, type: v })} /></Field>

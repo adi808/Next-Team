@@ -138,6 +138,9 @@ const out = (ok, label, extra) => { if (!ok) fails++; console.log(`${ok ? 'PASS'
   await p.click('text=גיבוש סוף עונה'); await wait(900);
   await p.click('button:has-text("ביטול הביטול")'); await wait(900);
   await hasNot('restoring brings the event back', 'האירוע בוטל');
+  await p.locator('.email-switch select').selectOption('on'); await wait(700);
+  out(await p.locator('.email-switch select').inputValue() === 'on', 'staff turn on email for one event');
+  await p.locator('.email-switch select').selectOption('type'); await wait(700);
 
   // player
   await pick('רוני לוי');
@@ -174,6 +177,9 @@ const out = (ok, label, extra) => { if (!ok) fails++; console.log(`${ok ? 'PASS'
   await has('system admin sees clubs and the creation form', 'מועדון חדש', 'מכבי הצפון');
   await p.fill('input >> nth=0', 'מועדון בדיקה'); await p.click('button:has-text("יצירת מועדון")'); await wait(800); await has('club created', 'מועדון בדיקה');
   await p.click('role=navigation >> text=רשימות'); await wait(800); await has('lists screen', 'סוגי אירוע', 'אימון', 'גיבוש'); await shot('lists');
+  await has('event types carry reminder and email switches', 'תזכורת', 'גם במייל');
+  out(await p.locator('li', { hasText: 'משחק' }).first().locator('input[type=checkbox]').nth(1).isChecked(), 'a match is emailed by default');
+  out(!(await p.locator('li', { hasText: 'אימון' }).first().locator('input[type=checkbox]').nth(1).isChecked()), 'a training is not emailed by default');
 
   out(errors.length === 0, 'no runtime errors', errors.slice(0, 3).join(' || '));
   await b.close(); console.log(fails ? `${fails} DEMO CHECKS FAILED` : 'ALL DEMO CHECKS PASSED'); process.exit(fails ? 1 : 0);

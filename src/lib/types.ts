@@ -121,6 +121,8 @@ export interface EventRow {
   cancelled_at: string | null;
   cancel_reason_id: string | null;
   cancel_note: string;
+  /** null = as the event type says (lookups.meta.email) */
+  send_email: boolean | null;
 }
 export interface TeamKit {
   id: string;

@@ -571,6 +571,8 @@ table.roster .cell-line.email { white-space: normal; overflow-wrap: anywhere; fo
 
 .notice { background: #fff8e1; border: 1px solid #f1d68a; border-radius: 12px; padding: 12px 14px; margin-bottom: 14px; }
 .notice p { margin: 6px 0 10px; }
+.notify-switches { gap: 10px; font-size: 0.85rem; }
+.notify-switches label { display: inline-flex; align-items: center; gap: 4px; }
 .notice.cancelled-banner { background: #fef2f2; border-color: #fecaca; color: #991b1b; }
 .list li.cancelled a, .card.cancelled h3, .cancelled-title { text-decoration: line-through; opacity: 0.75; }
 

@@ -564,6 +564,11 @@ export class DemoServer {
       if (this.find('lookups', a.p_reason)?.domain !== 'cancel_reason') this.bad('a cancel reason is required');
       Object.assign(e, { cancelled_at: new Date().toISOString(), cancel_reason_id: a.p_reason, cancel_note: String(a.p_note ?? '').trim() });
     },
+    set_event_email(this: DemoServer, a: Row) {
+      const e = this.find('events', a.p_event);
+      if (!e || !this.manageTeam(e.team_id)) this.deny();
+      e.send_email = a.p_send ?? null;
+    },
     restore_event(this: DemoServer, a: Row) {
       const e = this.find('events', a.p_event);
       if (!e || !this.manageTeam(e.team_id)) this.deny();

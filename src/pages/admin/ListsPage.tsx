@@ -57,6 +57,15 @@ export default function ListsPage() {
       clearLookupCache(); setTick((t) => t + 1);
     });
   }
+  async function setMeta(l: Lookup, key: 'remind' | 'email', value: boolean) {
+    await act.run(async () => {
+      await rpc('upsert_lookup', {
+        p_id: l.id, p_domain: l.domain, p_slug: l.slug, p_name_he: l.name_he, p_icon_path: l.icon_path,
+        p_parent: l.parent_id, p_sport: l.sport_id, p_club: l.club_id, p_sort: l.sort_order, p_meta: { ...l.meta, [key]: value }, p_active: l.active,
+      });
+      clearLookupCache(); setTick((t) => t + 1);
+    });
+  }
   const sportName = (id: string | null) => sports.find((s) => s.id === id)?.name_he;
   const parentName = (id: string | null) => formats.find((f) => f.id === id)?.name_he;
 
@@ -70,11 +79,20 @@ export default function ListsPage() {
         ))}
       </div>
       <small className="muted">{DOMAINS.find((d) => d.id === domain)?.hint}</small>
+      {domain === 'event_type' && <p className="muted">לכל סוג אירוע: האם לשלוח תזכורת אישור הגעה למי שלא ענה, והאם לשלוח תזכורות והודעות על שינוי גם במייל, למי שלא הפעיל התראות. הודעה על ביטול נשלחת תמיד. בכל אירוע אפשר לשנות את הגדרת המייל.</p>}
       <ul className="list" key={tick}>
         {items.map((l) => (
           <li key={l.id} className="row">
             <span className={l.active ? '' : 'muted'}>{l.name_he}</span>
             <small className="muted">{[sportName(l.sport_id), parentName(l.parent_id), l.club_id ? 'של המועדון' : 'כללי'].filter(Boolean).join(' · ')}</small>
+            {domain === 'event_type' && (
+              <span className="row notify-switches">
+                <label title="תזכורת אישור הגעה למי שלא ענה"><input type="checkbox" disabled={!canEdit(l) || act.busy}
+                  checked={l.meta?.remind !== false} onChange={(e) => setMeta(l, 'remind', e.target.checked)} /> תזכורת</label>
+                <label title="תזכורות והודעות על שינוי נשלחות גם במייל למי שלא הפעיל התראות"><input type="checkbox" disabled={!canEdit(l) || act.busy}
+                  checked={l.meta?.email === true} onChange={(e) => setMeta(l, 'email', e.target.checked)} /> גם במייל</label>
+              </span>
+            )}
             {canEdit(l) && <button className="small" disabled={act.busy} onClick={() => toggle(l)}>{l.active ? 'הסתרה' : 'הצגה'}</button>}
           </li>
         ))}
