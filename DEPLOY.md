@@ -48,6 +48,13 @@
 (בדיקת ה־JWT נשארת פעילה: רק משתמשים מחוברים יכולים לקרוא לה, והיא קוראת רק כתובות של football.org.il).
 אחר כך המאמן מדביק בלשונית הליגה (או בהגדרות הקבוצה) את כתובת דף הקבוצה, למשל `https://www.football.org.il/team-details/?team_id=8776&season_id=28`.
 
+## 5. העוזר (צ'אטבוט, Edge Function)
+הכפתור הצף בכל מסך פותח את העוזר. הוא רץ ב־Edge Function בשם `assistant` ומשתמש ב־Claude Haiku של Anthropic.
+1. ב־console.anthropic.com: יוצרים חשבון, מוסיפים אמצעי תשלום ויוצרים API key. מומלץ להגדיר שם מגבלת הוצאה חודשית.
+2. ב־Supabase ← Edge Functions ← Secrets מוסיפים `ANTHROPIC_API_KEY` עם המפתח.
+3. פורסים: `npx supabase functions deploy assistant --project-ref <project-ref>` (בדיקת ה־JWT נשארת פעילה: רק משתמשים מחוברים).
+העוזר עובד עם ההרשאות של המשתמש עצמו, ולכן רואה ועושה רק מה שמותר לו. כל פעולה (אישור הגעה, הסעה, משימה, יצירת אירוע או ביטולו) מוצגת לאישור בחלון השיחה לפני שהיא מתבצעת. בלי המפתח הכפתור מופיע, והעוזר עונה שהוא עדיין לא הוגדר.
+
 ## מיילים לאישור בקשות הצטרפות (Brevo, חינמי)
 1. ב־brevo.com: הרשמה, ואז Senders, Domains & Dedicated IPs ← Senders: אמתו את כתובת השולח.
 2. SMTP & API ← API Keys: צרו מפתח.
