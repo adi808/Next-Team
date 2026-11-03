@@ -7,7 +7,7 @@ import { useAuth } from '../auth/AuthProvider';
 // (the `assistant` Edge Function). It answers from the club's data with the person's own permissions, explains the
 // app, and prepares actions that run only after the person confirms them here.
 
-type ApiMessage = { role: 'user' | 'assistant'; content: string | { type: string; text?: string }[] };
+type ApiMessage = { role: 'user' | 'assistant' | 'tool'; content: string | null };
 interface PendingAction { id: string; name: string; summary: string }
 interface Pending { results: unknown[]; actions: PendingAction[] }
 interface Reply { messages: ApiMessage[]; reply: string; pending?: Pending; error?: string; reset?: boolean }
@@ -39,10 +39,8 @@ function bubbles(messages: ApiMessage[]): { mine: boolean; text: string }[] {
   const out: { mine: boolean; text: string }[] = [];
   for (const m of messages) {
     if (m.role === 'user' && typeof m.content === 'string') out.push({ mine: true, text: m.content });
-    if (m.role === 'assistant') {
-      const parts = typeof m.content === 'string' ? [m.content]
-        : m.content.filter((b) => b.type === 'text' && b.text?.trim()).map((b) => b.text as string);
-      const text = parts.join('\n').replace(/\*\*(.+?)\*\*/g, '$1').trim();
+    if (m.role === 'assistant' && typeof m.content === 'string') {
+      const text = m.content.replace(/\*\*(.+?)\*\*/g, '$1').trim();
       if (text) out.push({ mine: false, text });
     }
   }

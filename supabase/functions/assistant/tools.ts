@@ -1,7 +1,6 @@
 // Next Team assistant: the tools the model may call. Every call runs with the caller's own token, so row level
 // security and the permission checks inside the RPCs decide what the assistant can see and do: it never has more
 // rights than the person using it. Reading tools run at once; writing tools wait for the person to confirm.
-import type Anthropic from 'npm:@anthropic-ai/sdk@1.1.0';
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2.45.4';
 
 export interface Ctx {
@@ -12,6 +11,13 @@ export interface Ctx {
 }
 
 type Input = Record<string, unknown>;
+
+/** A tool in the OpenAI-compatible format Groq takes. */
+export interface ToolDef { type: 'function'; function: { name: string; description: string; parameters: Record<string, unknown> } }
+/** The answer to one tool call, as a `tool` message. */
+export interface ToolMessage { role: 'tool'; tool_call_id: string; content: string }
+const def = (name: string, description: string, parameters: Record<string, unknown>): ToolDef =>
+  ({ type: 'function', function: { name, description, parameters } });
 const str = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
 const uuid = (v: unknown) => {
   const s = str(v);
@@ -45,129 +51,89 @@ const israel = (iso: string | null) =>
 
 const LISTS = ['event_type', 'absence_reason', 'cancel_reason'] as const;
 
-export const TOOLS: Anthropic.Tool[] = [
-  {
-    name: 'list_events',
-    description: 'Events (trainings, matches, ...) of the person\'s teams, sorted by start time. Use it for "when is the next training", "what is on this week" and to find an event id before any other event tool.',
-    input_schema: {
-      type: 'object',
-      properties: {
-        team_id: { type: 'string', description: 'Only this team. Omit for all of the person\'s teams.' },
-        from: { type: 'string', description: 'ISO date or date-time to start from. Default: now.' },
-        to: { type: 'string', description: 'ISO date or date-time to end at. Default: 21 days after from.' },
-      },
-      additionalProperties: false,
+export const TOOLS: ToolDef[] = [
+  def('list_events', 'Events (trainings, matches, ...) of the person\'s teams, sorted by start time. Use it for "when is the next training", "what is on this week" and to find an event id before any other event tool.', {
+    type: 'object',
+    properties: {
+      team_id: { type: 'string', description: 'Only this team. Omit for all of the person\'s teams.' },
+      from: { type: 'string', description: 'ISO date or date-time to start from. Default: now.' },
+      to: { type: 'string', description: 'ISO date or date-time to end at. Default: 21 days after from.' },
     },
-  },
-  {
-    name: 'event_details',
-    description: 'One event in full: place, notes, equipment, match details, who answered attending / not attending / not yet, and transport. Use it for "who is coming", "did my child answer", "is there transport".',
-    input_schema: {
-      type: 'object',
-      properties: { event_id: { type: 'string' } },
-      required: ['event_id'],
-      additionalProperties: false,
-    },
-  },
-  {
-    name: 'list_tasks',
-    description: 'Tasks assigned to the person, to their children, or (for staff) to their team, with the assignment id needed to mark one done.',
-    input_schema: {
-      type: 'object',
-      properties: { include_done: { type: 'boolean', description: 'Also tasks already done. Default false.' } },
-      additionalProperties: false,
-    },
-  },
-  {
-    name: 'list_options',
-    description: 'Values of a list kept in the database: event types, absence reasons, cancel reasons. Use it to get the id to pass to a writing tool.',
-    input_schema: {
-      type: 'object',
-      properties: { list: { type: 'string', enum: [...LISTS] } },
-      required: ['list'],
-      additionalProperties: false,
-    },
-  },
-  {
-    name: 'team_contacts',
-    description: 'Contact details (phone, email) of the club, the staff, the parents and the players of a team.',
-    input_schema: {
-      type: 'object',
-      properties: { team_id: { type: 'string' } },
-      required: ['team_id'],
-      additionalProperties: false,
-    },
-  },
+    additionalProperties: false,
+  }),
+  def('event_details', 'One event in full: place, notes, equipment, match details, who answered attending / not attending / not yet, and transport. Use it for "who is coming", "did my child answer", "is there transport".', {
+    type: 'object',
+    properties: { event_id: { type: 'string' } },
+    required: ['event_id'],
+    additionalProperties: false,
+  }),
+  def('list_tasks', 'Tasks assigned to the person, to their children, or (for staff) to their team, with the assignment id needed to mark one done.', {
+    type: 'object',
+    properties: { include_done: { type: 'boolean', description: 'Also tasks already done. Default false.' } },
+    additionalProperties: false,
+  }),
+  def('list_options', 'Values of a list kept in the database: event types, absence reasons, cancel reasons. Use it to get the id to pass to a writing tool.', {
+    type: 'object',
+    properties: { list: { type: 'string', enum: [...LISTS] } },
+    required: ['list'],
+    additionalProperties: false,
+  }),
+  def('team_contacts', 'Contact details (phone, email) of the club, the staff, the parents and the players of a team.', {
+    type: 'object',
+    properties: { team_id: { type: 'string' } },
+    required: ['team_id'],
+    additionalProperties: false,
+  }),
   // writing tools: the person confirms each one in the app before it runs
-  {
-    name: 'respond_event',
-    description: 'Answer attendance for a player (a child of the person, or the person as a player): attending or not attending. Not attending needs a reason id from list_options("absence_reason"). The person confirms in the app before it is saved.',
-    input_schema: {
-      type: 'object',
-      properties: {
-        event_id: { type: 'string' },
-        player_id: { type: 'string' },
-        status: { type: 'string', enum: ['attending', 'not_attending'] },
-        reason_id: { type: 'string', description: 'Required when not attending.' },
-        note: { type: 'string' },
-      },
-      required: ['event_id', 'player_id', 'status'],
-      additionalProperties: false,
+  def('respond_event', 'Answer attendance for a player (a child of the person, or the person as a player): attending or not attending. Not attending needs a reason id from list_options("absence_reason"). The person confirms in the app before it is saved.', {
+    type: 'object',
+    properties: {
+      event_id: { type: 'string' },
+      player_id: { type: 'string' },
+      status: { type: 'string', enum: ['attending', 'not_attending'] },
+      reason_id: { type: 'string', description: 'Required when not attending.' },
+      note: { type: 'string' },
     },
-  },
-  {
-    name: 'set_transport_seats',
-    description: 'Ask for seats on an event\'s transport: for a child (player_id), or for a staff member themself (no player_id). 0 means not interested. Only on events with transport. The person confirms in the app.',
-    input_schema: {
-      type: 'object',
-      properties: {
-        event_id: { type: 'string' },
-        seats: { type: 'integer', minimum: 0, maximum: 9 },
-        player_id: { type: 'string' },
-      },
-      required: ['event_id', 'seats'],
-      additionalProperties: false,
+    required: ['event_id', 'player_id', 'status'],
+    additionalProperties: false,
+  }),
+  def('set_transport_seats', 'Ask for seats on an event\'s transport: for a child (player_id), or for a staff member themself (no player_id). 0 means not interested. Only on events with transport. The person confirms in the app.', {
+    type: 'object',
+    properties: {
+      event_id: { type: 'string' },
+      seats: { type: 'integer', minimum: 0, maximum: 9 },
+      player_id: { type: 'string' },
     },
-  },
-  {
-    name: 'complete_task',
-    description: 'Mark a task assignment done (or not done). The person confirms in the app.',
-    input_schema: {
-      type: 'object',
-      properties: { assignment_id: { type: 'string' }, done: { type: 'boolean' } },
-      required: ['assignment_id', 'done'],
-      additionalProperties: false,
+    required: ['event_id', 'seats'],
+    additionalProperties: false,
+  }),
+  def('complete_task', 'Mark a task assignment done (or not done). The person confirms in the app.', {
+    type: 'object',
+    properties: { assignment_id: { type: 'string' }, done: { type: 'boolean' } },
+    required: ['assignment_id', 'done'],
+    additionalProperties: false,
+  }),
+  def('create_event', 'Staff only: create one event for a team. type_id from list_options("event_type"). Times are ISO date-times with the Israel offset (+02:00 or +03:00). The person confirms in the app.', {
+    type: 'object',
+    properties: {
+      team_id: { type: 'string' },
+      type_id: { type: 'string' },
+      title: { type: 'string' },
+      starts_at: { type: 'string' },
+      ends_at: { type: 'string' },
+      location: { type: 'string' },
+      notes: { type: 'string' },
+      opponent: { type: 'string', description: 'Matches only.' },
     },
-  },
-  {
-    name: 'create_event',
-    description: 'Staff only: create one event for a team. type_id from list_options("event_type"). Times are ISO date-times with the Israel offset (+02:00 or +03:00). The person confirms in the app.',
-    input_schema: {
-      type: 'object',
-      properties: {
-        team_id: { type: 'string' },
-        type_id: { type: 'string' },
-        title: { type: 'string' },
-        starts_at: { type: 'string' },
-        ends_at: { type: 'string' },
-        location: { type: 'string' },
-        notes: { type: 'string' },
-        opponent: { type: 'string', description: 'Matches only.' },
-      },
-      required: ['team_id', 'type_id', 'title', 'starts_at'],
-      additionalProperties: false,
-    },
-  },
-  {
-    name: 'cancel_event',
-    description: 'Staff only: cancel an event. reason_id from list_options("cancel_reason"). The team is notified. The person confirms in the app.',
-    input_schema: {
-      type: 'object',
-      properties: { event_id: { type: 'string' }, reason_id: { type: 'string' }, note: { type: 'string' } },
-      required: ['event_id', 'reason_id'],
-      additionalProperties: false,
-    },
-  },
+    required: ['team_id', 'type_id', 'title', 'starts_at'],
+    additionalProperties: false,
+  }),
+  def('cancel_event', 'Staff only: cancel an event. reason_id from list_options("cancel_reason"). The team is notified. The person confirms in the app.', {
+    type: 'object',
+    properties: { event_id: { type: 'string' }, reason_id: { type: 'string' }, note: { type: 'string' } },
+    required: ['event_id', 'reason_id'],
+    additionalProperties: false,
+  }),
 ];
 
 export const WRITE_TOOLS = new Set(['respond_event', 'set_transport_seats', 'complete_task', 'create_event', 'cancel_event']);
@@ -396,9 +362,9 @@ export async function describeWrite(ctx: Ctx, name: string, a: Input): Promise<s
   return name;
 }
 
-/** Runs one tool and returns its tool_result block. Errors go back to the model, which explains them. */
-export async function runTool(ctx: Ctx, block: { id: string; name: string; input: unknown }): Promise<Anthropic.ToolResultBlockParam> {
-  const a = (block.input ?? {}) as Input;
+/** Runs one tool and returns its `tool` message. Errors go back to the model, which explains them. */
+export async function runTool(ctx: Ctx, block: { id: string; name: string; input: Input }): Promise<ToolMessage> {
+  const a = block.input ?? {};
   try {
     let out: unknown;
     switch (block.name) {
@@ -411,8 +377,8 @@ export async function runTool(ctx: Ctx, block: { id: string; name: string; input
         if (!WRITE_TOOLS.has(block.name)) throw new Error(`כלי לא מוכר: ${block.name}`);
         out = await runWrite(ctx, block.name, a);
     }
-    return { type: 'tool_result', tool_use_id: block.id, content: JSON.stringify(out) };
+    return { role: 'tool', tool_call_id: block.id, content: JSON.stringify(out) };
   } catch (e) {
-    return { type: 'tool_result', tool_use_id: block.id, content: (e as Error).message || 'שגיאה', is_error: true };
+    return { role: 'tool', tool_call_id: block.id, content: `שגיאה: ${(e as Error).message || 'הפעולה נכשלה'}` };
   }
 }

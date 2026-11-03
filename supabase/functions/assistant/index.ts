@@ -1,20 +1,57 @@
-// Next Team: the in-app assistant (the floating chat button). Claude Haiku answers questions from the club's data,
-// explains how to use the app, and prepares actions (attendance, transport, tasks, and for staff creating or
-// cancelling an event). It works with the caller's own token, so it sees and does only what the caller may; and every
-// action waits for the caller to confirm it in the app before it runs.
+// Next Team: the in-app assistant (the floating chat button). A language model on Groq (free tier) answers questions
+// from the club's data, explains how to use the app, and prepares actions (attendance, transport, tasks, and for staff
+// creating or cancelling an event). It works with the caller's own token, so it sees and does only what the caller
+// may; and every action waits for the caller to confirm it in the app before it runs.
 //
 // Request:  { mode, messages, text }                       a new message from the person
 //           { mode, messages, pending, decision }          the person confirmed or declined the prepared action
 // Response: { messages, reply, pending? }                  the client keeps `messages` and sends it back next time
 //
-// Secret: ANTHROPIC_API_KEY (Supabase -> Edge Functions -> Secrets).
-import Anthropic from 'npm:@anthropic-ai/sdk@1.1.0';
+// Secrets (Supabase -> Edge Functions -> Secrets): GROQ_API_KEY; optional GROQ_MODEL to change the model.
 import { createClient } from 'npm:@supabase/supabase-js@2.45.4';
-import { describeWrite, runTool, TOOLS, WRITE_TOOLS, type Ctx } from './tools.ts';
+import { describeWrite, runTool, TOOLS, WRITE_TOOLS, type Ctx, type ToolMessage } from './tools.ts';
 
-const MODEL = 'claude-haiku-5-5';
+const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
+const DEFAULT_MODEL = 'openai/gpt-oss-120b';
 const MAX_ROUNDS = 8; // model calls per request
 const MAX_MESSAGES = 60; // the client starts a new conversation beyond this
+
+interface ToolCall { id: string; type: 'function'; function: { name: string; arguments: string } }
+type Message =
+  | { role: 'user'; content: string }
+  | { role: 'assistant'; content: string | null; tool_calls?: ToolCall[] }
+  | ToolMessage;
+
+class GroqError extends Error { constructor(public status: number, msg: string) { super(msg); } }
+
+async function complete(apiKey: string, model: string, system: string, messages: Message[]) {
+  const res = await fetch(GROQ_URL, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model,
+      messages: [{ role: 'system', content: system }, ...messages],
+      tools: TOOLS,
+      tool_choice: 'auto',
+      temperature: 0.3,
+      max_completion_tokens: 2000,
+    }),
+    signal: AbortSignal.timeout(45_000),
+  });
+  if (!res.ok) throw new GroqError(res.status, (await res.text()).slice(0, 500));
+  const data = await res.json();
+  const msg = data.choices?.[0]?.message ?? {};
+  // keep only the fields the next request accepts
+  const out: Message = { role: 'assistant', content: typeof msg.content === 'string' ? msg.content : null };
+  if (Array.isArray(msg.tool_calls) && msg.tool_calls.length) {
+    out.tool_calls = msg.tool_calls.map((c: ToolCall) => ({ id: c.id, type: 'function', function: { name: c.function.name, arguments: c.function.arguments || '{}' } }));
+  }
+  return out;
+}
+
+const args = (c: ToolCall): Record<string, unknown> => {
+  try { const a = JSON.parse(c.function.arguments || '{}'); return a && typeof a === 'object' ? a : {}; } catch { return {}; }
+};
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -61,7 +98,7 @@ const SYSTEM = `את/ה העוזר של Next Team, אפליקציה לניהול
 - מנהל מועדון: יוצר קבוצות, מזמין צוות במייל, ורואה את טבלת השחקנים וההורים של המועדון עם ייצוא לאקסל.`;
 
 interface PendingAction { id: string; name: string; input: Record<string, unknown>; summary: string }
-interface Pending { results: Anthropic.ToolResultBlockParam[]; actions: PendingAction[] }
+interface Pending { results: ToolMessage[]; actions: PendingAction[] }
 
 async function personContext(db: Ctx['db'], uid: string, mode: string) {
   const [profile, memberships, guardianships, players] = await Promise.all([
@@ -117,16 +154,13 @@ async function personContext(db: Ctx['db'], uid: string, mode: string) {
   return { teamIds, text: lines.join('\n') };
 }
 
-/** Text of the model's last reply. */
-const textOf = (content: Anthropic.ContentBlock[]) =>
-  content.filter((b): b is Anthropic.TextBlock => b.type === 'text').map((b) => b.text).join('\n').trim();
-
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
   if (req.method !== 'POST') return json(405, { error: 'POST only' });
 
-  const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
-  if (!apiKey) return json(503, { error: 'העוזר עדיין לא הוגדר (חסר ANTHROPIC_API_KEY)' });
+  const apiKey = Deno.env.get('GROQ_API_KEY');
+  if (!apiKey) return json(503, { error: 'העוזר עדיין לא הוגדר (חסר GROQ_API_KEY)' });
+  const model = Deno.env.get('GROQ_MODEL') || DEFAULT_MODEL;
 
   const auth = req.headers.get('Authorization') ?? '';
   const db = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, {
@@ -137,81 +171,63 @@ Deno.serve(async (req) => {
   if (!user?.user) return json(401, { error: 'יש להתחבר מחדש' });
   const uid = user.user.id;
 
-  let body: { mode?: string; messages?: Anthropic.MessageParam[]; text?: string; pending?: Pending; decision?: string };
+  let body: { mode?: string; messages?: Message[]; text?: string; pending?: Pending; decision?: string };
   try { body = await req.json(); } catch { return json(400, { error: 'בקשה לא תקינה' }); }
   const mode = String(body.mode ?? '');
-  const messages: Anthropic.MessageParam[] = Array.isArray(body.messages) ? body.messages : [];
+  const messages: Message[] = Array.isArray(body.messages) ? body.messages : [];
   if (messages.length > MAX_MESSAGES) return json(400, { error: 'השיחה ארוכה מדי. התחילו שיחה חדשה.' });
 
   const person = await personContext(db, uid, mode);
   const ctx: Ctx = { db, uid, teamIds: person.teamIds };
 
   if (body.pending) {
-    // The person answered the confirmation card: run the actions (or not) and give the model every result together.
+    // The person answered the confirmation card: run the actions (or not) and give the model every result.
     const last = messages[messages.length - 1];
-    const asked = new Set(
-      last?.role === 'assistant' && Array.isArray(last.content)
-        ? last.content.filter((b) => b.type === 'tool_use').map((b) => (b as Anthropic.ToolUseBlockParam).id)
-        : [],
-    );
-    const actions = (body.pending.actions ?? []).filter((a) => asked.has(a.id) && WRITE_TOOLS.has(a.name));
-    const results = (body.pending.results ?? []).filter((r) => asked.has(r.tool_use_id));
+    const asked = new Set(last?.role === 'assistant' ? (last.tool_calls ?? []).map((c) => c.id) : []);
+    const actions = (body.pending.actions ?? []).filter((x) => asked.has(x.id) && WRITE_TOOLS.has(x.name));
+    const results = (body.pending.results ?? []).filter((r) => asked.has(r.tool_call_id));
     if (!actions.length || results.length + actions.length !== asked.size) return json(400, { error: 'הפעולה כבר לא בתוקף' });
-    for (const a of actions) {
+    // the action runs with the arguments the model gave, as stored in the conversation
+    const calls = new Map(((last as { tool_calls?: ToolCall[] }).tool_calls ?? []).map((c) => [c.id, c]));
+    for (const x of actions) {
       results.push(body.decision === 'confirm'
-        ? await runTool(ctx, a)
-        : { type: 'tool_result', tool_use_id: a.id, content: 'המשתמש ביטל את הפעולה ולא אישר אותה.', is_error: true });
+        ? await runTool(ctx, { id: x.id, name: x.name, input: args(calls.get(x.id)!) })
+        : { role: 'tool', tool_call_id: x.id, content: 'המשתמש ביטל את הפעולה ולא אישר אותה.' });
     }
-    messages.push({ role: 'user', content: results });
+    messages.push(...results);
   } else {
     const text = String(body.text ?? '').trim().slice(0, 2000);
     if (!text) return json(400, { error: 'הודעה ריקה' });
     messages.push({ role: 'user', content: text });
   }
 
-  const client = new Anthropic({ apiKey });
+  const system = `${SYSTEM}\n\n${person.text}`;
   try {
     for (let round = 0; round < MAX_ROUNDS; round++) {
-      const res = await client.messages.create({
-        model: MODEL,
-        max_tokens: 4000,
-        output_config: { effort: 'low' },
-        system: [
-          { type: 'text', text: SYSTEM, cache_control: { type: 'ephemeral' } },
-          { type: 'text', text: person.text },
-        ],
-        tools: TOOLS,
-        messages,
-      });
-      messages.push({ role: 'assistant', content: res.content });
-
-      if (res.stop_reason === 'refusal') {
-        return json(200, { messages, reply: 'אני לא יכול לעזור בזה. אפשר לשאול על הקבוצה, האירועים או האפליקציה.' });
+      const reply = await complete(apiKey, model, system, messages);
+      messages.push(reply);
+      const calls = reply.role === 'assistant' ? reply.tool_calls ?? [] : [];
+      if (!calls.length) {
+        return json(200, { messages, reply: (reply.content ?? '').trim() || 'לא הצלחתי לנסח תשובה. נסו לשאול שוב.' });
       }
-      if (res.stop_reason !== 'tool_use') {
-        return json(200, { messages, reply: textOf(res.content) || 'לא הצלחתי לנסח תשובה. נסו לשאול שוב.' });
-      }
-
-      const uses = res.content.filter((b): b is Anthropic.ToolUseBlock => b.type === 'tool_use');
-      const reads = uses.filter((u) => !WRITE_TOOLS.has(u.name));
-      const writes = uses.filter((u) => WRITE_TOOLS.has(u.name));
-      const results = await Promise.all(reads.map((u) => runTool(ctx, u)));
+      const reads = calls.filter((c) => !WRITE_TOOLS.has(c.function.name));
+      const writes = calls.filter((c) => WRITE_TOOLS.has(c.function.name));
+      const results = await Promise.all(reads.map((c) => runTool(ctx, { id: c.id, name: c.function.name, input: args(c) })));
       if (writes.length) {
         // Stop here: the app shows the actions and sends the answer back with `pending`.
-        const actions = await Promise.all(writes.map(async (u) => ({
-          id: u.id, name: u.name, input: u.input as Record<string, unknown>,
-          summary: await describeWrite(ctx, u.name, u.input as Record<string, unknown>),
+        const actions = await Promise.all(writes.map(async (c) => ({
+          id: c.id, name: c.function.name, input: args(c), summary: await describeWrite(ctx, c.function.name, args(c)),
         })));
-        return json(200, { messages, reply: textOf(res.content), pending: { results, actions } satisfies Pending });
+        return json(200, { messages, reply: reply.content ?? '', pending: { results, actions } satisfies Pending });
       }
-      messages.push({ role: 'user', content: results });
+      messages.push(...results);
     }
     return json(200, { messages, reply: 'זה לקח יותר מדי צעדים. נסו לשאול בצורה ממוקדת יותר.' });
   } catch (e) {
     console.error('assistant', e);
-    if (e instanceof Anthropic.RateLimitError) return json(429, { error: 'העוזר עמוס כרגע. נסו שוב בעוד דקה.' });
-    if (e instanceof Anthropic.AuthenticationError) return json(503, { error: 'מפתח ה־API של העוזר לא תקין' });
-    if (e instanceof Anthropic.BadRequestError) return json(400, { error: 'השיחה לא תקינה. התחילו שיחה חדשה.', reset: true });
+    if (e instanceof GroqError && e.status === 429) return json(429, { error: 'העוזר עמוס כרגע (הגענו למכסה החינמית). נסו שוב מאוחר יותר.' });
+    if (e instanceof GroqError && (e.status === 401 || e.status === 403)) return json(503, { error: 'מפתח ה־API של העוזר לא תקין' });
+    if (e instanceof GroqError && e.status === 400) return json(400, { error: 'השיחה לא תקינה. התחילו שיחה חדשה.', reset: true });
     return json(502, { error: 'העוזר לא זמין כרגע. נסו שוב.' });
   }
 });
