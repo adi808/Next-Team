@@ -1,3 +1,4 @@
+import { CancelledBadge } from '../../components/Cancelled';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
@@ -112,8 +113,9 @@ export default function EventsTab({ team, canManage }: TeamTabProps) {
           const kit = kitOf(e.kit_id);
           const over = isOver(e);
           return (
-            <li key={e.id} className={`row${over ? ' past' : ''}`}>
+            <li key={e.id} className={`row${over ? ' past' : ''}${e.cancelled_at ? ' cancelled' : ''}`}>
               <Badge>{typeName(e.type_id)}</Badge>
+              <CancelledBadge event={e} />
               <Link to={`../event/${e.id}`}>{eventHeading(e, typeName(e.type_id), team.name)}</Link>
               <small className="muted">{fmtDate(e.starts_at)}</small>
               {e.our_score !== null && <strong>{e.our_score}:{e.their_score}</strong>}

@@ -9,6 +9,7 @@ import type { Lookup } from '../../lib/types';
 const DOMAINS: { id: string; label: string; hint: string }[] = [
   { id: 'event_type', label: 'סוגי אירוע', hint: 'אימון, משחק, גיבוש…' },
   { id: 'absence_reason', label: 'סיבות אי הגעה', hint: 'מחלה, חופשה…' },
+  { id: 'cancel_reason', label: 'סיבות ביטול אירוע', hint: 'מזג אוויר, המגרש לא זמין…' },
   { id: 'match_format', label: 'מספר שחקנים במגרש', hint: '11 על 11, 9 על 9…' },
   { id: 'formation', label: 'מערכים', hint: '4-3-3, 4-4-2… (שייכים למספר שחקנים)' },
   { id: 'stat_type', label: 'סוגי סטטיסטיקה', hint: 'שער, בישול, כרטיס…' },
@@ -80,7 +81,7 @@ export default function ListsPage() {
       </ul>
       <Card title="ערך חדש">
         <Field label="שם"><input value={name} onChange={(e) => setName(e.target.value)} /></Field>
-        {domain !== 'event_type' && domain !== 'absence_reason' && (
+        {domain !== 'event_type' && domain !== 'absence_reason' && domain !== 'cancel_reason' && (
           <Field label="ענף">
             <select value={sportId} onChange={(e) => setSportId(e.target.value)}>
               <option value="">כל הענפים</option>

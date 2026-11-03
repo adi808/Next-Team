@@ -118,6 +118,9 @@ export interface EventRow {
   series_id: string | null;
   equipment: string[];
   has_transport: boolean;
+  cancelled_at: string | null;
+  cancel_reason_id: string | null;
+  cancel_note: string;
 }
 export interface TeamKit {
   id: string;

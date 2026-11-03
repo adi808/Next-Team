@@ -15,6 +15,9 @@ export function friendlyError(e: unknown): string {
   const err = e as PgError;
   if (err?.message?.includes('birth_date_check')) return 'תאריך הלידה לא יכול להיות בעתיד';
   if (err?.message?.includes('phone number belongs')) return 'מספר הטלפון כבר שייך לחשבון אחר';
+  if (err?.message?.includes('the event was cancelled')) return 'האירוע בוטל, אין צורך לאשר הגעה';
+  if (err?.message?.includes('already cancelled')) return 'האירוע כבר בוטל';
+  if (err?.message?.includes('a cancel reason is required')) return 'בחרו סיבת ביטול';
   if (err?.code && BY_CODE[err.code]) return BY_CODE[err.code];
   if (err?.code === '22023') return `הנתונים שהוזנו אינם תקינים (${err.message})`;
   return err?.message ?? 'משהו השתבש';

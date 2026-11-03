@@ -1,3 +1,4 @@
+import { CancelledBadge, CancelledBanner } from '../../components/Cancelled';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { q, useLoad } from '../../lib/db';
@@ -82,8 +83,9 @@ export default function CoachHome() {
             <h3>בהמשך</h3>
             <ul className="list compact">
               {data.later.map((e) => (
-                <li key={e.id} className="row">
+                <li key={e.id} className={`row${e.cancelled_at ? ' cancelled' : ''}`}>
                   <Badge>{typeOf(e.type_id)?.name_he ?? ''}</Badge>
+                  <CancelledBadge event={e} />
                   <Link to={`../event/${e.id}`}>{eventHeading(e, typeOf(e.type_id)?.name_he ?? '', team?.name)}</Link>
                   <TransportChip total={transport.get(e.id)} />
                   <span className="grow" />
@@ -108,6 +110,7 @@ function NextEventCard({ event, heading, teamName, type, kit, squad, responses, 
   const isMatch = !!type?.meta?.is_match;
   return (
     <section className="stack next-event">
+      <CancelledBanner event={event} />
       <EventPoster event={event} typeLabel={type?.name_he ?? ''} isMatch={isMatch} teamName={teamName} kit={kit} heading={heading} />
       <div className="card">
       {kit && <span className="row"><KitAvatar kit={kit} size={26} />תלבושת: {kit.name}</span>}
