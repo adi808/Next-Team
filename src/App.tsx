@@ -21,6 +21,7 @@ import RequestsPage from './pages/RequestsPage';
 import NotificationsPage from './pages/NotificationsPage';
 import { forgetPath, pendingJoin, pendingPath, rememberJoin, rememberPath } from './lib/join';
 import { recentPlace } from './lib/place';
+import { entered } from './lib/entry';
 import type { Mode } from './lib/types';
 import { FamilyChat, FamilyEvents, FamilyHome, FamilySurveys, FamilyTasks } from './pages/family/Family';
 
@@ -48,12 +49,15 @@ function Home() {
     return p;
   });
   const [place] = useState(() => recentPlace(session?.user.id));
+  useState(entered); // this start was decided here (picker, join link, shared link or resume)
   if (code) return <Navigate to={`/join/${code}`} replace />;
   // No name yet (signed in by emailed code, added ahead by email): ask once. Home stays mounted meanwhile,
   // so a shared link kept above still opens afterwards. A join link asks for the name itself.
   if (profile && !profile.full_name.trim()) return <CompleteProfile />;
-  // the shared link works in the mode it names, or in the account's only mode
-  const linked = path?.match(/^\/m\/([a-z]+)\/(.+)$/);
+  // A link opened from outside (an event shared on WhatsApp, a notification) works in the mode it names, or in the
+  // account's only mode. Any other inner screen kept from before sign-in (the app reopening where it was) goes
+  // through the role picker, so an account with several roles is asked how to enter.
+  const linked = path?.match(/^\/m\/([a-z]+)\/(event\/.+)$/);
   if (linked) {
     const mode = modes.includes(linked[1] as Mode) ? linked[1] : modes.length === 1 ? modes[0] : null;
     if (mode) return <Navigate to={`/m/${mode}/${linked[2]}`} replace />;
