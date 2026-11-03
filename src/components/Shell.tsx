@@ -8,6 +8,7 @@ import { isDemo, supabase } from '../lib/supabase';
 import type { Mode } from '../lib/types';
 import { PendingRequestsBanner } from '../pages/RequestsPage';
 import { InstallBanner } from './InstallBanner';
+import { Assistant } from './Assistant';
 
 const NAV: Record<Mode, { to: string; label: string; icon: IconName }[]> = {
   sysadmin: [{ to: 'clubs', label: 'מועדונים', icon: 'shield' }, { to: 'lists', label: 'רשימות', icon: 'list' }],
@@ -90,6 +91,7 @@ export default function Shell() {
           </NavLink>
         ))}
       </nav>
+      <Assistant />
     </div>
   );
 }
