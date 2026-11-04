@@ -116,6 +116,17 @@ export const TOOLS: ToolDef[] = [
     required: ['team_id'],
     additionalProperties: false,
   }),
+  def('team_roster', 'The squad of a team: how many players, their names and ages, and the staff with their roles.', {
+    type: 'object',
+    properties: { team_id: { type: 'string' } },
+    required: ['team_id'],
+    additionalProperties: false,
+  }),
+  def('weather', 'Weather forecast (Open-Meteo) for an event, at its place and hours, up to 15 days ahead. Or for a place and ISO date.', {
+    type: 'object',
+    properties: { event_id: { type: 'string' }, place: { type: 'string' }, date: { type: 'string', description: 'ISO date' } },
+    additionalProperties: false,
+  }),
   def('app_help', 'How to do things in the app (screens, buttons, joining, installing). Use for how-to questions.', {
     type: 'object', properties: {}, additionalProperties: false,
   }),
@@ -308,6 +319,100 @@ async function teamContacts(ctx: Ctx, a: Input) {
   return { contacts: rows.map((r) => ({ kind: r.kind, name: r.full_name, phone: r.phone, email: r.email, note: r.note || undefined })) };
 }
 
+async function teamRoster(ctx: Ctx, a: Input) {
+  const team = uuid(a.team_id);
+  const [roster, staff, roles] = await Promise.all([
+    q<{ player_id: string }[]>(ctx.db.from('team_players').select('player_id').eq('team_id', team)),
+    q<{ full_name: string; staff_role_id: string | null }[]>(ctx.db.rpc('team_staff', { p_team: team })),
+    lookupNames(ctx, 'staff_role'),
+  ]);
+  const ids = roster.map((r) => r.player_id);
+  const players = ids.length
+    ? await q<{ full_name: string; birth_date: string | null }[]>(
+      ctx.db.from('v_players').select('full_name, birth_date').in('id', ids).order('full_name'))
+    : [];
+  const age = (b: string | null) => {
+    if (!b) return undefined;
+    const d = new Date(b), now = new Date();
+    let y = now.getFullYear() - d.getFullYear();
+    if (now < new Date(now.getFullYear(), d.getMonth(), d.getDate())) y--;
+    return y;
+  };
+  return {
+    // players this person may see; a parent may see only part of the squad
+    players_count: ids.length,
+    players: players.map((p) => ({ name: p.full_name, age: age(p.birth_date) })),
+    staff: staff.map((m) => ({ name: m.full_name, role: m.staff_role_id ? roles.get(m.staff_role_id) : 'צוות' })),
+  };
+}
+
+// Weather from Open-Meteo (free, no key), as the event card shows it.
+const WEATHER_CODES: [number[], string][] = [
+  [[0], 'בהיר'], [[1, 2], 'מעונן חלקית'], [[3], 'מעונן'], [[45, 48], 'ערפל'], [[51, 53, 55, 56, 57], 'טפטוף'],
+  [[61, 63, 65, 66, 67, 80, 81, 82], 'גשם'], [[71, 73, 75, 77, 85, 86], 'שלג'], [[95, 96, 99], 'סופת רעמים'],
+];
+const weatherText = (code: number) => WEATHER_CODES.find(([c]) => c.includes(code))?.[1] ?? 'מעונן';
+
+async function geocode(location: string): Promise<{ lat: number; lon: number; name: string } | null> {
+  // the whole text, then each comma-separated part from the end (the town is usually last)
+  const parts = location.split(',').map((p) => p.trim()).filter(Boolean);
+  for (const name of [location.trim(), ...parts.reverse()]) {
+    const r = await fetch(`https://geocoding-api.open-meteo.com/v1/search?count=1&language=he&format=json&name=${encodeURIComponent(name)}`,
+      { signal: AbortSignal.timeout(8000) });
+    const hit = (await r.json())?.results?.[0];
+    if (hit) return { lat: hit.latitude, lon: hit.longitude, name: hit.name };
+  }
+  return null;
+}
+
+async function weather(ctx: Ctx, a: Input) {
+  let place = str(a.place), start: Date, end: Date | null = null;
+  if (a.event_id) {
+    const e = await q<{ location: string; starts_at: string; ends_at: string | null } | null>(
+      ctx.db.from('events').select('location, starts_at, ends_at').eq('id', uuid(a.event_id)).maybeSingle());
+    if (!e) throw new Error('האירוע לא נמצא');
+    place = place || e.location;
+    start = new Date(e.starts_at);
+    end = e.ends_at ? new Date(e.ends_at) : null;
+  } else {
+    start = str(a.date) ? new Date(str(a.date)) : new Date();
+  }
+  if (!place) throw new Error('לאירוע אין מיקום, אז אין תחזית. אפשר לשאול על עיר מסוימת.');
+  if (isNaN(start.getTime())) throw new Error('תאריך לא תקין');
+  const ahead = start.getTime() - Date.now();
+  if (ahead > 15 * 86_400_000) return { note: 'התחזית זמינה רק עד 15 יום קדימה' };
+  if (ahead < -86_400_000) return { note: 'האירוע כבר עבר' };
+  const pos = await geocode(place);
+  if (!pos) throw new Error(`לא מצאתי את המקום "${place}" במפה`);
+  const ymd = start.toLocaleDateString('en-CA', { timeZone: 'Asia/Jerusalem' });
+  const r = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${pos.lat}&longitude=${pos.lon}`
+    + `&hourly=temperature_2m,precipitation_probability,weather_code,wind_speed_10m`
+    + `&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,weather_code`
+    + `&timezone=Asia%2FJerusalem&start_date=${ymd}&end_date=${ymd}`, { signal: AbortSignal.timeout(8000) });
+  const w = await r.json();
+  if (!w?.hourly) throw new Error('שירות מזג האוויר לא ענה');
+  const hourOf = (d: Date) => Number(d.toLocaleString('en-GB', { timeZone: 'Asia/Jerusalem', hour: '2-digit', hourCycle: 'h23' }));
+  // hours: the event's hours (start to end, or two hours), or from a time given with the date; none for a whole day
+  const withTime = !!a.event_id || /T\d/.test(str(a.date));
+  const hours = [];
+  if (withTime) {
+    const from = hourOf(start);
+    const to = Math.min(23, end ? Math.max(from, hourOf(end)) : from + 2);
+    for (let h = from; h <= to; h++) {
+      hours.push({ hour: `${String(h).padStart(2, '0')}:00`, temp: Math.round(w.hourly.temperature_2m[h]),
+        rain_chance: w.hourly.precipitation_probability[h] ?? 0, sky: weatherText(w.hourly.weather_code[h]),
+        wind_kmh: Math.round(w.hourly.wind_speed_10m[h]) });
+    }
+  }
+  return {
+    place: pos.name,
+    date: israel(start.toISOString())?.split(',').slice(0, 2).join(','),
+    day: { min: Math.round(w.daily.temperature_2m_min[0]), max: Math.round(w.daily.temperature_2m_max[0]),
+      rain_chance: w.daily.precipitation_probability_max[0] ?? 0, sky: weatherText(w.daily.weather_code[0]) },
+    hours: withTime ? hours : undefined,
+  };
+}
+
 // ---------- writing ----------
 
 async function rpc(ctx: Ctx, name: string, args: Record<string, unknown>) {
@@ -412,6 +517,8 @@ export async function runTool(ctx: Ctx, block: { id: string; name: string; input
       case 'list_tasks': out = await listTasks(ctx, a); break;
       case 'list_options': out = await listOptions(ctx, a); break;
       case 'team_contacts': out = await teamContacts(ctx, a); break;
+      case 'team_roster': out = await teamRoster(ctx, a); break;
+      case 'weather': out = await weather(ctx, a); break;
       case 'app_help': out = APP_HELP; break;
       default:
         if (!WRITE_TOOLS.has(block.name)) throw new Error(`כלי לא מוכר: ${block.name}`);
