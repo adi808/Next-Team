@@ -116,6 +116,12 @@ export const TOOLS: ToolDef[] = [
     required: ['team_id'],
     additionalProperties: false,
   }),
+  def('team_roster', 'The squad of a team: how many players, their names and ages, and the staff with their roles.', {
+    type: 'object',
+    properties: { team_id: { type: 'string' } },
+    required: ['team_id'],
+    additionalProperties: false,
+  }),
   def('app_help', 'How to do things in the app (screens, buttons, joining, installing). Use for how-to questions.', {
     type: 'object', properties: {}, additionalProperties: false,
   }),
@@ -308,6 +314,33 @@ async function teamContacts(ctx: Ctx, a: Input) {
   return { contacts: rows.map((r) => ({ kind: r.kind, name: r.full_name, phone: r.phone, email: r.email, note: r.note || undefined })) };
 }
 
+async function teamRoster(ctx: Ctx, a: Input) {
+  const team = uuid(a.team_id);
+  const [roster, staff, roles] = await Promise.all([
+    q<{ player_id: string }[]>(ctx.db.from('team_players').select('player_id').eq('team_id', team)),
+    q<{ full_name: string; staff_role_id: string | null }[]>(ctx.db.rpc('team_staff', { p_team: team })),
+    lookupNames(ctx, 'staff_role'),
+  ]);
+  const ids = roster.map((r) => r.player_id);
+  const players = ids.length
+    ? await q<{ full_name: string; birth_date: string | null }[]>(
+      ctx.db.from('v_players').select('full_name, birth_date').in('id', ids).order('full_name'))
+    : [];
+  const age = (b: string | null) => {
+    if (!b) return undefined;
+    const d = new Date(b), now = new Date();
+    let y = now.getFullYear() - d.getFullYear();
+    if (now < new Date(now.getFullYear(), d.getMonth(), d.getDate())) y--;
+    return y;
+  };
+  return {
+    // players this person may see; a parent may see only part of the squad
+    players_count: ids.length,
+    players: players.map((p) => ({ name: p.full_name, age: age(p.birth_date) })),
+    staff: staff.map((m) => ({ name: m.full_name, role: m.staff_role_id ? roles.get(m.staff_role_id) : 'צוות' })),
+  };
+}
+
 // ---------- writing ----------
 
 async function rpc(ctx: Ctx, name: string, args: Record<string, unknown>) {
@@ -412,6 +445,7 @@ export async function runTool(ctx: Ctx, block: { id: string; name: string; input
       case 'list_tasks': out = await listTasks(ctx, a); break;
       case 'list_options': out = await listOptions(ctx, a); break;
       case 'team_contacts': out = await teamContacts(ctx, a); break;
+      case 'team_roster': out = await teamRoster(ctx, a); break;
       case 'app_help': out = APP_HELP; break;
       default:
         if (!WRITE_TOOLS.has(block.name)) throw new Error(`כלי לא מוכר: ${block.name}`);
