@@ -32,6 +32,13 @@ const out = (ok, label, extra) => { if (!ok) fails++; console.log(`${ok ? 'PASS'
   await has('coach lands on home with the next event', 'שלום, אבי', 'האירוע הבא', 'אימון מחר', 'מגיעים', 'טרם השיבו', 'הכנה לאירוע'); await shot('coach-home');
   await has('coach home also shows the next event of another type', 'המשחק הקרוב', 'הפועל');
   await has('coach home shows the staff type', 'מאמן ראשי · ילדים ב׳');
+  await has('coach home: this week, Sunday to Saturday, with the training and the match', 'השבוע שלי', 'אימון קבוצתי', 'משחק ליגה נגד הפועל');
+  await p.click('button:has-text("תמונת לו")'); await wait(900);
+  out(await p.locator('.week-share img').count() === 1, 'week poster preview is drawn');
+  await has('week message lists the events and the kit', 'לו"ז אירועים לשבוע', '👕 בית');
+  await p.click('.week-share button:has-text("סגירה")'); await wait(200);
+  await p.click('button[aria-label="השבוע הבא"]'); await wait(700); await has('week arrows move to next week', 'שבוע הבא', 'חזרה לשבוע הנוכחי');
+  await p.click('button:has-text("חזרה לשבוע הנוכחי")'); await wait(700);
   await hasNot('coach does not see the other coach team', 'נוער כדורסל');
   await p.click('text=לפרטי האירוע'); await wait(1000);
   await has('event shows what to bring', 'מה להביא', 'בקבוק מים', 'נעלי כדורגל', 'מגני שוקיים'); await shot('event');
@@ -94,6 +101,7 @@ const out = (ok, label, extra) => { if (!ok) fails++; console.log(`${ok ? 'PASS'
   // parent
   await pick('שרה כהן');
   await has('parent lands on events', 'אירועים קרובים', 'דני כהן'); await hasNot('parent sees only their child', 'רוני לוי', 'נועה מזרחי');
+  await has('parent week shows the child\'s answer', 'השבוע שלי', 'מגיע/ה');
   await has('parent dashboard: next event and the next match', 'האירוע הבא', 'אימון מחר', 'המשחק הקרוב', 'הפועל', 'בעוד', 'תלבושת', 'בהמשך'); await shot('parent-dashboard');
   await p.click('role=navigation >> text=הילדים'); await wait(800);
   await has('parent home links to the league', 'הקבוצות והליגה', 'טבלה וקבוצות בליגה');
