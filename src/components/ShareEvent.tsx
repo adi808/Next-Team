@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { Card, ErrorText, Field } from './ui';
+import { useBusArt } from './TeamBus';
+import { kitColors, kitFor, useTeamBrand } from '../lib/brand';
 import { BANNER_H, BANNER_STYLES, BANNER_W, TEMPLATES, canvasBlob, drawBanner, shareText, type BannerStyle, type ShareData, type ShareTemplate } from '../lib/share';
 
 /**
@@ -22,13 +24,22 @@ async function loadPhoto(path: string): Promise<HTMLImageElement | null> {
   });
 }
 
-export function ShareEvent({ data, link, kidPool, onClose }: {
-  data: ShareData; link: string; kidPool: { path: string; name: string }[]; onClose: () => void;
+export function ShareEvent({ data, link, kidPool, transport, onClose }: {
+  data: ShareData; link: string; kidPool: { path: string; name: string }[];
+  /** the event offers transport: the team bus can top the banner */
+  transport?: { teamId: string; kitId: string | null } | null;
+  onClose: () => void;
 }) {
+  const brand = useTeamBrand(transport?.teamId ?? '');
+  const [withBus, setWithBus] = useState(!!transport);
   const [template, setTemplate] = useState<ShareTemplate>('invite');
   const [allowed, setAllowed] = useState<BannerStyle[]>(['dark', 'color']);
   const [style, setStyle] = useState<BannerStyle>(() => pickOne<BannerStyle>(['dark', 'color']));
-  const [withKids, setWithKids] = useState(kidPool.length > 0);
+  const [withKids, setWithKids] = useState(!transport && kidPool.length > 0);
+  const bus = useBusArt(withBus && transport && brand.data ? {
+    teamName: brand.data.teamName, clubName: brand.data.clubName, logoPath: brand.data.logoPath,
+    colors: kitColors(kitFor(brand.data.kits, transport.teamId, transport.kitId)),
+  } : null);
   const [kids, setKids] = useState<HTMLImageElement[]>([]);
   const [roll, setRoll] = useState(0);
   const [withLink, setWithLink] = useState(false);
@@ -57,9 +68,10 @@ export function ShareEvent({ data, link, kidPool, onClose }: {
   useEffect(() => { setText(shareText(data, template, withLink ? link : null)); }, [data, template, withLink, link]);
   useEffect(() => {
     const c = canvas.current ?? (canvas.current = document.createElement('canvas'));
-    drawBanner(c, data, template, hero, style, kids);
+    const top = withBus && bus ? bus.canvas : hero;
+    drawBanner(c, data, template, top, style, withBus && bus ? [] : kids);
     try { setPreview(c.toDataURL('image/png')); } catch { setPreview(''); setError('אי אפשר להציג תמונות שחקנים בבאנר מהמכשיר הזה'); }
-  }, [data, template, hero, style, kids]);
+  }, [data, template, hero, style, kids, withBus, bus]);
 
   function toggleStyle(id: BannerStyle) {
     const next = allowed.includes(id) ? allowed.filter((x) => x !== id) : [...allowed, id];
@@ -119,7 +131,10 @@ export function ShareEvent({ data, link, kidPool, onClose }: {
         ))}
         <button className="small secondary" onClick={shuffle}>🎲 ערבוב</button>
       </div>
-      <label className="check"><input type="checkbox" checked={withKids} disabled={!kidPool.length} onChange={(e) => setWithKids(e.target.checked)} /> לשלב תמונות של 3 שחקנים (נבחרים אקראית בכל ערבוב)</label>
+      {transport && (
+        <label className="check"><input type="checkbox" checked={withBus} onChange={(e) => { setWithBus(e.target.checked); if (e.target.checked) setWithKids(false); }} /> 🚌 אוטובוס ההסעה בראש הבאנר (בצבעי התלבושת, עם הלוגו)</label>
+      )}
+      <label className="check"><input type="checkbox" checked={withKids} disabled={!kidPool.length} onChange={(e) => { setWithKids(e.target.checked); if (e.target.checked) setWithBus(false); }} /> לשלב תמונות של 3 שחקנים (נבחרים אקראית בכל ערבוב)</label>
       <small className="muted">{kidPool.length ? `רק שחקנים שההורים אישרו הצגת תמונה שלהם (${kidPool.length} בקבוצה).` : 'אין עדיין שחקנים עם תמונה והסכמה להצגה. ההסכמה ניתנת בפרופיל הילד.'}</small>
       {preview && <img className="share-preview" src={preview} width={BANNER_W} height={BANNER_H} alt="תצוגה מקדימה של הבאנר" />}
       <Field label="תמונה לראש הבאנר (לא חובה, למשל תמונת הקבוצה)">

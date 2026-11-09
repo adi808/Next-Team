@@ -664,7 +664,15 @@ table.roster .cell-line.email { white-space: normal; overflow-wrap: anywhere; fo
 .assistant-compose textarea { flex: 1; margin: 0; resize: none; max-height: 7rem; min-height: 44px; font: inherit; }
 
 /* ---- team bus ---- */
-.team-bus { display: block; width: 100%; max-width: 460px; height: auto; margin: 0 auto 0.5rem; }
+.team-bus { position: relative; margin: 0 0 0.6rem; }
+.team-bus img { display: block; width: 100%; height: auto; border-radius: 14px; box-shadow: var(--shadow); }
+.team-bus-placeholder { aspect-ratio: 2 / 1; border-radius: 14px; background: linear-gradient(135deg, #dbeafe, #eff6ff); }
+.team-bus-count {
+  position: absolute; top: 0.5rem; inset-inline-end: 0.5rem; padding: 0.2rem 0.7rem; border-radius: 999px;
+  background: rgba(11, 21, 53, 0.82); color: #fff; font-weight: 700; font-size: 0.9rem;
+}
+.team-bus-actions { position: absolute; bottom: 0.5rem; inset-inline-start: 0.5rem; display: flex; gap: 0.35rem; }
+.team-bus-actions button { background: rgba(255, 255, 255, 0.9); }
 
 /* ---- week schedule ---- */
 .week-head { display: flex; align-items: center; gap: 0.6rem; text-align: center; margin-bottom: 0.4rem; }
