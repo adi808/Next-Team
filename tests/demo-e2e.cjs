@@ -146,10 +146,19 @@ const out = (ok, label, extra) => { if (!ok) fails++; console.log(`${ok ? 'PASS'
   await p.fill('input[placeholder="כתבו הודעה…"] >> nth=0', 'אני יכולה לסיע בשבת'); await p.locator('form.composer button').first().click(); await wait(700);
   await has('parent message posted', 'אני יכולה לסיע בשבת');
   await p.click('role=navigation >> text=משימות'); await wait(700); await has('parent tasks (hers and her child\'s)', 'מתיחות 10 דקות כל יום', '100 הרמות כדור');
+  await p.click('role=navigation >> text=סקרים'); await wait(800);
+  await has('a choice question offers "other"', 'האם תגיעו?', 'אחר');
+  await card('טורניר סוף עונה').locator('label', { hasText: 'אחר' }).click(); await wait(200);
+  await card('טורניר סוף עונה').locator('.other-input').fill('נגיע באיחור של שעה');
+  await card('טורניר סוף עונה').getByRole('button', { name: 'שליחה' }).click(); await wait(800);
+  await has('"other" answer saved', 'התשובות נשמרו'); await shot('survey-other');
 
   // the coach sees what the parent did
   await pick('אבי כץ'); await p.click('.bottom-nav >> text=אירועים'); await wait(1000); await p.click('text=גיבוש סוף עונה'); await wait(900);
   await has('coach sees the parent\'s answer', 'דני כהן', 'מגיעים 1');
+  await p.click('.bottom-nav >> text=אירועים'); await wait(1000); await p.click('role=tab[name="סקרים"]'); await wait(800);
+  await has('coach sees the "other" answers with names', 'אחר', 'נגיע באיחור של שעה', 'נגיע רק לחצי השני של היום');
+  await p.click('role=tab[name="אירועים"]'); await wait(600); await p.click('text=גיבוש סוף עונה'); await wait(900);
 
   // the coach cancels the event with a reason; it stays, marked, and parents can no longer answer
   await p.click('button:has-text("❌ ביטול האירוע")'); await wait(500);

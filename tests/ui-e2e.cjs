@@ -16,6 +16,8 @@ function sign(sub) {
   const h = b64({ alg: 'HS256', typ: 'JWT' }), p = b64({ sub, role: 'authenticated', aud: 'authenticated', exp: Math.floor(Date.now() / 1000) + 3600 });
   return `${h}.${p}.${crypto.createHmac('sha256', SECRET).update(`${h}.${p}`).digest('base64url')}`;
 }
+// The scenario's users have no name; give them one so the app skips the "complete your profile" screen.
+psql("update profiles set full_name = 'בודק ' || split_part(email, '@', 1) where coalesce(btrim(full_name), '') = ''");
 const ids = Object.fromEntries(psql('select email, id from profiles').split('\n').map((l) => l.split('|')));
 const EMAILS = { S: 'u01@test.io', A: 'u02@test.io', C: 'u03@test.io', P1: 'u05@test.io', U2: 'u06@test.io', O: 'u08@test.io' };
 const K1 = psql("select id from players where full_name = 'דני כהן'"), T1 = psql("select id from teams where name = 'ילדים א'");

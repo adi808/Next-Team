@@ -354,6 +354,8 @@ legend { font-weight: 600; font-size: 0.9rem; padding: 0 0.35rem; }
 .attr-row select, .attr-row input { width: auto; flex: 1; min-width: 6rem; margin: 0; }
 .history { margin: 0.25rem 0; padding-inline-start: 1.25rem; font-size: 0.85rem; color: var(--muted); }
 .question { margin: 0.75rem 0; }
+.survey-other { margin: 0.1rem 0; padding-inline-start: 0.75rem; }
+.other-input { margin-top: 0.25rem; }
 .chat { list-style: none; padding: 0; margin: 0.5rem 0; display: flex; flex-direction: column; gap: 0.5rem; }
 .chat li {
   background: var(--surface); border: 1px solid var(--border); border-radius: 16px; border-start-start-radius: 4px;

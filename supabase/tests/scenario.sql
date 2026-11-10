@@ -289,6 +289,29 @@ select t.check('coach sees all answers', (select count(*) from survey_answers) =
 select t.as_user('O');
 select t.denied('outsider cannot answer', $$select submit_survey(t.id('SV'), '[]'::jsonb)$$);
 select t.check('outsider sees no surveys', (select count(*) from surveys) = 0);
+-- a choice question with "other" (free text)
+select t.as_user('C');
+insert into t.ctx select 'SV2', create_survey(t.id('T1'), 'הסעה', '', null,
+  '[{"text":"איך תגיעו?","kind":"single","options":["רכב","אוטובוס"],"allow_other":true},{"text":"מה להביא?","kind":"multi","options":["מים","כדור"],"allow_other":true},{"text":"צבע","kind":"single","options":["כחול","לבן"]}]'::jsonb);
+insert into t.ctx select 'SV2_q1', id from survey_questions where survey_id = t.id('SV2') and position = 1;
+insert into t.ctx select 'SV2_q2', id from survey_questions where survey_id = t.id('SV2') and position = 2;
+insert into t.ctx select 'SV2_q3', id from survey_questions where survey_id = t.id('SV2') and position = 3;
+select t.check('a choice question can allow "other"',
+  (select array_agg(allow_other order by position) from survey_questions where survey_id = t.id('SV2')) = array[true, true, false]);
+select t.as_user('P1');
+select submit_survey(t.id('SV2'), jsonb_build_array(
+  jsonb_build_object('question_id', t.id('SV2_q1'), 'option_ids', '[]'::jsonb, 'other', ' ברגל '),
+  jsonb_build_object('question_id', t.id('SV2_q2'), 'option_ids', jsonb_build_array((select id from survey_options where question_id = t.id('SV2_q2') and label = 'מים')), 'other', 'כפפות')));
+select t.check('"other" is saved as free text (trimmed), also next to options on a multi-choice question',
+  (select text_answer from survey_answers where question_id = t.id('SV2_q1')) = 'ברגל'
+  and (select count(*) from survey_answers where question_id = t.id('SV2_q2')) = 2
+  and exists (select 1 from survey_answers where question_id = t.id('SV2_q2') and option_id is null and text_answer = 'כפפות'));
+select t.denied('a single-choice question takes an option or "other", not both',
+  $$select submit_survey(t.id('SV2'), jsonb_build_array(jsonb_build_object('question_id', t.id('SV2_q1'),
+    'option_ids', jsonb_build_array((select id from survey_options where question_id = t.id('SV2_q1') and label = 'רכב')), 'other', 'x')))$$);
+select t.denied('"other" is refused on a question that does not allow it',
+  $$select submit_survey(t.id('SV2'), jsonb_build_array(jsonb_build_object('question_id', t.id('SV2_q3'), 'option_ids', '[]'::jsonb, 'other', 'ירוק')))$$);
+select t.check('a refused answer keeps the earlier answers', (select count(*) from survey_answers where question_id = t.id('SV2_q1')) = 1);
 
 -- ---------------------------------------------------------------- chat
 select t.as_user('P1');

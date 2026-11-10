@@ -631,7 +631,7 @@ export class DemoServer {
       this.t.surveys.push({ id, team_id: a.p_team, title: String(a.p_title).trim(), description: a.p_description ?? '', closes_at: a.p_closes ?? null, created_at: new Date().toISOString() });
       a.p_questions.forEach((q: Row, i: number) => {
         const qid = this.id('q');
-        this.t.survey_questions.push({ id: qid, survey_id: id, text: q.text, kind: q.kind ?? 'single', position: i + 1 });
+        this.t.survey_questions.push({ id: qid, survey_id: id, text: q.text, kind: q.kind ?? 'single', position: i + 1, allow_other: (q.kind ?? 'single') !== 'text' && !!q.allow_other });
         if ((q.kind ?? 'single') !== 'text') {
           if ((q.options ?? []).length < 2) this.bad('a choice question needs at least two options');
           q.options.forEach((label: string, j: number) => this.t.survey_options.push({ id: this.id('o'), question_id: qid, label, position: j + 1 }));
@@ -648,7 +648,14 @@ export class DemoServer {
       for (const ans of a.p_answers as Row[]) {
         if (ans.text !== undefined) {
           if (String(ans.text).trim()) this.t.survey_answers.push({ id: this.id('sa'), question_id: ans.question_id, respondent_id: this.uid, option_id: null, text_answer: ans.text });
-        } else for (const o of ans.option_ids ?? []) this.t.survey_answers.push({ id: this.id('sa'), question_id: ans.question_id, respondent_id: this.uid, option_id: o, text_answer: null });
+        } else {
+          const qn = this.find('survey_questions', ans.question_id);
+          const other = String(ans.other ?? '').trim();
+          if (other && !qn?.allow_other) this.bad('this question has no "other" answer');
+          if (qn?.kind === 'single' && (ans.option_ids ?? []).length + (other ? 1 : 0) > 1) this.bad('only one option allowed');
+          for (const o of ans.option_ids ?? []) this.t.survey_answers.push({ id: this.id('sa'), question_id: ans.question_id, respondent_id: this.uid, option_id: o, text_answer: null });
+          if (other) this.t.survey_answers.push({ id: this.id('sa'), question_id: ans.question_id, respondent_id: this.uid, option_id: null, text_answer: other });
+        }
       }
     },
     post_message(this: DemoServer, a: Row) {

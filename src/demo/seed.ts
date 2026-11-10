@@ -196,8 +196,8 @@ export function seed(): Tables {
     ],
     surveys: [{ id: 's1', team_id: 't1', title: 'טורניר סוף עונה: מי מגיע?', description: 'הטורניר ב־20 בחודש, נשמח לדעת כמה נהיה', closes_at: null, created_at: ago(2) }],
     survey_questions: [
-      { id: 'q1', survey_id: 's1', text: 'האם תגיעו?', kind: 'single', position: 1 },
-      { id: 'q2', survey_id: 's1', text: 'הערות', kind: 'text', position: 2 },
+      { id: 'q1', survey_id: 's1', text: 'האם תגיעו?', kind: 'single', position: 1, allow_other: true },
+      { id: 'q2', survey_id: 's1', text: 'הערות', kind: 'text', position: 2, allow_other: false },
     ],
     survey_options: [
       { id: 'o1', question_id: 'q1', label: 'כן', position: 1 }, { id: 'o2', question_id: 'q1', label: 'לא', position: 2 }, { id: 'o3', question_id: 'q1', label: 'אולי', position: 3 },
@@ -206,6 +206,7 @@ export function seed(): Tables {
       { id: 'sa1', question_id: 'q1', respondent_id: 'u_p1', option_id: 'o1', text_answer: null },
       { id: 'sa2', question_id: 'q1', respondent_id: 'u_p2', option_id: 'o3', text_answer: null },
       { id: 'sa3', question_id: 'q2', respondent_id: 'u_p2', option_id: null, text_answer: 'תלוי בשעות המשחק' },
+      { id: 'sa4', question_id: 'q1', respondent_id: 'u_admin', option_id: null, text_answer: 'נגיע רק לחצי השני של היום' },
     ],
     messages: [
       msg('ms1', 't1', 'u_admin', 'ברוכים הבאים לעונה החדשה, בהצלחה לכולם!', 12),
