@@ -9,6 +9,7 @@ import { EventPoster } from '../../components/EventDashboard';
 import { useLookupName, useLookups } from '../../components/Lookups';
 import { KitAvatar } from '../../components/Kit';
 import { TransportChip, useTransportTotals } from '../../components/Transport';
+import { WeekSchedule } from '../../components/WeekSchedule';
 import { eventHeading, isOver, nextAndOther } from '../../lib/events';
 import type { EventResponse, EventRow, Lookup, Team, TeamKit } from '../../lib/types';
 
@@ -70,6 +71,8 @@ export default function CoachHome() {
           <div className="card"><Empty>אין אירועים קרובים.</Empty></div>
         ))}
         {data?.other && card(data.other, `ה${typeOf(data.other.type_id)?.name_he ?? 'אירוע'} הקרוב`)}
+
+        {team && <WeekSchedule teams={[team]} canShare />}
 
         {teamId && (
           <div className="quick-actions">

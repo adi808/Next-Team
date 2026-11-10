@@ -19,10 +19,11 @@ Built: everything in the business spec except features marked "proposed" there.
 | Surveys | single / multiple choice / free text, one answer set per person (replaceable) |
 | Chat | team channel (staff and parents write, players read) and personal coach-player chat (parents see all of it, club admin does not) |
 | Home dashboards | coach, parent and player see the nearest event and, below it, the nearest event of another type (e.g. training, then a match) |
+| Week schedule | "My week" card (Sunday to Saturday in Israel, arrows to other weeks): every training and match of the coach's team, or of all the teams of a parent's children / the player, each edged in its kit colours, with time, place, kit and transport. Personal for a parent or player: each child's answer (coming / not coming / not answered) on the event. Staff turn the week into a poster (a card per event in its kit colours, the club logo, the week's equipment) and a WhatsApp message to share |
 | Lineup | on a football match the staff see a pitch sketch: players placed by the formation and their position, with photo and shirt number; tap to swap, save (`event_lineups`) |
 | Staff and parents | staff type per membership (list `staff_role`: team manager, head coach, assistant, fitness, secretary, medic; a label only, every team staff member has the coach's permissions), shown to the whole team; a parent's relation to the child (list `guardian_relation`: mom, dad, guardian) |
 | League | team parameter `league_url` (the team's page on football.org.il); the team's "league" tab shows the league table and fixtures, read by the `league` Edge Function (`supabase/functions/league`) |
-| Transport | staff turn on transport (הסעה) for an event; a parent answers per child "not interested" or the number of passengers, staff for themselves; everyone sees the total, staff see who travels (`event_transport`) |
+| Transport | the transport card shows the team bus: a photo-like coach on a stadium background (template in `public/bus`, built once by `scripts/make-bus-template.py` from a reference picture), repainted in the browser in the colours of the event's kit (body and brush strokes in the shirt colour, swoosh in the shorts or socks colour; the team's first kit when the event has none), with the club name, team name and logo on its side, the logo in the corner and the passenger count; it can be shared or downloaded, and tops the event's WhatsApp banner when the event has transport. Staff turn on transport (הסעה) for an event; a parent answers per child "not interested" or the number of passengers, staff for themselves; everyone sees the total, staff see who travels (`event_transport`) |
 | Contacts | phone (optional) and email for everyone: own profile (club admin, staff, parent), player (parent or staff edit; the player's own account email), club (phone, email, address, website; club admin edits). The team's "contacts" tab lists the club, its admins, the staff, the parents (with their children) and the players with call / WhatsApp / email buttons, for every member of the team (`team_contacts`) |
 | Parents | both parents of a child with relation (mom / dad / guardian), phone and email. A parent or the staff add the second parent (also in the join form); without an account they are kept as a contact (`guardian_contacts`), and signing in with that email links them to the child |
 | Roster | club admins (whole club, filter by team) and coaches (their team) see a table of every child with parents and contact details; search, edit a child and its parents, unlink a parent, delete a child (club admin), export to Excel (CSV) (`club_roster`) |
@@ -36,7 +37,7 @@ Built: everything in the business spec except features marked "proposed" there.
 * `sports` - table with an icon per sport.
 
 ### Demo
-`npm run build:demo` writes `dist-demo/next-team-demo.html`: one self-contained page with the real UI and an in-browser sample backend (`src/demo/`), with a person picker. It is excluded from the production bundle. `node tests/demo-e2e.cjs` drives it (77 checks).
+`npm run build:demo` writes `dist-demo/next-team-demo.html`: one self-contained page with the real UI and an in-browser sample backend (`src/demo/`), with a person picker. It is excluded from the production bundle. `node tests/demo-e2e.cjs` drives it (84 checks).
 
 ### Verified
 * `supabase/tests/scenario.sql`: 212 role-by-role checks on Postgres 16 (against a stub `auth` schema). Run it with `supabase/tests/stub_auth.sql` first, then the migrations, then the scenario.
@@ -68,4 +69,5 @@ Set a system admin by hand: `update profiles set is_system_admin = true where id
 3. Team channel: staff and parents write, players read. Personal chat: coach <-> player, parents see all of it, club admin and system admin do not.
 4. Medical info: parent, coach, club admin, system admin. Ratings: also the player. Each parent / player sees only their own child.
 5. Players may answer attendance only when the team allows it and the player is at least the team's minimum age.
-6. Still open: legal review of privacy (medical info, photos, chat with minors), reporting abusive content in personal chat, and a trademark / domain check for the name.
+6. Team colours on artwork (bus, week cards and poster) come from the event's kit, not a separate club colour.
+7. Still open: legal review of privacy (medical info, photos, chat with minors), reporting abusive content in personal chat, and a trademark / domain check for the name.

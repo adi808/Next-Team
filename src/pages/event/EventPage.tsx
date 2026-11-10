@@ -119,7 +119,7 @@ export default function EventPage() {
         <CancelEventBox event={event} onClose={() => setCancelling(false)} onDone={() => { setCancelling(false); reload(); }} />
       )}
       {canManage && share && (
-        <ShareEvent onClose={() => setShare(false)} kidPool={players.filter((p) => p.photo_consent && p.photo_path).map((p) => ({ path: p.photo_path as string, name: p.full_name }))} link={`${window.location.origin}/m/parent/event/${event.id}`}
+        <ShareEvent onClose={() => setShare(false)} transport={event.has_transport ? { teamId: event.team_id, kitId: event.kit_id } : null} kidPool={players.filter((p) => p.photo_consent && p.photo_path).map((p) => ({ path: p.photo_path as string, name: p.full_name }))} link={`${window.location.origin}/m/parent/event/${event.id}`}
           data={{
             teamName: team.name, typeLabel: typeName(event.type_id), isMatch, opponent: event.opponent ?? '', startsAt: event.starts_at, endsAt: event.ends_at,
             location: event.location ?? '', notes: event.notes ?? '', kit: kit ? { name: kit.name, shirt: kit.shirt, shorts: kit.shorts, socks: kit.socks } : null,

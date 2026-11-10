@@ -2,6 +2,8 @@ import { q, rpc, useAction, useLoad } from '../lib/db';
 import { isDemo, supabase } from '../lib/supabase';
 import type { EventResponse, EventRow, Player } from '../lib/types';
 import { Badge, Card, Empty, ErrorText } from './ui';
+import { TeamBus } from './TeamBus';
+import { kitColors, kitFor, useTeamBrand } from '../lib/brand';
 
 interface Seat { player_id: string | null; profile_id: string | null; name: string; role: string; staff_label: string | null; seats: number }
 
@@ -43,7 +45,12 @@ export function TransportCard({ event, players = [], responses, myKids, canManag
   const list = useLoad(() => (event.has_transport ? rpc<Seat[]>('event_transport_list', { p_event: event.id }) : Promise.resolve([])),
     [event.id, event.has_transport, answers]);
   const act = useAction();
+  const brand = useTeamBrand(event.team_id);
   if (!event.has_transport && !canManage) return null;
+  const bus = (count?: number) => brand.data && (
+    <TeamBus teamName={brand.data.teamName} clubName={brand.data.clubName} logoPath={brand.data.logoPath}
+      colors={kitColors(kitFor(brand.data.kits, event.team_id, event.kit_id))} count={count} />
+  );
 
   const rows = list.data ?? [];
   const total = rows.reduce((s, r) => s + r.seats, 0);
@@ -59,6 +66,7 @@ export function TransportCard({ event, players = [], responses, myKids, canManag
   if (!event.has_transport) {
     return (
       <Card title="הסעה">
+        {bus()}
         <p className="muted">אפשר להציע הסעה לאירוע. ההורים יענו לכל ילד "לא מעוניין" או כמה נוסעים.</p>
         <button disabled={act.busy} onClick={() => toggle(true)}>🚌 הוספת אפשרות להסעה</button>
         <ErrorText error={act.error} />
@@ -72,6 +80,7 @@ export function TransportCard({ event, players = [], responses, myKids, canManag
     <Card title="🚌 הסעה" actions={canManage && (
       <button className="small secondary" disabled={act.busy} onClick={() => { if (confirm('לבטל את ההסעה לאירוע? התשובות יישמרו.')) toggle(false); }}>ביטול הסעה</button>
     )}>
+      {bus(total)}
       <div className="transport-total"><strong>{total}</strong><span>נוסעים בהסעה</span></div>
       {myKids.map((k) => (
         <div key={k.id} className="transport-row">

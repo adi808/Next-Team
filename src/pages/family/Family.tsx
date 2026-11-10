@@ -14,6 +14,7 @@ import { Conversation, TeamChannel } from '../../components/Chat';
 import { useLookups, useSports } from '../../components/Lookups';
 import { EventDashboard } from '../../components/EventDashboard';
 import { TransportCard } from '../../components/Transport';
+import { WeekSchedule } from '../../components/WeekSchedule';
 import { isDemo } from '../../lib/supabase';
 import { eventHeading, isOver, nextAndOther } from '../../lib/events';
 import { PlayerAvatar } from '../../components/People';
@@ -202,6 +203,7 @@ export function FamilyEvents() {
     <>
       <PageHero kicker={asParent ? 'הורה' : 'שחקן'} title="אירועים קרובים" />
       <Loading loading={loading || l2} error={error || e2} />
+      {teams.length > 0 && <WeekSchedule teams={teams} kids={kids} links={links} />}
       {data && !data.events.length && <Empty>אין אירועים קרובים.</Empty>}
       {next && dashboard(next, 'האירוע הבא')}
       {other && dashboard(other, `ה${typeName(other.type_id) || 'אירוע'} הקרוב`)}

@@ -66,7 +66,7 @@ export function shareText(d: ShareData, template: ShareTemplate, link: string | 
 }
 
 const NAVY = '#1a1a8c';
-const FONT = 'system-ui, -apple-system, "Segoe UI", "Heebo", "Arial", sans-serif';
+export const FONT = 'system-ui, -apple-system, "Segoe UI", "Heebo", "Arial", sans-serif';
 
 export type BannerStyle = 'dark' | 'color' | 'classic';
 export const BANNER_STYLES: { id: BannerStyle; label: string }[] = [
@@ -82,23 +82,23 @@ const HEBREW_TITLES: Record<ShareTemplate, (d: ShareData) => string> = {
   cancel: (d) => `בוטל: ${d.isMatch ? 'משחק' : d.typeLabel}`,
 };
 
-function fit(ctx: CanvasRenderingContext2D, text: string, maxW: number, size: number, weight = 800, italic = false) {
+export function fit(ctx: CanvasRenderingContext2D, text: string, maxW: number, size: number, weight = 800, italic = false) {
   let s = size;
   do { ctx.font = `${italic ? 'italic ' : ''}${weight} ${s}px ${FONT}`; s -= 2; } while (ctx.measureText(text).width > maxW && s > 16);
 }
 
-const initials = (name: string) => {
+export const initials = (name: string) => {
   const words = name.replace(/[^\p{L}\p{N}\s]/gu, '').split(/\s+/).filter(Boolean);
   return (words.length > 1 ? words.slice(0, 2).map((w) => w[0]).join('') : (words[0] ?? '?').slice(0, 2)).toUpperCase();
 };
 
-const lum = (hex: string) => {
+export const lum = (hex: string) => {
   const n = parseInt(hex.replace('#', '').padEnd(6, '0').slice(0, 6), 16);
   return 0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255);
 };
-const inkOn = (hex: string) => (lum(hex) > 150 ? '#0b1535' : '#ffffff');
+export const inkOn = (hex: string) => (lum(hex) > 150 ? '#0b1535' : '#ffffff');
 
-function rrect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
+export function rrect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
   ctx.beginPath();
   ctx.moveTo(x + r, y);
   ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
@@ -107,7 +107,7 @@ function rrect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h
 }
 
 /** A drawn football (no emoji): white ball, dark centre patch and five panels. */
-function ball(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number, alpha = 1) {
+export function ball(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number, alpha = 1) {
   ctx.save(); ctx.globalAlpha = alpha;
   ctx.fillStyle = '#fff'; ctx.strokeStyle = '#1b2440'; ctx.lineWidth = r * 0.05;
   ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
@@ -129,7 +129,7 @@ function ball(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number, 
 }
 
 /** Pitch markings as faint line art. */
-function pitch(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, color: string, alpha: number) {
+export function pitch(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, color: string, alpha: number) {
   ctx.save(); ctx.strokeStyle = color; ctx.globalAlpha = alpha; ctx.lineWidth = 5;
   ctx.strokeRect(x, y, w, h);
   ctx.beginPath(); ctx.moveTo(x, y + h / 2); ctx.lineTo(x + w, y + h / 2); ctx.stroke();
@@ -146,7 +146,7 @@ function crest(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number,
 }
 
 /** A map pin drawn with paths. */
-function pin(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, color: string) {
+export function pin(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, color: string) {
   ctx.save(); ctx.fillStyle = color;
   ctx.beginPath(); ctx.arc(x, y - size * 0.35, size * 0.5, Math.PI, 0); ctx.quadraticCurveTo(x + size * 0.5, y + size * 0.1, x, y + size * 0.62);
   ctx.quadraticCurveTo(x - size * 0.5, y + size * 0.1, x - size * 0.5, y - size * 0.35); ctx.fill();
