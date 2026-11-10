@@ -6,6 +6,7 @@ import { useAuth } from '../../auth/AuthProvider';
 import { useActingRole } from '../../auth/acting';
 import { Card, Empty, Loading, PageHero, ScoreRing, StatTiles } from '../../components/ui';
 import { useLookups } from '../../components/Lookups';
+import { appliesToKind } from '../../components/Attributes';
 import { PlayerAvatar, ShirtNo, useShirtNumbers } from '../../components/People';
 import { average, defsFor, latestRatings } from '../../lib/scores';
 import { eventHeading } from '../../lib/events';
@@ -66,7 +67,10 @@ export default function EventPrepPage() {
   };
   // field player / goalkeeper decides; otherwise a goalkeeper position does
   const isKeeper = (pid: string) => { const k = kindOf(pid); return k ? !!k.meta?.goalkeeper : !!positionOf(pid)?.meta?.goalkeeper; };
-  const scoreOf = (pid: string) => average(latestRatings(scaleDefs, values, pid).map((r) => r.score));
+  const scoreOf = (pid: string) => {
+    const keeper = isKeeper(pid);
+    return average(latestRatings(scaleDefs.filter((d) => appliesToKind(d, keeper)), values, pid).map((r) => r.score));
+  };
 
   const keepers = coming.filter((p) => isKeeper(p.id)).length;
   const sportPositions = positions.filter((l) => l.sport_id === team.sport_id && l.active);

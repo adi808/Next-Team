@@ -73,6 +73,7 @@ const out = (ok, label, extra) => { if (!ok) fails++; console.log(`${ok ? 'PASS'
   await has('player page: profile tabs and medical info', 'פרופיל שחקן', 'פרטים', 'הערכה', 'יעדים', 'אלרגיה', 'בוטנים', 'תפקיד ברירת מחדל', 'קישור', 'שחקן שדה', 'רגל חזקה', 'שמאל', 'מספר חולצה');
   await p.click('role=tab[name="הערכה"]'); await wait(700);
   await has('player rating: latest average and bars', 'הערכה מקצועית אחרונה', '7.7/10', 'שליטה בכדור', '8/10'); await shot('player');
+  await has('a field player gets the field ratings', 'בעיטה', 'מסירה'); await hasNot('a field player does not get goalkeeper ratings', 'תגובה', 'תפיסה');
   await p.click('role=tab[name="יעדים"]'); await wait(700);
   await has('player goals', 'לשפר בעיטה ברגל שמאל', '50 הרמות כדור ברצף');
   await p.fill('input[placeholder^="יעד חדש"]', 'לעבוד על מסירות ארוכות'); await p.click('.goal-form button'); await wait(700);
@@ -86,9 +87,26 @@ const out = (ok, label, extra) => { if (!ok) fails++; console.log(`${ok ? 'PASS'
   out(await p.locator('.pitch .pitch-slot').count() === 11, 'pitch has 11 slots for 4-3-3');
   const keeper = await p.locator('.pitch .pitch-slot').first().getAttribute('aria-label'); out(keeper === 'נועה מזרחי', 'the goalkeeper stands in goal', keeper);
   await p.locator('.pitch .pitch-slot').nth(0).click(); await p.locator('.pitch .pitch-slot').nth(10).click(); await wait(300);
+  await has('a match without a lineup gets a saved draft', 'טיוטה');
   await has('a swap marks the lineup unsaved', 'לא נשמר');
-  await p.click('button:has-text("שמירת ההרכב")'); await wait(800); await hasNot('saved lineup', 'לא נשמר');
+  await p.click('button:has-text("שמירת טיוטה")'); await wait(800); await hasNot('saved lineup', 'לא נשמר'); await has('saved as a draft', 'טיוטה');
   const moved = await p.locator('.pitch .pitch-slot').first().getAttribute('aria-label'); out(moved !== 'נועה מזרחי', 'saved lineup keeps the swap', moved);
+  await p.click('button:has-text("אישור ההרכב")'); await wait(800); await has('coach approves the lineup', 'מאושר');
+  await p.locator('.pitch .pitch-slot').nth(1).click(); await p.locator('.pitch .pitch-slot').nth(2).click(); await wait(300);
+  await p.click('button:has-text("שמירת טיוטה")'); await wait(800); await has('a change after approval is a draft again', 'טיוטה');
+  // two groups playing at once, from each player's default group
+  await p.click('.bottom-nav >> text=אירועים'); await wait(1000);
+  await p.click('text=טורניר 7 על 7'); await wait(1500);
+  await has('tournament: two groups of 7 on two pitches', 'הרכב על המגרש · 2-3-1 · 2 קבוצות', 'קבוצה 1', 'קבוצה 2'); await shot('pitch-groups');
+  out(await p.locator('.pitch').count() === 2, 'two pitches');
+  out(await p.locator('.pitch').nth(0).locator('.pitch-slot').count() === 7, 'each pitch has 7 slots');
+  const g2 = await p.locator('.pitch').nth(1).locator('.pitch-slot').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')));
+  out(g2.includes('גיל פרידמן') && g2.includes('תומר שמש'), 'group 2 players stand in group 2', g2.join(','));
+  const g1 = await p.locator('.pitch').nth(0).locator('.pitch-slot').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')));
+  out(g1[0] === 'נועה מזרחי' && g1.includes('דני כהן'), 'group 1 keeps its keeper and players', g1.join(','));
+  await has('an absent player stays on the pitch, marked with the reason', 'פציעה', 'לא מגיעים על המגרש');
+  await p.click('.bottom-nav >> text=אירועים'); await wait(1000);
+  await p.click('text=משחק ליגה נגד הפועל'); await wait(1200);
   await p.click('button:has-text("עריכת פרטי האירוע")'); await wait(400);
   await has('event edit has type and end time', 'סוג', 'מסתיים (לא חובה)', 'יריבה');
   await p.fill('input[type="datetime-local"] >> nth=1', '2030-01-01T12:00'); await p.locator('.card', { hasText: 'מסתיים' }).getByRole('button', { name: 'שמירה' }).click(); await wait(800);

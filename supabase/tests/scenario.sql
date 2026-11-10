@@ -470,7 +470,27 @@ select set_event_lineup(t.id('E_match'), array[t.id('K1'), null, t.id('K2')]);
 select t.check('coach saves a lineup (slots 0 and 2)',
   (select array_agg(slot order by slot) from event_lineups where event_id = t.id('E_match')) = array[0, 2]);
 select t.denied('the same player cannot stand in two slots', $$select set_event_lineup(t.id('E_match'), array[t.id('K1'), t.id('K1')])$$);
+select t.check('the one-group form saves a draft', not exists (select 1 from event_lineup_state where event_id = t.id('E_match')));
+select save_event_lineup(t.id('E_match'), jsonb_build_array(jsonb_build_array(t.id('K1')), jsonb_build_array(null, t.id('K2'))), false);
+select t.check('coach saves a lineup of two parallel groups',
+  (select array_agg(group_no || ':' || slot order by group_no, slot) from event_lineups where event_id = t.id('E_match')) = array['1:0', '2:1']);
+select t.check('a saved lineup is a draft until approved', not exists (select 1 from event_lineup_state where event_id = t.id('E_match')));
+select save_event_lineup(t.id('E_match'), jsonb_build_array(jsonb_build_array(t.id('K1')), jsonb_build_array(null, t.id('K2'))), true);
+select t.check('coach approves the lineup', exists (select 1 from event_lineup_state where event_id = t.id('E_match') and approved_by = t.id('C')));
+select save_event_lineup(t.id('E_match'), jsonb_build_array(jsonb_build_array(t.id('K2')), jsonb_build_array(t.id('K1'))), false);
+select t.check('a change after approval turns it back into a draft', not exists (select 1 from event_lineup_state where event_id = t.id('E_match')));
+select t.denied('a player cannot stand in two groups',
+  $$select save_event_lineup(t.id('E_match'), jsonb_build_array(jsonb_build_array(t.id('K1')), jsonb_build_array(t.id('K1'))))$$);
+select t.denied('up to 4 groups', $$select save_event_lineup(t.id('E_match'), '[[], [], [], [], []]'::jsonb)$$);
+select t.check('parallel groups, default group and kind ratings are defined',
+  exists (select 1 from attribute_defs where scope = 'team' and key = 'parallel_groups')
+  and exists (select 1 from attribute_defs where scope = 'player' and key = 'default_group' and not ('parent' = any (visible_to)))
+  and (select count(*) from lookups where domain = 'lineup_group') = 5
+  and exists (select 1 from attribute_defs where key = 'football_gk_reflexes' and config ->> 'player_kind' = 'goalkeeper')
+  and exists (select 1 from attribute_defs where key = 'football_kicking' and config ->> 'player_kind' = 'field'));
 select t.as_user('P1');
+select t.check('a parent does not see the lineup state', not exists (select 1 from event_lineup_state));
+select t.denied('a parent cannot save a lineup', $$select save_event_lineup(t.id('E_match'), '[[]]'::jsonb, true)$$);
 select t.check('a parent does not see the lineup', not exists (select 1 from event_lineups));
 select t.denied('a parent cannot set the lineup', $$select set_event_lineup(t.id('E_match'), array[t.id('K1')])$$);
 

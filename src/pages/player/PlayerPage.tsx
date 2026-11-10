@@ -6,7 +6,7 @@ import { normEmail } from '../../lib/email';
 import { useAuth } from '../../auth/AuthProvider';
 import { useActingRole } from '../../auth/acting';
 import { Badge, Card, Empty, ErrorText, Field, Loading, PageHero, ScoreBar, Tabs } from '../../components/ui';
-import { AttributesPanel } from '../../components/Attributes';
+import { AttributesPanel, appliesToKind, isGoalkeeper } from '../../components/Attributes';
 import { useLookups } from '../../components/Lookups';
 import { PlayerAvatar, ShirtNo, useShirtNumbers } from '../../components/People';
 import { ContactLinks, fmtPhone } from '../../components/Contacts';
@@ -190,8 +190,11 @@ function usePlayerValues(playerId: string, tick = 0) {
 function RatingTab({ player, scope }: { player: Player; scope: Scope }) {
   const [tick, setTick] = useState(0);
   const { data, loading, error } = usePlayerValues(player.id, tick);
+  const kinds = useLookups('player_kind', { includeInactive: true });
+  const positions = useLookups('position', { includeInactive: true });
   if (!data) return <Loading loading={loading} error={error} />;
-  const scaleDefs = defsFor(data.defs, scope).filter((d) => d.data_type === 'scale');
+  const keeper = isGoalkeeper(data.defs, data.values, player.id, kinds, positions);
+  const scaleDefs = defsFor(data.defs, scope).filter((d) => d.data_type === 'scale' && appliesToKind(d, keeper));
   const ratings = latestRatings(scaleDefs, data.values, player.id);
   const avg = average(ratings.map((r) => r.score));
   const last = ratings.reduce<string | null>((m, r) => (!m || r.at > m ? r.at : m), null);
@@ -284,7 +287,7 @@ function GoalsTab({ playerId, canEdit }: { playerId: string; canEdit: boolean })
 /** Every change to the player's parameters, newest first. */
 function HistoryCard({ playerId, scope }: { playerId: string; scope: Scope }) {
   const { data, loading, error } = usePlayerValues(playerId);
-  const positions = [...useLookups('position', { includeInactive: true }), ...useLookups('player_kind', { includeInactive: true })];
+  const positions = [...useLookups('position', { includeInactive: true }), ...useLookups('player_kind', { includeInactive: true }), ...useLookups('lineup_group', { includeInactive: true })];
   if (!data) return <Loading loading={loading} error={error} />;
   const defs = defsFor(data.defs, scope);
   const rows = data.values.filter((v) => defs.some((d) => d.id === v.def_id));

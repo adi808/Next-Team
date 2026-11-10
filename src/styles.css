@@ -467,6 +467,11 @@ legend { font-weight: 600; font-size: 0.9rem; padding: 0 0.35rem; }
 .pitch-name { font-size: 0.75rem; font-weight: 700; line-height: 1.1; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6); white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 .pitch-pos { font-size: 0.65rem; line-height: 1; opacity: 0.9; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6); }
 .pitch-help { font-size: 0.82rem; margin: 0.25rem 0; }
+.pitch-reason {
+  font-size: 0.62rem; line-height: 1.1; padding: 0.05rem 0.3rem; border-radius: 6px; background: #ef4444; color: #fff;
+  white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis;
+}
+.pitch-group-title { margin: 0.75rem 0 0.15rem; text-align: center; }
 .bench { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 0.75rem; padding: 0.5rem; border-radius: var(--radius); background: #e7efe9; }
 .bench .pitch-slot { position: static; transform: none; color: var(--text); }
 .bench .pitch-name, .bench .pitch-pos { text-shadow: none; }

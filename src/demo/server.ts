@@ -80,7 +80,7 @@ export class DemoServer {
     switch (table) {
       case 'profiles': case 'sports': case 'lookups': case 'attribute_defs': return t[table];
       case 'memberships': return t.memberships.filter((m) => m.user_id === this.uid || this.adminOf(m.club_id) || (m.team_id && this.coachOf(m.team_id)));
-      case 'event_lineups': return t.event_lineups.filter((r) => this.manageTeam(this.find('events', r.event_id)?.team_id));
+      case 'event_lineups': case 'event_lineup_state': return t[table].filter((r) => this.manageTeam(this.find('events', r.event_id)?.team_id));
       case 'guardianships': return t.guardianships.filter((g) => g.parent_id === this.uid || this.selfPlayer(g.player_id) || this.coachesPlayer(g.player_id) || this.sys);
       case 'v_players': return t.players.filter((p) => this.canView(p.id)).map((p) => {
         const fam = this.managePlayer(p.id) || this.parentOf(p.id) || this.selfPlayer(p.id);
@@ -396,13 +396,23 @@ export class DemoServer {
         notes: a.p_notes ?? '', opponent: String(a.p_opponent ?? '').trim() || null, our_score: a.p_our_score ?? null, their_score: a.p_their_score ?? null,
       });
     },
-    set_event_lineup(this: DemoServer, a: Row) {
+    save_event_lineup(this: DemoServer, a: Row) {
       const e = this.find('events', a.p_event);
       if (!e || !this.manageTeam(e.team_id)) this.deny();
-      const ids = (a.p_players ?? []) as (string | null)[];
-      if (new Set(ids.filter(Boolean)).size !== ids.filter(Boolean).length) this.bad('a player can stand in one slot only');
+      const groups = (a.p_groups ?? []) as (string | null)[][];
+      if (groups.length > 4) this.bad('up to 4 groups');
+      const ids = groups.flat().filter(Boolean);
+      if (new Set(ids).size !== ids.length) this.bad('a player can stand in one place only');
+      if (ids.some((p) => !this.t.team_players.some((x) => x.team_id === e.team_id && x.player_id === p))) this.bad('player is not on this team');
       this.t.event_lineups = this.t.event_lineups.filter((r) => r.event_id !== a.p_event);
-      ids.forEach((player_id, slot) => { if (player_id) this.t.event_lineups.push({ event_id: a.p_event, slot, player_id }); });
+      groups.forEach((g, gi) => g.forEach((player_id, slot) => {
+        if (player_id) this.t.event_lineups.push({ event_id: a.p_event, group_no: gi + 1, slot, player_id });
+      }));
+      this.t.event_lineup_state = this.t.event_lineup_state.filter((r) => r.event_id !== a.p_event);
+      if (a.p_approve) this.t.event_lineup_state.push({ event_id: a.p_event, approved_at: new Date().toISOString(), approved_by: this.uid });
+    },
+    set_event_lineup(this: DemoServer, a: Row) {
+      return this.rpcs.save_event_lineup.call(this, { p_event: a.p_event, p_groups: [a.p_players ?? []], p_approve: false });
     },
     set_guardian_relation(this: DemoServer, a: Row) {
       if (!((a.p_parent === this.uid && this.parentOf(a.p_player)) || this.managePlayer(a.p_player))) this.deny();
