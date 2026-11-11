@@ -289,7 +289,7 @@ export function FamilyTasks() {
 }
 
 interface Survey { id: string; team_id: string; title: string; description: string; closes_at: string | null }
-interface Question { id: string; survey_id: string; text: string; kind: 'single' | 'multi' | 'text' }
+interface Question { id: string; survey_id: string; text: string; kind: 'single' | 'multi' | 'text'; allow_other: boolean }
 interface Option { id: string; question_id: string; label: string }
 interface MyAnswer { question_id: string; option_id: string | null; text_answer: string | null }
 
@@ -300,7 +300,7 @@ export function FamilySurveys() {
     if (!teams.length) return null;
     const surveys = await q<Survey[]>(supabase.from('surveys').select('id, team_id, title, description, closes_at').in('team_id', teams.map((t) => t.id)).order('created_at', { ascending: false }));
     const sid = surveys.map((s) => s.id);
-    const questions = sid.length ? await q<Question[]>(supabase.from('survey_questions').select('id, survey_id, text, kind').in('survey_id', sid).order('position')) : [];
+    const questions = sid.length ? await q<Question[]>(supabase.from('survey_questions').select('id, survey_id, text, kind, allow_other').in('survey_id', sid).order('position')) : [];
     const qid = questions.map((x) => x.id);
     const options = qid.length ? await q<Option[]>(supabase.from('survey_options').select('id, question_id, label').in('question_id', qid).order('position')) : [];
     const mine = qid.length ? await q<MyAnswer[]>(supabase.from('survey_answers').select('question_id, option_id, text_answer').in('question_id', qid)) : [];
@@ -321,11 +321,16 @@ export function FamilySurveys() {
 
 function SurveyForm({ survey, questions, options, mine, onDone }: { survey: Survey; questions: Question[]; options: Option[]; mine: MyAnswer[]; onDone: () => void }) {
   const initial: Record<string, string[]> = {};
+  // "other": a choice question's free-text answer (a row with no option), and whether it is ticked
+  const initialOther: Record<string, { on: boolean; text: string }> = {};
   questions.forEach((qn) => {
     const mineHere = mine.filter((m) => m.question_id === qn.id);
-    initial[qn.id] = qn.kind === 'text' ? [mineHere[0]?.text_answer ?? ''] : mineHere.map((m) => m.option_id as string);
+    initial[qn.id] = qn.kind === 'text' ? [mineHere[0]?.text_answer ?? ''] : mineHere.filter((m) => m.option_id).map((m) => m.option_id as string);
+    const other = qn.kind === 'text' ? undefined : mineHere.find((m) => !m.option_id)?.text_answer;
+    initialOther[qn.id] = { on: !!other, text: other ?? '' };
   });
   const [vals, setVals] = useState(initial);
+  const [other, setOther] = useState(initialOther);
   const [saved, setSaved] = useState(false);
   const act = useAction();
   const answered = mine.some((m) => questions.some((qn) => qn.id === m.question_id));
@@ -334,7 +339,7 @@ function SurveyForm({ survey, questions, options, mine, onDone }: { survey: Surv
     await act.run(async () => {
       const answers = questions.map((qn) => qn.kind === 'text'
         ? { question_id: qn.id, text: vals[qn.id]?.[0] ?? '' }
-        : { question_id: qn.id, option_ids: vals[qn.id] ?? [] });
+        : { question_id: qn.id, option_ids: vals[qn.id] ?? [], other: qn.allow_other && other[qn.id]?.on ? other[qn.id].text : '' });
       await rpc('submit_survey', { p_survey: survey.id, p_answers: answers });
       setSaved(true); onDone();
     });
@@ -352,12 +357,30 @@ function SurveyForm({ survey, questions, options, mine, onDone }: { survey: Surv
             options.filter((o) => o.question_id === qn.id).map((o) => (
               <label key={o.id} className="check">
                 <input type={qn.kind === 'single' ? 'radio' : 'checkbox'} name={qn.id} checked={vals[qn.id]?.includes(o.id) ?? false}
-                  onChange={(e) => setVals({
-                    ...vals,
-                    [qn.id]: qn.kind === 'single' ? [o.id] : e.target.checked ? [...(vals[qn.id] ?? []), o.id] : (vals[qn.id] ?? []).filter((x) => x !== o.id),
-                  })} /> {o.label}
+                  onChange={(e) => {
+                    setVals({
+                      ...vals,
+                      [qn.id]: qn.kind === 'single' ? [o.id] : e.target.checked ? [...(vals[qn.id] ?? []), o.id] : (vals[qn.id] ?? []).filter((x) => x !== o.id),
+                    });
+                    if (qn.kind === 'single') setOther({ ...other, [qn.id]: { ...other[qn.id], on: false } });
+                  }} /> {o.label}
               </label>
             ))
+          )}
+          {qn.kind !== 'text' && qn.allow_other && (
+            <>
+              <label className="check">
+                <input type={qn.kind === 'single' ? 'radio' : 'checkbox'} name={qn.id} checked={other[qn.id]?.on ?? false}
+                  onChange={(e) => {
+                    setOther({ ...other, [qn.id]: { text: other[qn.id]?.text ?? '', on: qn.kind === 'single' || e.target.checked } });
+                    if (qn.kind === 'single') setVals({ ...vals, [qn.id]: [] });
+                  }} /> אחר
+              </label>
+              {other[qn.id]?.on && (
+                <input className="other-input" value={other[qn.id].text} placeholder="פרטו…" aria-label={`${qn.text}: אחר`}
+                  onChange={(e) => setOther({ ...other, [qn.id]: { on: true, text: e.target.value } })} />
+              )}
+            </>
           )}
         </div>
       ))}

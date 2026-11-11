@@ -1,5 +1,6 @@
 // Integration test through a real PostgREST (the API Supabase uses): signed JWTs per role, real HTTP.
-// Prerequisites: a database prepared as in supabase/tests (stub_auth.sql + migrations + scenario.sql, so users and data exist)
+// Prerequisites: a database prepared as in supabase/tests (stub_auth.sql + migrations + scenario.sql up to the
+// "edit / delete clubs and teams" section, which deletes the test club), so users and data exist,
 // and PostgREST running on :3000 with the jwt-secret below. Run: node tests/api-integration.cjs
 const crypto = require('crypto');
 const { execFileSync } = require('child_process');
@@ -38,7 +39,7 @@ const T1 = one("select id from teams where name = 'ילדים א'"), E_TRAIN = o
 
   // coach
   r = await call('C', 'GET', '/v_players?select=id,full_name,birth_date&order=full_name'); check('coach lists players with birth dates', r.status === 200 && r.json.length === 2 && r.json.every((p) => p.birth_date), r);
-  r = await call('C', 'GET', `/events?team_id=eq.${T1}&select=id,title,type_id`); check('coach lists events', r.status === 200 && r.json.length === 2, r);
+  r = await call('C', 'GET', `/events?team_id=eq.${T1}&select=id,title,type_id`); check('coach lists every event of the team', r.status === 200 && r.json.length > 0 && r.json.length === Number(one(`select count(*) from events where team_id = '${T1}'`)), r);
   r = await call('C', 'GET', '/lookups?domain=eq.event_type&select=slug,name_he&order=sort_order'); check('lookups readable (event types)', r.status === 200 && r.json.length === 3, r);
   r = await call('C', 'POST', '/rpc/create_event', { p_team: T1, p_type: one("select id from lookups where slug = 'team_building'"), p_title: 'גיבוש עונה', p_starts: new Date(Date.now() + 5 * 864e5).toISOString() });
   check('RPC with named params creates an event (returns the id)', r.status === 200 && typeof r.json === 'string', r);

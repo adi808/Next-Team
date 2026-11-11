@@ -289,6 +289,29 @@ select t.check('coach sees all answers', (select count(*) from survey_answers) =
 select t.as_user('O');
 select t.denied('outsider cannot answer', $$select submit_survey(t.id('SV'), '[]'::jsonb)$$);
 select t.check('outsider sees no surveys', (select count(*) from surveys) = 0);
+-- a choice question with "other" (free text)
+select t.as_user('C');
+insert into t.ctx select 'SV2', create_survey(t.id('T1'), 'הסעה', '', null,
+  '[{"text":"איך תגיעו?","kind":"single","options":["רכב","אוטובוס"],"allow_other":true},{"text":"מה להביא?","kind":"multi","options":["מים","כדור"],"allow_other":true},{"text":"צבע","kind":"single","options":["כחול","לבן"]}]'::jsonb);
+insert into t.ctx select 'SV2_q1', id from survey_questions where survey_id = t.id('SV2') and position = 1;
+insert into t.ctx select 'SV2_q2', id from survey_questions where survey_id = t.id('SV2') and position = 2;
+insert into t.ctx select 'SV2_q3', id from survey_questions where survey_id = t.id('SV2') and position = 3;
+select t.check('a choice question can allow "other"',
+  (select array_agg(allow_other order by position) from survey_questions where survey_id = t.id('SV2')) = array[true, true, false]);
+select t.as_user('P1');
+select submit_survey(t.id('SV2'), jsonb_build_array(
+  jsonb_build_object('question_id', t.id('SV2_q1'), 'option_ids', '[]'::jsonb, 'other', ' ברגל '),
+  jsonb_build_object('question_id', t.id('SV2_q2'), 'option_ids', jsonb_build_array((select id from survey_options where question_id = t.id('SV2_q2') and label = 'מים')), 'other', 'כפפות')));
+select t.check('"other" is saved as free text (trimmed), also next to options on a multi-choice question',
+  (select text_answer from survey_answers where question_id = t.id('SV2_q1')) = 'ברגל'
+  and (select count(*) from survey_answers where question_id = t.id('SV2_q2')) = 2
+  and exists (select 1 from survey_answers where question_id = t.id('SV2_q2') and option_id is null and text_answer = 'כפפות'));
+select t.denied('a single-choice question takes an option or "other", not both',
+  $$select submit_survey(t.id('SV2'), jsonb_build_array(jsonb_build_object('question_id', t.id('SV2_q1'),
+    'option_ids', jsonb_build_array((select id from survey_options where question_id = t.id('SV2_q1') and label = 'רכב')), 'other', 'x')))$$);
+select t.denied('"other" is refused on a question that does not allow it',
+  $$select submit_survey(t.id('SV2'), jsonb_build_array(jsonb_build_object('question_id', t.id('SV2_q3'), 'option_ids', '[]'::jsonb, 'other', 'ירוק')))$$);
+select t.check('a refused answer keeps the earlier answers', (select count(*) from survey_answers where question_id = t.id('SV2_q1')) = 1);
 
 -- ---------------------------------------------------------------- chat
 select t.as_user('P1');
@@ -470,7 +493,27 @@ select set_event_lineup(t.id('E_match'), array[t.id('K1'), null, t.id('K2')]);
 select t.check('coach saves a lineup (slots 0 and 2)',
   (select array_agg(slot order by slot) from event_lineups where event_id = t.id('E_match')) = array[0, 2]);
 select t.denied('the same player cannot stand in two slots', $$select set_event_lineup(t.id('E_match'), array[t.id('K1'), t.id('K1')])$$);
+select t.check('the one-group form saves a draft', not exists (select 1 from event_lineup_state where event_id = t.id('E_match')));
+select save_event_lineup(t.id('E_match'), jsonb_build_array(jsonb_build_array(t.id('K1')), jsonb_build_array(null, t.id('K2'))), false);
+select t.check('coach saves a lineup of two parallel groups',
+  (select array_agg(group_no || ':' || slot order by group_no, slot) from event_lineups where event_id = t.id('E_match')) = array['1:0', '2:1']);
+select t.check('a saved lineup is a draft until approved', not exists (select 1 from event_lineup_state where event_id = t.id('E_match')));
+select save_event_lineup(t.id('E_match'), jsonb_build_array(jsonb_build_array(t.id('K1')), jsonb_build_array(null, t.id('K2'))), true);
+select t.check('coach approves the lineup', exists (select 1 from event_lineup_state where event_id = t.id('E_match') and approved_by = t.id('C')));
+select save_event_lineup(t.id('E_match'), jsonb_build_array(jsonb_build_array(t.id('K2')), jsonb_build_array(t.id('K1'))), false);
+select t.check('a change after approval turns it back into a draft', not exists (select 1 from event_lineup_state where event_id = t.id('E_match')));
+select t.denied('a player cannot stand in two groups',
+  $$select save_event_lineup(t.id('E_match'), jsonb_build_array(jsonb_build_array(t.id('K1')), jsonb_build_array(t.id('K1'))))$$);
+select t.denied('up to 4 groups', $$select save_event_lineup(t.id('E_match'), '[[], [], [], [], []]'::jsonb)$$);
+select t.check('parallel groups, default group and kind ratings are defined',
+  exists (select 1 from attribute_defs where scope = 'team' and key = 'parallel_groups')
+  and exists (select 1 from attribute_defs where scope = 'player' and key = 'default_group' and not ('parent' = any (visible_to)))
+  and (select count(*) from lookups where domain = 'lineup_group') = 5
+  and exists (select 1 from attribute_defs where key = 'football_gk_reflexes' and config ->> 'player_kind' = 'goalkeeper')
+  and exists (select 1 from attribute_defs where key = 'football_kicking' and config ->> 'player_kind' = 'field'));
 select t.as_user('P1');
+select t.check('a parent does not see the lineup state', not exists (select 1 from event_lineup_state));
+select t.denied('a parent cannot save a lineup', $$select save_event_lineup(t.id('E_match'), '[[]]'::jsonb, true)$$);
 select t.check('a parent does not see the lineup', not exists (select 1 from event_lineups));
 select t.denied('a parent cannot set the lineup', $$select set_event_lineup(t.id('E_match'), array[t.id('K1')])$$);
 

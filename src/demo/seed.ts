@@ -38,6 +38,9 @@ export function seed(): Tables {
     lk('rel_mother', 'guardian_relation', 'אמא', 1), lk('rel_father', 'guardian_relation', 'אבא', 2), lk('rel_guardian', 'guardian_relation', 'אפוטרופוס', 3),
     lk('sr_manager', 'staff_role', 'מנהל קבוצה', 0), lk('sr_head', 'staff_role', 'מאמן ראשי', 1), lk('sr_assist', 'staff_role', 'עוזר מאמן', 2), lk('sr_fitness', 'staff_role', 'מנהל כושר', 3),
     lk('sr_secretary', 'staff_role', 'מזכירה', 4), lk('sr_medic', 'staff_role', 'חובש', 5),
+    lk('grp_1', 'lineup_group', 'קבוצה 1', 1, { meta: { group_no: 1 } }), lk('grp_2', 'lineup_group', 'קבוצה 2', 2, { meta: { group_no: 2 } }),
+    lk('grp_3', 'lineup_group', 'קבוצה 3', 3, { meta: { group_no: 3 } }), lk('grp_4', 'lineup_group', 'קבוצה 4', 4, { meta: { group_no: 4 } }),
+    lk('grp_bench', 'lineup_group', 'ספסל', 9, { meta: { bench: true } }),
   ];
   [['4-3-3', 'fm11'], ['4-4-2', 'fm11'], ['3-5-2', 'fm11'], ['4-2-3-1', 'fm11'], ['3-3-2', 'fm9'], ['3-2-3', 'fm9'], ['2-3-1', 'fm7'], ['3-2-1', 'fm7'], ['2-2', 'fm5'], ['1-2-1', 'fm5']]
     .forEach(([name, parent], i) => lookups.push(lk(`f_${name}`, 'formation', name, i + 1, { parent_id: parent, sport_id: 'sp_fb' })));
@@ -50,6 +53,7 @@ export function seed(): Tables {
     def('d_shirt', 'player', 'shirt_number', 'מספר חולצה', 'number', { min: 1, max: 99 }, ALL, STAFF, { sort_order: -3 }),
     def('d_kind', 'player', 'player_kind', 'שחקן שדה / שוער', 'lookup', { domain: 'player_kind' }, ALL, STAFF, { sport_id: 'sp_fb', sort_order: -2 }),
     def('d_pos', 'player', 'position', 'תפקיד ברירת מחדל', 'lookup', { domain: 'position' }, ALL, STAFF, { sort_order: -1 }),
+    def('d_group', 'player', 'default_group', 'קבוצה ברירת מחדל', 'lookup', { domain: 'lineup_group' }, STAFF, STAFF, { sort_order: -1 }),
     def('d_foot', 'player', 'strong_foot', 'רגל חזקה', 'select', { options: ['ימין', 'שמאל'] }, ALL, STAFF, { sport_id: 'sp_fb', sort_order: 1 }),
     def('d_allergy', 'player', 'medical_allergy', 'אלרגיה', 'text', {}, [...STAFF, 'parent'], ['coach', 'parent'], { sort_order: 10 }),
     def('d_cond', 'player', 'medical_condition', 'בעיה רפואית', 'text', {}, [...STAFF, 'parent'], ['coach', 'parent'], { sort_order: 11 }),
@@ -59,10 +63,16 @@ export function seed(): Tables {
     def('d_league', 'team', 'league_url', 'קישור לדף הקבוצה באתר ההתאחדות (טבלת ליגה)', 'text', {}, ALL, STAFF, { sort_order: 5 }),
     def('d_dform', 'team', 'default_formation', 'מערך (ברירת מחדל)', 'lookup', { domain: 'formation', depends_on: 'default_match_format' }, ALL, STAFF, { sort_order: 4 }),
     def('d_efmt', 'event', 'match_format', 'מספר שחקנים במגרש', 'lookup', { domain: 'match_format', default_from_team: 'default_match_format' }, ALL, STAFF, { sort_order: 1 }),
+    def('d_groups', 'team', 'parallel_groups', 'מספר קבוצות שמשחקות במקביל', 'number', { min: 1, max: 4, default: 1 }, ALL, STAFF, { sort_order: 6 }),
+    def('d_egroups', 'event', 'parallel_groups', 'מספר קבוצות במקביל', 'number', { min: 1, max: 4, default_from_team: 'parallel_groups' }, ALL, STAFF, { sort_order: 3 }),
     def('d_eform', 'event', 'formation', 'מערך', 'lookup', { domain: 'formation', depends_on: 'match_format', default_from_team: 'default_formation' }, ALL, STAFF, { sort_order: 2 }),
     def('d_ball', 'player', 'ball_control', 'שליטה בכדור', 'scale', { min: 1, max: 10 }, ALL, ['coach'], { team_id: 't1', club_id: 'c1', sort_order: 1 }),
     def('d_speed', 'player', 'speed', 'מהירות', 'scale', { min: 1, max: 10 }, ALL, ['coach'], { team_id: 't1', club_id: 'c1', sort_order: 2 }),
     def('d_team', 'player', 'teamwork', 'עבודת צוות', 'scale', { min: 1, max: 10 }, ALL, ['coach'], { team_id: 't1', club_id: 'c1', sort_order: 3 }),
+    def('d_kick', 'player', 'football_kicking', 'בעיטה', 'scale', { min: 1, max: 10, player_kind: 'field' }, ALL, STAFF, { sport_id: 'sp_fb', sort_order: 6 }),
+    def('d_pass', 'player', 'football_passing', 'מסירה', 'scale', { min: 1, max: 10, player_kind: 'field' }, ALL, STAFF, { sport_id: 'sp_fb', sort_order: 7 }),
+    def('d_gk_ref', 'player', 'football_gk_reflexes', 'תגובה', 'scale', { min: 1, max: 10, player_kind: 'goalkeeper' }, ALL, STAFF, { sport_id: 'sp_fb', sort_order: 6 }),
+    def('d_gk_hand', 'player', 'football_gk_handling', 'תפיסה', 'scale', { min: 1, max: 10, player_kind: 'goalkeeper' }, ALL, STAFF, { sport_id: 'sp_fb', sort_order: 7 }),
   ];
   let seq = 0;
   const val = (def_id: string, entity_id: string, value: unknown, daysAgo: number, by = 'u_coach'): Row =>
@@ -77,10 +87,14 @@ export function seed(): Tables {
     val('d_foot', 'k1', 'שמאל', 60), val('d_foot', 'k2', 'ימין', 60),
     val('d_pos', 'k1', 'pos_mf', 60), val('d_pos', 'k2', 'pos_fw', 60), val('d_pos', 'k3', 'pos_gk', 60),
     val('d_pos', 'k4', 'pos_df', 60), val('d_pos', 'k5', 'pos_df', 60), val('d_pos', 'k6', 'pos_mf', 60),
+    val('d_group', 'k1', 'grp_1', 60), val('d_group', 'k2', 'grp_1', 60), val('d_group', 'k3', 'grp_1', 60),
+    val('d_group', 'k4', 'grp_2', 60), val('d_group', 'k5', 'grp_2', 60), val('d_group', 'k6', 'grp_2', 60),
+    val('d_kick', 'k2', 8, 10), val('d_pass', 'k2', 9, 10), val('d_gk_ref', 'k3', 8, 7), val('d_gk_hand', 'k3', 7, 7),
     val('d_allergy', 'k1', 'בוטנים', 100, 'u_p1'), val('d_cond', 'k2', 'אסתמה קלה, ממליצים על משאף בתיק', 60, 'u_p2'),
     val('d_canresp', 't1', true, 30), val('d_minage', 't1', 12, 30), val('d_dfmt', 't1', 'fm11', 30), val('d_dform', 't1', 'f_4-3-3', 30),
     val('d_league', 't1', 'https://www.football.org.il/team-details/?team_id=8776&season_id=28', 30),
     val('d_efmt', 'e_match', 'fm11', 5), val('d_eform', 'e_match', 'f_4-3-3', 5), val('d_efmt', 'e_past', 'fm11', 9), val('d_eform', 'e_past', 'f_4-4-2', 9),
+    val('d_efmt', 'e_cup', 'fm7', 5), val('d_eform', 'e_cup', 'f_2-3-1', 5), val('d_egroups', 'e_cup', 2, 5),
   ];
 
   const player = (id: string, full_name: string, birth_date: string, user_id: string | null = null): Row =>
@@ -137,6 +151,7 @@ export function seed(): Tables {
       { id: 'e_past', team_id: 't1', type_id: 'lk_match', title: 'משחק ליגה נגד בית״ר', starts_at: at(-3, 10), ends_at: null, location: 'מגרש בית״ר', notes: '', opponent: 'בית״ר', our_score: 2, their_score: 1 },
       { id: 'e_train', team_id: 't1', type_id: 'lk_train', title: 'אימון קבוצתי', starts_at: at(1, 17, 30), ends_at: null, location: 'מגרש 3', notes: 'להגיע עם מים וקרמפונים', opponent: null, our_score: null, their_score: null, kit_id: 'kit_home', equipment: ['eq_water', 'eq_boots', 'eq_shin'] },
       { id: 'e_match', team_id: 't1', type_id: 'lk_match', title: 'משחק ליגה נגד הפועל', starts_at: at(4, 10), ends_at: null, location: 'אצטדיון עירוני', notes: 'התכנסות שעה לפני', opponent: 'הפועל', our_score: null, their_score: null, kit_id: 'kit_away' },
+      { id: 'e_cup', team_id: 't1', type_id: 'lk_match', title: 'טורניר 7 על 7', starts_at: at(6, 9), ends_at: null, location: 'מגרש 3', notes: 'משחקים בשתי קבוצות במקביל', opponent: 'טורניר', our_score: null, their_score: null },
       { id: 'e_build', team_id: 't1', type_id: 'lk_build', title: 'גיבוש סוף עונה', starts_at: at(9, 16), ends_at: null, location: 'פארק הירקון', notes: '', opponent: null, our_score: null, their_score: null },
       { id: 'e_bb', team_id: 't2', type_id: 'lk_train', title: 'אימון כדורסל', starts_at: at(2, 19), ends_at: null, location: 'אולם ספורט', notes: '', opponent: null, our_score: null, their_score: null },
     ],
@@ -148,8 +163,12 @@ export function seed(): Tables {
       { event_id: 'e_match', player_id: 'k2', status: 'attending', reason_id: null, note: '', responded_at: ago(0) },
       { event_id: 'e_match', player_id: 'k3', status: 'attending', reason_id: null, note: '', responded_at: ago(0) },
       { event_id: 'e_match', player_id: 'k6', status: 'not_attending', reason_id: 'r_fam', note: '', responded_at: ago(0) },
+      { event_id: 'e_cup', player_id: 'k1', status: 'attending', reason_id: null, note: '', responded_at: ago(0) },
+      { event_id: 'e_cup', player_id: 'k4', status: 'attending', reason_id: null, note: '', responded_at: ago(0) },
+      { event_id: 'e_cup', player_id: 'k5', status: 'not_attending', reason_id: 'r_inj', note: '', responded_at: ago(0) },
     ],
     event_lineups: [],
+    event_lineup_state: [],
     event_stats: [
       { id: 'es1', event_id: 'e_past', player_id: 'k2', stat_type_id: 'st_goal', minute: 12, note: '' },
       { id: 'es2', event_id: 'e_past', player_id: 'k1', stat_type_id: 'st_assist', minute: 12, note: '' },
@@ -177,8 +196,8 @@ export function seed(): Tables {
     ],
     surveys: [{ id: 's1', team_id: 't1', title: 'טורניר סוף עונה: מי מגיע?', description: 'הטורניר ב־20 בחודש, נשמח לדעת כמה נהיה', closes_at: null, created_at: ago(2) }],
     survey_questions: [
-      { id: 'q1', survey_id: 's1', text: 'האם תגיעו?', kind: 'single', position: 1 },
-      { id: 'q2', survey_id: 's1', text: 'הערות', kind: 'text', position: 2 },
+      { id: 'q1', survey_id: 's1', text: 'האם תגיעו?', kind: 'single', position: 1, allow_other: true },
+      { id: 'q2', survey_id: 's1', text: 'הערות', kind: 'text', position: 2, allow_other: false },
     ],
     survey_options: [
       { id: 'o1', question_id: 'q1', label: 'כן', position: 1 }, { id: 'o2', question_id: 'q1', label: 'לא', position: 2 }, { id: 'o3', question_id: 'q1', label: 'אולי', position: 3 },
@@ -187,6 +206,7 @@ export function seed(): Tables {
       { id: 'sa1', question_id: 'q1', respondent_id: 'u_p1', option_id: 'o1', text_answer: null },
       { id: 'sa2', question_id: 'q1', respondent_id: 'u_p2', option_id: 'o3', text_answer: null },
       { id: 'sa3', question_id: 'q2', respondent_id: 'u_p2', option_id: null, text_answer: 'תלוי בשעות המשחק' },
+      { id: 'sa4', question_id: 'q1', respondent_id: 'u_admin', option_id: null, text_answer: 'נגיע רק לחצי השני של היום' },
     ],
     messages: [
       msg('ms1', 't1', 'u_admin', 'ברוכים הבאים לעונה החדשה, בהצלחה לכולם!', 12),

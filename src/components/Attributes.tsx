@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { q, rpc, useAction, useLoad, fmtDate } from '../lib/db';
-import { ENTITY_ROLES, ENTITY_ROLE_LABELS, type AttrDef, type AttrType, type AttrValue, type EntityRole } from '../lib/types';
+import { ENTITY_ROLES, ENTITY_ROLE_LABELS, type AttrDef, type AttrType, type AttrValue, type EntityRole, type Lookup } from '../lib/types';
 import { Card, ErrorText, Field, Loading } from './ui';
 import { LookupSelect, useLookups } from './Lookups';
 
@@ -12,6 +12,7 @@ function useFormat() {
     ...useLookups('formation', { includeInactive: true }),
     ...useLookups('position', { includeInactive: true }),
     ...useLookups('player_kind', { includeInactive: true }),
+    ...useLookups('lineup_group', { includeInactive: true }),
   ];
   return (def: AttrDef, v: unknown): string => {
     if (v === null || v === undefined) return '';
@@ -79,11 +80,32 @@ export interface AttributesScope {
   sportIds: string[];
 }
 
+/** Which players a rating is for: config.player_kind is a player_kind slug ('goalkeeper' / 'field'); none = everyone. */
+export const KIND_LABELS: Record<string, string> = { '': 'כל השחקנים', field: 'שחקני שדה', goalkeeper: 'שוערים' };
+export const defKind = (d: AttrDef) => String((d.config as { player_kind?: string }).player_kind ?? '');
+/** Whether a player parameter applies to a goalkeeper (true) or a field player (false). */
+export const appliesToKind = (d: AttrDef, keeper: boolean) => !defKind(d) || defKind(d) === (keeper ? 'goalkeeper' : 'field');
+
+/**
+ * A player is a goalkeeper by "field player / goalkeeper", else by the default role; otherwise a field player.
+ * values must be newest first.
+ */
+export function isGoalkeeper(defs: AttrDef[], values: AttrValue[], playerId: string, kinds: Lookup[], positions: Lookup[]) {
+  const latest = (key: string) => {
+    const ids = new Set(defs.filter((d) => d.key === key && d.scope === 'player').map((d) => d.id));
+    return values.find((v) => ids.has(v.def_id) && v.entity_id === playerId)?.value;
+  };
+  const kind = kinds.find((l) => l.id === latest('player_kind'));
+  return kind ? !!kind.meta?.goalkeeper : !!positions.find((l) => l.id === latest('position'))?.meta?.goalkeeper;
+}
+
 /** Dynamic parameters of a player / team / event, each with its full history. */
 export function AttributesPanel({ scope, entityId, myRoles, clubId, teamIds, sportIds, title, hideKeys, onlyTypes, skipTypes, onSaved }: AttributesScope & {
   title?: string; hideKeys?: string[]; onlyTypes?: AttrType[]; skipTypes?: AttrType[]; onSaved?: () => void;
 }) {
   const format = useFormat();
+  const kinds = useLookups('player_kind', { includeInactive: true });
+  const positions = useLookups('position', { includeInactive: true });
   const { data, error, loading, reload } = useLoad(async () => {
     const [defs, values] = await Promise.all([
       q<AttrDef[]>(supabase.from('attribute_defs').select('*').eq('scope', scope).eq('active', true).order('sort_order')),
@@ -96,6 +118,8 @@ export function AttributesPanel({ scope, entityId, myRoles, clubId, teamIds, spo
   const act = useAction();
 
   const mine = (list: EntityRole[]) => list.some((r) => myRoles.includes(r));
+  const keeper = scope === 'player' && isGoalkeeper(data?.defs ?? [], data?.values ?? [], entityId, kinds, positions);
+  const forThisKind = (d: AttrDef) => scope !== 'player' || appliesToKind(d, keeper);
   const defs = (data?.defs ?? []).filter(
     (d) =>
       !hideKeys?.includes(d.key) &&
@@ -104,6 +128,7 @@ export function AttributesPanel({ scope, entityId, myRoles, clubId, teamIds, spo
       (!d.club_id || d.club_id === clubId) &&
       (!d.team_id || teamIds.includes(d.team_id)) &&
       (!d.sport_id || sportIds.includes(d.sport_id)) &&
+      forThisKind(d) &&
       mine(d.visible_to),
   );
   const current = (id: string) => data?.values.find((v) => v.def_id === id)?.value;
@@ -180,6 +205,7 @@ export function DefCreator({ scope, clubId, teamId, sportId, onCreated }: {
   const [min, setMin] = useState(1);
   const [max, setMax] = useState(10);
   const [options, setOptions] = useState('');
+  const [kind, setKind] = useState('');
   const [visible, setVisible] = useState<EntityRole[]>(['system_admin', 'club_admin', 'coach', 'parent', 'player']);
   const [editable, setEditable] = useState<EntityRole[]>(['coach']);
   const act = useAction();
@@ -190,6 +216,7 @@ export function DefCreator({ scope, clubId, teamId, sportId, onCreated }: {
   async function create() {
     const config: Record<string, unknown> = {};
     if (type === 'scale') { config.min = min; config.max = max; }
+    if (scope === 'player' && kind) config.player_kind = kind;
     if (type === 'select') config.options = options.split(',').map((s) => s.trim()).filter(Boolean);
     const ok = await act.run(async () => {
       await rpc('create_attribute_def', {
@@ -215,6 +242,13 @@ export function DefCreator({ scope, clubId, teamId, sportId, onCreated }: {
           <Field label="מ־"><input type="number" value={min} onChange={(e) => setMin(Number(e.target.value))} /></Field>
           <Field label="עד"><input type="number" value={max} onChange={(e) => setMax(Number(e.target.value))} /></Field>
         </div>
+      )}
+      {scope === 'player' && (
+        <Field label="חל על">
+          <select value={kind} onChange={(e) => setKind(e.target.value)}>
+            {Object.entries(KIND_LABELS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+          </select>
+        </Field>
       )}
       {type === 'select' && <Field label="אפשרויות (מופרדות בפסיק)"><input value={options} onChange={(e) => setOptions(e.target.value)} /></Field>}
       <fieldset><legend>מי רואה</legend>
@@ -252,7 +286,7 @@ export function DefList({ scope, teamId, clubId, onChanged }: { scope: AttrDef['
       {data.map((d) => (
         <li key={d.id} className="row">
           <span className={d.active ? '' : 'muted'}>{d.label_he}</span>
-          <small className="muted">{TYPE_LABELS[d.data_type]}</small>
+          <small className="muted">{TYPE_LABELS[d.data_type]}{defKind(d) ? ` · ${KIND_LABELS[defKind(d)] ?? defKind(d)}` : ''}</small>
           <button className="small" disabled={act.busy}
             onClick={() => act.run(async () => { await rpc('update_attribute_def', { p_def: d.id, p_active: !d.active }); reload(); onChanged(); })}>
             {d.active ? 'הסתרה' : 'הצגה'}
