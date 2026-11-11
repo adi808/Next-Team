@@ -8,6 +8,7 @@ import { PageHero } from '../components/ui';
 import { useLookupName } from '../components/Lookups';
 import { parseJoinCode } from '../lib/join';
 import { entered } from '../lib/entry';
+import { endPreview, getPreview } from '../auth/preview';
 
 const HINTS: Record<Mode, string> = {
   sysadmin: 'מועדונים, רשימות והגדרות מערכת',
@@ -35,17 +36,20 @@ function JoinCodeField() {
 
 /** Entry screen: an account with several roles (for example coach and parent) chooses how to enter. */
 export default function ModePicker({ auto }: { auto?: boolean }) {
-  const { modes, loading, profile, signOut, memberships } = useAuth();
+  const { modes, loading, profile, signOut, memberships, adminClubIds } = useAuth();
   const navigate = useNavigate();
   const staffName = useLookupName('staff_role');
   // The team staff card carries the staff type (e.g. team manager) when all the user's teams agree on it.
   const types = [...new Set(memberships.filter((m) => m.role === 'coach').map((m) => staffName(m.staff_role_id)))];
   useEffect(() => { entered(); }, []);
+  // back on the entry screen: "view as" ends
+  useEffect(() => { if (getPreview()) endPreview(); }, []);
+  const canPreview = !!profile?.is_system_admin || adminClubIds.length > 0;
   const label = (m: Mode) => (m === 'coach' && types.length === 1 && types[0] ? types[0] : MODE_LABELS[m]);
   if (loading) return <p className="center">טוען…</p>;
 
   // one role: straight in; several: always this screen
-  if (auto && modes.length === 1) return <Navigate to={homeOf(modes[0])} replace />;
+  if (auto && modes.length === 1 && !canPreview) return <Navigate to={homeOf(modes[0])} replace />;
 
   if (!modes.length) {
     return (
@@ -74,6 +78,13 @@ export default function ModePicker({ auto }: { auto?: boolean }) {
             <span className="chev" aria-hidden="true">‹</span>
           </button>
         ))}
+        {canPreview && (
+          <button className="role-card preview-card" onClick={() => navigate('/preview')}>
+            <span className="role-icon"><Icon name="users" size={26} /></span>
+            <span><strong>צפייה כמאמן / כשחקן</strong><small>לראות את המסכים שלהם, בלי שיוך לקבוצה ובלי לשמור שינויים</small></span>
+            <span className="chev" aria-hidden="true">‹</span>
+          </button>
+        )}
       </div>
       <p className="center-link"><button className="link" onClick={signOut}>יציאה</button></p>
     </div>

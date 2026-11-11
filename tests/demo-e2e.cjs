@@ -32,7 +32,9 @@ const out = (ok, label, extra) => { if (!ok) fails++; console.log(`${ok ? 'PASS'
   await has('coach lands on home with the next event', 'שלום, אבי', 'האירוע הבא', 'אימון מחר', 'מגיעים', 'טרם השיבו', 'הכנה לאירוע'); await shot('coach-home');
   await has('coach home also shows the next event of another type', 'המשחק הקרוב', 'הפועל');
   await has('coach home shows the staff type', 'מאמן ראשי · ילדים ב׳');
-  await has('coach home: this week, Sunday to Saturday, with the training and the match', 'השבוע שלי', 'אימון קבוצתי', 'משחק ליגה נגד הפועל');
+  // the sample match is 4 days from today: it is in this week (Sunday to Saturday) only until Tuesday
+  const matchThisWeek = new Date().getDay() + 4 <= 6;
+  await has('coach home: this week, Sunday to Saturday, with the training (and the match when it falls this week)', 'השבוע שלי', 'אימון קבוצתי', ...(matchThisWeek ? ['משחק ליגה נגד הפועל'] : []));
   await p.click('button:has-text("תמונת לו")'); await wait(900);
   out(await p.locator('.week-share img').count() === 1, 'week poster preview is drawn');
   await has('week message lists the events and the kit', 'לו"ז אירועים לשבוע', '👕 בית');
@@ -183,6 +185,25 @@ const out = (ok, label, extra) => { if (!ok) fails++; console.log(`${ok ? 'PASS'
   // club admin who is also a parent: mode picker
   await pick('רונית מזרחי');
   await has('mode picker for a user with two roles', 'איך נכנסים היום?', 'מנהל מועדון', 'הורה');
+  // "view as": the club admin looks at the app as a coach and as a player, read only
+  await has('the admin can view as a coach or a player', 'צפייה כמאמן / כשחקן');
+  await p.click('button:has-text("צפייה כמאמן / כשחקן")'); await wait(800);
+  await p.click('.card button:has-text("ילדים ב׳")'); await wait(800);
+  await has('preview picker lists the squad', 'כמאמן של ילדים ב׳', 'דני כהן', 'נועה מזרחי');
+  await p.click('button:has-text("כמאמן של ילדים ב׳")'); await wait(1500);
+  await has('coach view: the banner and the coach home', 'צפייה כמאמן של ילדים ב׳', 'לקריאה בלבד', 'האירוע הבא'); await shot('preview-coach');
+  await p.click('.bottom-nav >> text=אירועים'); await wait(1000); await p.click('text=משחק ליגה נגד הפועל'); await wait(1500);
+  await has('coach view shows the lineup', 'הרכב על המגרש');
+  await p.locator('.pitch .pitch-slot').nth(1).click(); await p.locator('.pitch .pitch-slot').nth(2).click(); await wait(300);
+  await p.click('button:has-text("שמירת טיוטה")'); await wait(800);
+  await has('coach view is read only', 'מצב צפייה: אי אפשר לשמור שינויים');
+  await p.click('button:has-text("יציאה מצפייה")'); await wait(1000);
+  await has('leaving the view returns to the entry screen', 'איך נכנסים היום?'); await hasNot('the coach card is gone after the view', 'צפייה כמאמן של');
+  await p.click('button:has-text("צפייה כמאמן / כשחקן")'); await wait(800);
+  await p.click('.card button:has-text("ילדים ב׳")'); await wait(800);
+  await p.click('.card li button:has-text("דני כהן")'); await wait(1500);
+  await has('player view: the banner and the player\'s events', 'צפייה כשחקן: דני כהן', 'אימון');
+  await p.click('button:has-text("יציאה מצפייה")'); await wait(1000);
   await p.click('button:has-text("מנהל מועדון")'); await wait(900); await has('admin sees the club', 'מכבי הצפון');
   await p.click('text=מכבי הצפון'); await wait(900); await has('club teams for the admin', 'ילדים ב׳', 'נוער כדורסל'); await shot('club');
   p.on('dialog', (d) => d.accept());
@@ -227,6 +248,8 @@ const out = (ok, label, extra) => { if (!ok) fails++; console.log(`${ok ? 'PASS'
 
   // system admin
   await pick('יוסי אברהם');
+  await has('a system admin also gets the "view as" card', 'איך נכנסים היום?', 'צפייה כמאמן / כשחקן');
+  await p.click('button:has-text("מנהל מערכת")'); await wait(900);
   await has('system admin sees clubs and the creation form', 'מועדון חדש', 'מכבי הצפון');
   await p.fill('input >> nth=0', 'מועדון בדיקה'); await p.click('button:has-text("יצירת מועדון")'); await wait(800); await has('club created', 'מועדון בדיקה');
   await p.click('role=navigation >> text=רשימות'); await wait(800); await has('lists screen', 'סוגי אירוע', 'אימון', 'גיבוש'); await shot('lists');

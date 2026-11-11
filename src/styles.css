@@ -376,7 +376,7 @@ legend { font-weight: 600; font-size: 0.9rem; padding: 0 0.35rem; }
 .demo-lead { margin-top: 0; }
 .demo-note { font-size: 0.85rem; }
 .demo-bar {
-  position: sticky; top: 0; z-index: 20; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;
+  display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;
   flex-wrap: wrap; padding: 0.45rem 1rem; background: var(--primary-soft); color: var(--primary-hover); font-size: 0.85rem; font-weight: 500;
   border-bottom: 1px solid #dbe6fe;
 }
@@ -479,6 +479,12 @@ legend { font-weight: 600; font-size: 0.9rem; padding: 0 0.35rem; }
 .bench .pitch-name, .bench .pitch-pos { text-shadow: none; }
 .bench .pitch-photo { border-color: #2f8f4e; }
 .bench .pitch-slot:hover:not(:disabled) { background: rgba(47, 143, 78, 0.12); }
+.preview-bar {
+  display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;
+  padding: 0.45rem 1rem; background: #facc15; color: #1f2937; font-size: 0.88rem; font-weight: 600;
+}
+.preview-bar button { min-height: 0; padding: 0.3rem 0.7rem; background: #1f2937; color: #fff; }
+.preview-card { border-style: dashed; }
 .inline-select { width: auto; min-height: 0; padding: 0.3rem 0.55rem; font-size: 0.88rem; }
 
 /* ---- league tab ---- */

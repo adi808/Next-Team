@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from './supabase';
+import { assertNotPreview } from '../auth/preview';
 
 interface PgError { message: string; code?: string }
 
@@ -13,6 +14,7 @@ const BY_CODE: Record<string, string> = {
 
 export function friendlyError(e: unknown): string {
   const err = e as PgError;
+  if (err?.code === 'preview') return 'מצב צפייה: אי אפשר לשמור שינויים';
   if (err?.message?.includes('birth_date_check')) return 'תאריך הלידה לא יכול להיות בעתיד';
   if (err?.message?.includes('phone number belongs')) return 'מספר הטלפון כבר שייך לחשבון אחר';
   if (err?.message?.includes('the event was cancelled')) return 'האירוע בוטל, אין צורך לאשר הגעה';
@@ -32,11 +34,18 @@ export async function q<T>(p: PromiseLike<{ data: unknown; error: PgError | null
 
 // Updates or deletes one row by id; RLS hides rows it refuses, so an empty result means no permission.
 export async function mutateOne(p: PromiseLike<{ data: unknown; error: PgError | null }>): Promise<void> {
+  assertNotPreview();
   const rows = await q<unknown[] | null>(p);
   if (!rows?.length) throw { code: '42501', message: 'not allowed' } satisfies PgError;
 }
 
+// Functions that only read: allowed while previewing ("view as"). Every other function changes data.
+const READ_RPCS = new Set(['club_roster', 'event_transport_list', 'join_link_info', 'pending_join_requests', 'player_details',
+  'player_email_invite', 'player_parents', 'push_public_key', 'team_contacts', 'team_param', 'team_staff']);
+
 export function rpc<T = unknown>(name: string, args?: Record<string, unknown>): Promise<T> {
+  // no request at all while previewing (read only); reads go through rpc too, so only known reads pass
+  if (!READ_RPCS.has(name)) { try { assertNotPreview(); } catch (e) { return Promise.reject(e); } }
   return q<T>(supabase.rpc(name, args));
 }
 
