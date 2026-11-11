@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { assertNotPreview } from '../auth/preview';
 
 // Shrinks a photo to fit maxSide and re-encodes it as JPEG, so uploads stay small (the buckets cap files at 2 MB).
 export async function shrinkImage(file: File, maxSide = 800): Promise<Blob> {
@@ -15,6 +16,7 @@ export async function shrinkImage(file: File, maxSide = 800): Promise<Blob> {
 
 /** Uploads a shrunk copy under folder/ with a new name and returns its storage path. */
 export async function uploadImage(bucket: string, folder: string, file: File): Promise<string> {
+  assertNotPreview();
   const blob = await shrinkImage(file);
   const path = `${folder}/${Date.now()}.jpg`;
   const { error } = await supabase.storage.from(bucket).upload(path, blob, { contentType: 'image/jpeg' });

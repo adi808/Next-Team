@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { q, rpc, useAction, useLoad } from '../lib/db';
 import { Badge, Card, Empty, ErrorText } from './ui';
 import { useLookups } from './Lookups';
+import { isPreview } from '../auth/preview';
 import { PlayerAvatar, useShirtNumbers } from './People';
 import type { AttrDef, AttrValue, EventResponse, EventRow, Lookup, Player } from '../lib/types';
 
@@ -181,7 +182,8 @@ export function LineupPitch({ event, players, responses }: { event: EventRow; pl
 
   // A match without a lineup gets a draft saved right away, from the defaults; the coach reviews and approves it.
   useEffect(() => {
-    if (!data || savedLineup || drafted.current || !lookupsReady || !players.length) return;
+    // not while previewing ("view as" is read only): the suggestion is shown, nothing is saved
+    if (!data || savedLineup || drafted.current || !lookupsReady || !players.length || isPreview()) return;
     drafted.current = true;
     const draft = suggestion();
     if (!draft.some((g) => g.some(Boolean))) return;

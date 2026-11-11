@@ -4,6 +4,7 @@ import { isDemo } from './lib/supabase';
 import { AuthProvider, useAuth } from './auth/AuthProvider';
 import Login from './pages/Login';
 import ModePicker from './pages/ModePicker';
+import PreviewPicker from './pages/PreviewPicker';
 import CompleteProfile from './pages/CompleteProfile';
 import Shell from './components/Shell';
 import ClubsPage from './pages/admin/ClubsPage';
@@ -92,6 +93,7 @@ function Gate() {
       <Route path="/join/:code" element={<JoinPage />} />
       <Route path="/requests" element={<ToRequests />} />
       <Route path="/pick" element={<ModePicker />} />
+      <Route path="/preview" element={<PreviewPicker />} />
       <Route path="/m/:mode" element={<Shell />}>
         <Route path="clubs" element={<ClubsPage />} />
         <Route path="club/:clubId" element={<ClubPage />} />

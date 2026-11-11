@@ -6,6 +6,7 @@ import { normEmail } from '../../lib/email';
 import { useAuth } from '../../auth/AuthProvider';
 import { useActingRole } from '../../auth/acting';
 import { Badge, Card, Empty, ErrorText, Field, Loading, PageHero, ScoreBar, Tabs } from '../../components/ui';
+import { assertNotPreview } from '../../auth/preview';
 import { AttributesPanel, appliesToKind, isGoalkeeper } from '../../components/Attributes';
 import { useLookups } from '../../components/Lookups';
 import { PlayerAvatar, ShirtNo, useShirtNumbers } from '../../components/People';
@@ -63,6 +64,7 @@ export default function PlayerPage() {
   }
   async function upload(file: File) {
     await act.run(async () => {
+      assertNotPreview();
       const path = `${player.id}/${Date.now()}.${file.name.split('.').pop() || 'jpg'}`;
       const { error: err } = await supabase.storage.from('player-photos').upload(path, file, { upsert: true });
       if (err) throw err;

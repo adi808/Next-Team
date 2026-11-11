@@ -48,7 +48,7 @@ function useUnread(key: string) {
 
 export default function Shell() {
   const { mode } = useParams();
-  const { modes, profile, signOut } = useAuth();
+  const { modes, profile, signOut, preview, endPreview, previewPending } = useAuth();
   const m = mode as Mode;
   const valid = modes.includes(m);
   const { pathname } = useLocation();
@@ -82,6 +82,7 @@ export default function Shell() {
     };
   }, [navigate]);
 
+  if (previewPending) return <p className="center">טוען…</p>;
   if (!valid || pickOnStart) return <Navigate to="/pick" replace />;
   return (
     <div className="shell">
@@ -101,6 +102,12 @@ export default function Shell() {
         </Link>
         <button className="link" onClick={signOut}>יציאה</button>
       </header>
+      {preview && (m === 'coach' || m === 'player') && (
+        <div className="preview-bar" role="status">
+          <span>👁 {preview.kind === 'coach' ? `צפייה כמאמן של ${preview.label}` : `צפייה כשחקן: ${preview.label}`} · לקריאה בלבד</span>
+          <button className="small" onClick={() => { endPreview(); navigate('/pick'); }}>יציאה מצפייה</button>
+        </div>
+      )}
       <main>
         <InstallBanner />
         {(m === 'coach' || m === 'admin' || m === 'sysadmin') && !pathname.endsWith('/requests') && !pathname.endsWith('/notifications') && <PendingRequestsBanner key={pathname} />}

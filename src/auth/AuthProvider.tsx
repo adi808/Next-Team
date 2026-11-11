@@ -3,6 +3,7 @@ import type { Session } from '@supabase/supabase-js';
 import { isDemo, supabase } from '../lib/supabase';
 import { q } from '../lib/db';
 import type { Membership, Mode, Player, Profile } from '../lib/types';
+import { endPreview, getPreview, type Preview } from './preview';
 
 interface AuthState {
   loading: boolean;
@@ -16,6 +17,11 @@ interface AuthState {
   modes: Mode[];
   adminClubIds: string[];
   coachTeamIds: string[];
+  /** "view as" a coach or a player (club admin / system admin only), read only */
+  preview: (Preview & { label: string }) | null;
+  /** a "view as" was just chosen and is still loading */
+  previewPending: boolean;
+  endPreview: () => void;
   reload: () => void;
   signOut: () => Promise<void>;
 }
@@ -31,6 +37,16 @@ export function AuthProvider({ children: kids }: { children: ReactNode }) {
   const [me, setMe] = useState<Player | null>(null);
   const [tick, setTick] = useState(0);
   const loadedOnce = useRef(false);
+  const [preview, setPreview] = useState<Preview | null>(getPreview);
+  const [allPlayers, setAllPlayers] = useState<Player[]>([]);
+  const [previewTeam, setPreviewTeam] = useState<{ id: string; club_id: string; name: string } | null>(null);
+  useEffect(() => {
+    const on = () => setPreview(getPreview());
+    window.addEventListener('nt-preview', on);
+    return () => window.removeEventListener('nt-preview', on);
+  }, []);
+  const previewKey = preview ? JSON.stringify(preview) : '';
+  const [resolvedKey, setResolvedKey] = useState('');
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -42,7 +58,9 @@ export function AuthProvider({ children: kids }: { children: ReactNode }) {
       // Signed in (by code, emailed link or Google): forget the address the login screen was waiting on.
       if (next) { try { localStorage.removeItem('nt-login-pending'); } catch { /* storage blocked */ } }
       if (!next) {
-        setProfile(null); setMemberships([]); setChildren([]); setMe(null); loadedOnce.current = false; setLoading(false);
+        setProfile(null); setMemberships([]); setChildren([]); setMe(null); setAllPlayers([]); setPreviewTeam(null);
+        loadedOnce.current = false; setLoading(false);
+        if (getPreview()) endPreview();
       }
     });
     return () => sub.subscription.unsubscribe();
@@ -68,31 +86,56 @@ export function AuthProvider({ children: kids }: { children: ReactNode }) {
       setMemberships(m);
       setChildren(players.filter((pl) => mine.has(pl.id)));
       setMe(players.find((pl) => pl.is_me) ?? null);
+      setAllPlayers(players);
+      const pv = getPreview();
+      const team = pv?.kind === 'coach'
+        ? (await q<{ id: string; club_id: string; name: string }[]>(supabase.from('teams').select('id, club_id, name').eq('id', pv.teamId)))[0] ?? null
+        : null;
+      if (cancelled) return;
+      setPreviewTeam(team);
+      setResolvedKey(pv ? JSON.stringify(pv) : '');
       loadedOnce.current = true;
       setLoading(false);
     })().catch(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [userId, tick]);
+  }, [userId, tick, previewKey]);
 
   const reload = useCallback(() => setTick((t) => t + 1), []);
 
   const value = useMemo<AuthState>(() => {
     const adminClubIds = memberships.filter((m) => m.role === 'club_admin').map((m) => m.club_id);
-    const coachTeamIds = memberships.filter((m) => m.role === 'coach' && m.team_id).map((m) => m.team_id as string);
+    let coachTeamIds = memberships.filter((m) => m.role === 'coach' && m.team_id).map((m) => m.team_id as string);
+    let allMemberships = memberships;
+    let meNow = me;
+    // "view as": only for the system admin or the admin of the team's / player's club
+    const canView = (club: string | undefined) => !!club && (!!profile?.is_system_admin || adminClubIds.includes(club));
+    let shown: AuthState['preview'] = null;
+    if (preview?.kind === 'coach' && previewTeam?.id === preview.teamId && canView(previewTeam.club_id)) {
+      coachTeamIds = [previewTeam.id];
+      allMemberships = [...memberships.filter((m) => m.role !== 'coach'),
+        { id: `preview-${previewTeam.id}`, club_id: previewTeam.club_id, team_id: previewTeam.id, role: 'coach', staff_role_id: null } as Membership];
+      shown = { ...preview, label: previewTeam.name };
+    }
+    const pp = preview?.kind === 'player' ? allPlayers.find((x) => x.id === preview.playerId) : undefined;
+    if (pp && canView(pp.club_id)) {
+      meNow = pp;
+      shown = { ...preview!, label: pp.full_name };
+    }
     const modes: Mode[] = [];
     if (profile?.is_system_admin) modes.push('sysadmin');
     if (adminClubIds.length) modes.push('admin');
     if (coachTeamIds.length) modes.push('coach');
     if (children.length || profile?.is_parent) modes.push('parent');
-    if (me) modes.push('player');
+    if (meNow) modes.push('player');
     return {
-      loading, session, profile, memberships, children, me, modes, adminClubIds, coachTeamIds, reload,
+      loading, session, profile, memberships: allMemberships, children, me: meNow, modes, adminClubIds, coachTeamIds, reload,
+      preview: shown, endPreview, previewPending: !!previewKey && previewKey !== resolvedKey,
       signOut: async () => {
         if (isDemo) { window.dispatchEvent(new Event('demo-exit')); return; }
         await supabase.auth.signOut();
       },
     };
-  }, [loading, session, profile, memberships, children, me, reload]);
+  }, [loading, session, profile, memberships, children, me, reload, preview, previewTeam, allPlayers, previewKey, resolvedKey]);
 
   return <AuthContext.Provider value={value}>{kids}</AuthContext.Provider>;
 }
