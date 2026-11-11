@@ -92,7 +92,7 @@ export default function TeamPage(opts: { teamId?: string; initialTab?: string })
         {canManage && <PicturePicker label={team.photo_path ? 'החלפת תמונה' : 'הוספת תמונה'} busy={act.busy} onPick={setPhoto} />}
       </div>
       <ErrorText error={act.error} />
-      <Tabs tabs={tabs} initial={opts.initialTab ?? search.get('tab') ?? undefined} />
+      <Tabs tabs={tabs} max={5} initial={opts.initialTab ?? search.get('tab') ?? undefined} />
     </>
   );
 }

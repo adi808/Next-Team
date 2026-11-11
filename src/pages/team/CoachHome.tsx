@@ -10,6 +10,7 @@ import { useLookupName, useLookups } from '../../components/Lookups';
 import { KitAvatar } from '../../components/Kit';
 import { TransportChip, useTransportTotals } from '../../components/Transport';
 import { WeekSchedule } from '../../components/WeekSchedule';
+import { FirstSteps } from '../../components/FirstSteps';
 import { eventHeading, isOver, nextAndOther } from '../../lib/events';
 import type { EventResponse, EventRow, Lookup, Team, TeamKit } from '../../lib/types';
 
@@ -66,6 +67,7 @@ export default function CoachHome() {
         )}
         {!coachTeamIds.length && <div className="card"><Empty>אין לך עדיין קבוצות.</Empty></div>}
         <Loading loading={loading} error={error} />
+        {teamId && <FirstSteps key={teamId} teamId={teamId} />}
 
         {data && (data.next ? card(data.next, 'האירוע הבא') : (
           <div className="card"><Empty>אין אירועים קרובים.</Empty></div>

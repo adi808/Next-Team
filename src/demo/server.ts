@@ -80,7 +80,12 @@ export class DemoServer {
     switch (table) {
       case 'profiles': case 'sports': case 'lookups': case 'attribute_defs': return t[table];
       case 'memberships': return t.memberships.filter((m) => m.user_id === this.uid || this.adminOf(m.club_id) || (m.team_id && this.coachOf(m.team_id)));
-      case 'event_lineups': case 'event_lineup_state': return t[table].filter((r) => this.manageTeam(this.find('events', r.event_id)?.team_id));
+      case 'event_lineups': case 'event_lineup_state': return t[table].filter((r) => {
+        const team = this.find('events', r.event_id)?.team_id;
+        return this.manageTeam(team) || (this.member(team) && t.event_lineup_state.some((s) => s.event_id === r.event_id && s.published_at));
+      });
+      case 'app_terms': return t.app_terms;
+      case 'terms_acceptances': return t.terms_acceptances.filter((x) => x.user_id === this.uid || this.sys);
       case 'guardianships': return t.guardianships.filter((g) => g.parent_id === this.uid || this.selfPlayer(g.player_id) || this.coachesPlayer(g.player_id) || this.sys);
       case 'v_players': return t.players.filter((p) => this.canView(p.id)).map((p) => {
         const fam = this.managePlayer(p.id) || this.parentOf(p.id) || this.selfPlayer(p.id);
@@ -410,6 +415,27 @@ export class DemoServer {
       }));
       this.t.event_lineup_state = this.t.event_lineup_state.filter((r) => r.event_id !== a.p_event);
       if (a.p_approve) this.t.event_lineup_state.push({ event_id: a.p_event, approved_at: new Date().toISOString(), approved_by: this.uid });
+    },
+    publish_event_lineup(this: DemoServer, a: Row) {
+      const e = this.find('events', a.p_event);
+      if (!e || !this.manageTeam(e.team_id)) this.deny();
+      const st = this.t.event_lineup_state.find((r) => r.event_id === a.p_event);
+      if (!st) this.bad('approve the lineup first');
+      st.published_at = new Date().toISOString();
+    },
+    accept_terms(this: DemoServer, a: Row) {
+      const latest = Math.max(...this.t.app_terms.map((x) => x.version));
+      if (a.p_version !== latest) this.bad('not the current terms');
+      if (!this.t.terms_acceptances.some((x) => x.user_id === this.uid && x.version === latest)) {
+        this.t.terms_acceptances.push({ user_id: this.uid, version: latest, accepted_at: new Date().toISOString() });
+      }
+      const p = this.find('profiles', this.uid); if (p) p.terms_version = latest;
+    },
+    publish_terms(this: DemoServer, a: Row) {
+      if (!this.sys) this.deny();
+      const v = Math.max(0, ...this.t.app_terms.map((x) => x.version)) + 1;
+      this.t.app_terms.push({ version: v, body: String(a.p_body).trim(), published_at: new Date().toISOString() });
+      return v;
     },
     set_event_lineup(this: DemoServer, a: Row) {
       return this.rpcs.save_event_lineup.call(this, { p_event: a.p_event, p_groups: [a.p_players ?? []], p_approve: false });

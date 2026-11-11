@@ -11,6 +11,7 @@ import { Link } from 'react-router-dom';
 import { disablePush, enablePush, pushDiagnostics, pushState, showLocalTest, wantsPush, type PushState } from '../lib/push';
 import { isDemo } from '../lib/supabase';
 import { fmtPhone } from '../components/Contacts';
+import { getTheme, setTheme, type Theme } from '../lib/theme';
 
 /** Every role this account holds, so it is clear who is signed in and what each role may do. */
 function RolesCard() {
@@ -36,6 +37,22 @@ function RolesCard() {
       <ul className="list compact">
         {modes.map((m) => <li key={m} className="stack"><strong>{MODE_LABELS[m]}</strong><small className="muted">{detail[m]}</small></li>)}
       </ul>
+    </Card>
+  );
+}
+
+/** Light / dark / follow the phone, kept on this device. */
+function AppearanceCard() {
+  const [theme, set] = useState<Theme>(getTheme);
+  const choose = (t: Theme) => { setTheme(t); set(t); };
+  const opts: [Theme, string][] = [['auto', 'לפי הטלפון'], ['light', 'בהיר'], ['dark', 'כהה']];
+  return (
+    <Card title="מראה">
+      <div className="segment" role="radiogroup" aria-label="מראה">
+        {opts.map(([t, label]) => (
+          <button key={t} type="button" role="radio" aria-checked={theme === t} aria-selected={theme === t} onClick={() => choose(t)}>{label}</button>
+        ))}
+      </div>
     </Card>
   );
 }
@@ -88,7 +105,9 @@ export default function ProfilePage() {
         </div>
       </Card>
       <RolesCard />
+      <AppearanceCard />
       {!isDemo && <PushCard />}
+      <p className="center-link"><Link to="../terms">תקנון ותנאי שימוש</Link></p>
     </>
   );
 }

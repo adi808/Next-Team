@@ -27,17 +27,38 @@ export function Empty({ children }: { children: ReactNode }) {
   return <p className="muted">{children}</p>;
 }
 
-export function Tabs({ tabs, initial }: { tabs: { id: string; label: string; render: () => ReactNode }[]; initial?: string }) {
+/** Tabs; with max, the tabs after the first max go into a "more" menu (the open one stays in the row). */
+export function Tabs({ tabs, initial, max }: { tabs: { id: string; label: string; render: () => ReactNode }[]; initial?: string; max?: number }) {
   const [active, setActive] = useState(initial ?? tabs[0]?.id);
+  const [menu, setMenu] = useState(false);
   const current = tabs.find((t) => t.id === active) ?? tabs[0];
+  const split = max !== undefined && tabs.length > max + 1;
+  const main = split ? tabs.slice(0, max) : tabs;
+  const more = split ? tabs.slice(max) : [];
+  const shown = more.includes(current) ? [...main, current] : main;
+  const open = (id: string) => { setActive(id); setMenu(false); };
   return (
     <>
-      <div className="tabs" role="tablist">
-        {tabs.map((t) => (
-          <button key={t.id} role="tab" aria-selected={t.id === current.id} onClick={() => setActive(t.id)}>
-            {t.label}
-          </button>
-        ))}
+      <div className="tabs-wrap">
+        <div className="tabs" role="tablist">
+          {shown.map((t) => (
+            <button key={t.id} role="tab" aria-selected={t.id === current.id} onClick={() => open(t.id)}>
+              {t.label}
+            </button>
+          ))}
+          {split && (
+            <button type="button" className="tabs-more" aria-expanded={menu} aria-haspopup="true" onClick={() => setMenu(!menu)}>
+              עוד ▾
+            </button>
+          )}
+        </div>
+        {menu && (
+          <div className="tabs-menu" role="tablist" aria-label="עוד">
+            {more.map((t) => (
+              <button key={t.id} role="tab" aria-selected={t.id === current.id} onClick={() => open(t.id)}>{t.label}</button>
+            ))}
+          </div>
+        )}
       </div>
       {current.render()}
     </>

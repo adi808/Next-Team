@@ -28,6 +28,8 @@ export interface Profile {
   /** parent mode is open even before a child is linked */
   is_parent?: boolean;
   avatar_path: string | null;
+  /** the last terms-of-use version this account accepted */
+  terms_version?: number | null;
 }
 
 export interface Membership {

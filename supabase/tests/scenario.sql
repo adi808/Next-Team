@@ -511,6 +511,33 @@ select t.check('parallel groups, default group and kind ratings are defined',
   and (select count(*) from lookups where domain = 'lineup_group') = 5
   and exists (select 1 from attribute_defs where key = 'football_gk_reflexes' and config ->> 'player_kind' = 'goalkeeper')
   and exists (select 1 from attribute_defs where key = 'football_kicking' and config ->> 'player_kind' = 'field'));
+select t.denied('a draft cannot be published', $$select publish_event_lineup(t.id('E_match'))$$);
+select t.as_user('P1');
+select t.check('a parent does not see a lineup before it is published', not exists (select 1 from event_lineups));
+select t.as_user('C');
+select save_event_lineup(t.id('E_match'), jsonb_build_array(jsonb_build_array(t.id('K2')), jsonb_build_array(t.id('K1'))), true);
+select publish_event_lineup(t.id('E_match'));
+select t.check('coach publishes the approved lineup', (select published_at is not null from event_lineup_state where event_id = t.id('E_match')));
+select t.as_user('P1');
+select t.check('a parent sees the published lineup', (select count(*) from event_lineups where event_id = t.id('E_match')) = 2
+  and exists (select 1 from event_lineup_state where event_id = t.id('E_match')));
+select t.denied('a parent cannot publish', $$select publish_event_lineup(t.id('E_match'))$$);
+select t.as_user('C');
+select save_event_lineup(t.id('E_match'), jsonb_build_array(jsonb_build_array(t.id('K1'))), false);
+select t.as_user('P1');
+select t.check('a change after publishing hides the lineup again', not exists (select 1 from event_lineups));
+-- terms of use
+select t.check('there is a current terms version', (select max(version) from app_terms) = 1);
+select t.check('a new user has not accepted the terms yet', (select terms_version from profiles where id = t.id('P1')) is null);
+select t.denied('only the current terms can be accepted', $$select accept_terms(99)$$);
+select accept_terms(1);
+select t.check('accepting the terms is recorded', (select terms_version from profiles where id = t.id('P1')) = 1
+  and exists (select 1 from terms_acceptances where user_id = t.id('P1') and version = 1));
+select t.denied('only the system admin publishes terms', $$select publish_terms('x')$$);
+select t.as_user('S');
+select publish_terms('## תקנון חדש' || chr(10) || 'טקסט');
+select t.check('a new version asks everyone again', (select max(version) from app_terms) = 2
+  and (select terms_version from profiles where id = t.id('P1')) = 1);
 select t.as_user('P1');
 select t.check('a parent does not see the lineup state', not exists (select 1 from event_lineup_state));
 select t.denied('a parent cannot save a lineup', $$select save_event_lineup(t.id('E_match'), '[[]]'::jsonb, true)$$);

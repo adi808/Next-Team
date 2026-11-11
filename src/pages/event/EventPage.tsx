@@ -175,6 +175,9 @@ export default function EventPage() {
       {isMatch && canManage && sports.find((s) => s.id === team.sport_id)?.slug === 'football' && (
         <LineupPitch key={lineupKey} event={event} players={players} responses={responses} />
       )}
+      {isMatch && !canManage && sports.find((s) => s.id === team.sport_id)?.slug === 'football' && (
+        <LineupPitch event={event} players={players} responses={[]} readOnly highlight={myKids.map((k) => k.id)} />
+      )}
       {isMatch && (
         <AttributesPanel scope="event" entityId={event.id} myRoles={myRoles} clubId={team.club_id} teamIds={[team.id]} sportIds={[team.sport_id]} title="שיטת משחק"
           onSaved={() => setLineupKey((k) => k + 1)} />

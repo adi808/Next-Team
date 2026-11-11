@@ -73,7 +73,13 @@ function autoLineup(slots: Slot[], groups: number, players: string[], role: (id:
 
 type Picked = { g: number; slot: number } | { bench: string };
 
-export function LineupPitch({ event, players, responses }: { event: EventRow; players: Player[]; responses: EventResponse[] }) {
+/**
+ * The match lineup. Staff edit, approve and publish it; with readOnly (parents and players) it shows the published
+ * lineup only, with their own children highlighted and no attendance or absence details.
+ */
+export function LineupPitch({ event, players, responses, readOnly, highlight = [] }: {
+  event: EventRow; players: Player[]; responses: EventResponse[]; readOnly?: boolean; highlight?: string[];
+}) {
   const formations = useLookups('formation', { includeInactive: true });
   const formats = useLookups('match_format', { includeInactive: true });
   const positions = useLookups('position', { includeInactive: true });
@@ -89,11 +95,12 @@ export function LineupPitch({ event, players, responses }: { event: EventRow; pl
       .in('def_id', defs.map((d) => d.id)).in('entity_id', [event.id, ...ids]).order('seq', { ascending: false }));
     const saved = await q<{ group_no: number; slot: number; player_id: string }[]>(
       supabase.from('event_lineups').select('group_no, slot, player_id').eq('event_id', event.id));
-    const state = await q<{ approved_at: string }[]>(supabase.from('event_lineup_state').select('approved_at').eq('event_id', event.id));
+    const state = await q<{ approved_at: string; published_at: string | null }[]>(
+      supabase.from('event_lineup_state').select('*').eq('event_id', event.id));
     const teamFormation = await rpc<unknown>('team_param', { p_team: event.team_id, p_key: 'default_formation' });
     const teamGroups = await rpc<unknown>('team_param', { p_team: event.team_id, p_key: 'parallel_groups' });
     return {
-      defs, values, saved, approved: state.length > 0,
+      defs, values, saved, approved: state.length > 0, published: !!state[0]?.published_at,
       teamFormation: typeof teamFormation === 'string' ? teamFormation : null,
       teamGroups: typeof teamGroups === 'number' ? teamGroups : null,
     };
@@ -183,7 +190,7 @@ export function LineupPitch({ event, players, responses }: { event: EventRow; pl
   // A match without a lineup gets a draft saved right away, from the defaults; the coach reviews and approves it.
   useEffect(() => {
     // not while previewing ("view as" is read only): the suggestion is shown, nothing is saved
-    if (!data || savedLineup || drafted.current || !lookupsReady || !players.length || isPreview()) return;
+    if (readOnly || !data || savedLineup || drafted.current || !lookupsReady || !players.length || isPreview()) return;
     drafted.current = true;
     const draft = suggestion();
     if (!draft.some((g) => g.some(Boolean))) return;
@@ -196,6 +203,7 @@ export function LineupPitch({ event, players, responses }: { event: EventRow; pl
 
   if (error) return <Card title="הרכב על המגרש"><ErrorText error={error} /></Card>;
   if (!data || !lineup) return null;
+  if (readOnly && !data.saved.length) return null; // nothing published yet
 
   const onField = new Set(lineup.flat().filter(Boolean));
   const bench = [...coming, ...unanswered].filter((id) => !onField.has(id));
@@ -223,6 +231,10 @@ export function LineupPitch({ event, players, responses }: { event: EventRow; pl
     setPicked(picked && 'bench' in picked && picked.bench === id ? null : { bench: id });
   }
   const toBench = (g: number, i: number) => change(lineup!.map((grp, j) => grp.map((p, k) => (j === g && k === i ? null : p))));
+  const publish = () => act.run(async () => {
+    await rpc('publish_event_lineup', { p_event: event.id });
+    reload();
+  });
   const save = (approve: boolean) => act.run(async () => {
     await rpc('save_event_lineup', { p_event: event.id, p_groups: lineup, p_approve: approve });
     setDirty(false); reload();
@@ -231,11 +243,11 @@ export function LineupPitch({ event, players, responses }: { event: EventRow; pl
   const marker = (id: string) => {
     const p = player(id);
     if (!p) return null;
-    const st = status(id);
-    const reason = reasonOf(id);
+    const st = readOnly ? 'attending' : status(id);
+    const reason = readOnly ? '' : reasonOf(id);
     return (
       <>
-        <span className={`pitch-photo ${st === 'attending' ? '' : st === 'not_attending' ? 'out' : 'maybe'}`}>
+        <span className={`pitch-photo ${st === 'attending' ? '' : st === 'not_attending' ? 'out' : 'maybe'}${highlight.includes(id) ? ' mine' : ''}`}>
           <PlayerAvatar player={p} size={42} />
           {shirt(id) !== undefined && <b className="pitch-no">{shirt(id)}</b>}
         </span>
@@ -248,38 +260,56 @@ export function LineupPitch({ event, players, responses }: { event: EventRow; pl
   const groupName = (g: number) => groupList.find((l) => Number(l.meta?.group_no) === g + 1)?.name_he ?? `קבוצה ${g + 1}`;
   const absentOnField = lineup.flat().filter((id): id is string => !!id && absent(id)).length;
   const approved = data.approved && !dirty;
+  const published = data.published && !dirty;
+  const titleText = `${readOnly ? 'ההרכב למשחק' : 'הרכב על המגרש'} · ${rows.join('-')}${groups > 1 ? ` · ${groups} קבוצות` : ''}`;
+  const pitches = lineup.map((grp, g) => (
+    <div key={g}>
+      {groups > 1 && <h4 className="section-title pitch-group-title">{groupName(g)}</h4>}
+      <div className="pitch" role="group" aria-label={groups > 1 ? `סקיצת מגרש · ${groupName(g)}` : 'סקיצת מגרש'}>
+        <svg className="pitch-lines" viewBox="0 0 68 100" preserveAspectRatio="none" aria-hidden="true">
+          <g fill="none" stroke="rgba(255,255,255,0.75)" strokeWidth="0.5">
+            <rect x="2" y="2" width="64" height="96" />
+            <line x1="2" y1="50" x2="66" y2="50" />
+            <circle cx="34" cy="50" r="8" />
+            <rect x="15" y="2" width="38" height="15" /><rect x="25" y="2" width="18" height="5" />
+            <rect x="15" y="83" width="38" height="15" /><rect x="25" y="93" width="18" height="5" />
+          </g>
+        </svg>
+        {slots.map((s, i) => {
+          const id = grp[i];
+          const sel = !!picked && 'slot' in picked && picked.g === g && picked.slot === i;
+          return readOnly ? (
+            id ? <div key={i} className="pitch-slot" style={{ left: `${s.x}%`, top: `${s.y}%` }} aria-label={player(id)?.full_name}>{marker(id)}</div> : null
+          ) : (
+            <button key={i} type="button" className={`pitch-slot${sel ? ' picked' : ''}${id ? '' : ' empty'}`}
+              style={{ left: `${s.x}%`, top: `${s.y}%` }} onClick={() => tapSlot(g, i)}
+              aria-label={id ? player(id)?.full_name : 'מקום פנוי'}>
+              {id ? marker(id) : <span className="pitch-photo">＋</span>}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  ));
+
+  if (readOnly) {
+    const mine = highlight.filter((id) => onField.has(id));
+    return (
+      <Card title={titleText}>
+        {pitches}
+        <p className="muted pitch-help">
+          {mine.length ? 'הילד/ה שלך מסומן/ת במסגרת צהובה.' : highlight.length ? 'הילד/ה שלך לא בהרכב הפותח של המשחק.' : ''}
+        </p>
+      </Card>
+    );
+  }
 
   return (
     <Card title={`הרכב על המגרש · ${rows.join('-')}${groups > 1 ? ` · ${groups} קבוצות` : ''}`}
-      actions={dirty ? <span className="badge warn">לא נשמר</span> : <Badge tone={approved ? 'ok' : undefined}>{approved ? 'מאושר' : 'טיוטה'}</Badge>}>
+      actions={dirty ? <span className="badge warn">לא נשמר</span>
+        : <Badge tone={approved ? 'ok' : undefined}>{published ? 'פורסם' : approved ? 'מאושר' : 'טיוטה'}</Badge>}>
       {!coming.length && !unanswered.length && !absentOnField && <Empty>אין עדיין שחקנים שמגיעים.</Empty>}
-      {lineup.map((grp, g) => (
-        <div key={g}>
-          {groups > 1 && <h4 className="section-title pitch-group-title">{groupName(g)}</h4>}
-          <div className="pitch" role="group" aria-label={groups > 1 ? `סקיצת מגרש · ${groupName(g)}` : 'סקיצת מגרש'}>
-            <svg className="pitch-lines" viewBox="0 0 68 100" preserveAspectRatio="none" aria-hidden="true">
-              <g fill="none" stroke="rgba(255,255,255,0.75)" strokeWidth="0.5">
-                <rect x="2" y="2" width="64" height="96" />
-                <line x1="2" y1="50" x2="66" y2="50" />
-                <circle cx="34" cy="50" r="8" />
-                <rect x="15" y="2" width="38" height="15" /><rect x="25" y="2" width="18" height="5" />
-                <rect x="15" y="83" width="38" height="15" /><rect x="25" y="93" width="18" height="5" />
-              </g>
-            </svg>
-            {slots.map((s, i) => {
-              const id = grp[i];
-              const sel = !!picked && 'slot' in picked && picked.g === g && picked.slot === i;
-              return (
-                <button key={i} type="button" className={`pitch-slot${sel ? ' picked' : ''}${id ? '' : ' empty'}`}
-                  style={{ left: `${s.x}%`, top: `${s.y}%` }} onClick={() => tapSlot(g, i)}
-                  aria-label={id ? player(id)?.full_name : 'מקום פנוי'}>
-                  {id ? marker(id) : <span className="pitch-photo">＋</span>}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      ))}
+      {pitches}
       <p className="muted pitch-help">
         {picked ? 'עכשיו לחצו על שחקן או מקום נוסף כדי להחליף ביניהם.' : `לחצו על שחקן ואז על מקום אחר${groups > 1 ? ' (גם בקבוצה האחרת)' : ''} או על שחקן בספסל כדי להחליף.`}
         {' '}מסגרת מקווקוות: טרם אישר הגעה. אדומה: לא מגיע, עם הסיבה.
@@ -303,11 +333,13 @@ export function LineupPitch({ event, players, responses }: { event: EventRow; pl
       <div className="row wrap">
         <button className="secondary" disabled={act.busy || !dirty} onClick={() => save(false)}>שמירת טיוטה</button>
         <button disabled={act.busy || approved} onClick={() => save(true)}>אישור ההרכב</button>
+        {approved && !published && <button disabled={act.busy} onClick={publish}>פרסום להורים ולשחקנים</button>}
         <button className="secondary" disabled={act.busy} onClick={() => change(suggestion())}>סידור אוטומטי לפי ברירות המחדל</button>
       </div>
       <small className="muted">
         המערך ומספר הקבוצות במקביל נקבעים ב"שיטת משחק" למטה; תפקיד, קבוצה ברירת מחדל ומספר של כל שחקן נקבעים בפרופיל השחקן.
-        רק הצוות רואה את ההרכב.
+        {published ? 'ההרכב פורסם: ההורים והשחקנים רואים אותו (בלי סימוני היעדרות). שינוי יחזיר אותו לטיוטה ויסתיר אותו עד הפרסום הבא.'
+          : 'עד הפרסום רק הצוות רואה את ההרכב. אחרי אישור אפשר לפרסם להורים ולשחקנים.'}
       </small>
     </Card>
   );

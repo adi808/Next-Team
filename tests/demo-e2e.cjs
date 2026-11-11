@@ -54,8 +54,13 @@ const out = (ok, label, extra) => { if (!ok) fails++; console.log(`${ok ? 'PASS'
   await p.click('.tabs button:has-text("סגל")'); await wait(600);
   await has('squad with all six players and the pending request', 'דני כהן', 'רוני לוי', 'נועה מזרחי', 'גיל פרידמן', 'תומר שמש', 'יובל אורן', 'בקשות קישור', 'אילנה פרידמן'); await shot('squad');
   for (const [tab, needles] of [['אירועים', ['משחק ליגה נגד הפועל', 'גיבוש סוף עונה', 'טרם התקיימו', 'מהקרוב לרחוק']], ['משימות', ['מתיחות 10 דקות כל יום', 'מתוך 12']], ['סקרים', ['טורניר סוף עונה', 'אולי']], ['הודעות', ['אימון מחר', 'רוני בלי הסעה']], ['הגדרות', ['שליטה בכדור', 'מהירות', 'גיל מינימלי']]]) {
+    if (!(await p.locator(`role=tab[name="${tab}"]`).count())) { await p.click('button:has-text("עוד ▾")'); await wait(200); }
     await p.click(`role=tab[name="${tab}"]`); await wait(700); await has(`coach tab ${tab}`, ...needles);
   }
+  await p.click('role=tab[name="אירועים"]'); await wait(400);
+  out(!(await p.locator('role=tab[name="אנשי קשר"]').count()), 'less used team tabs wait in the "more" menu');
+  await p.click('button:has-text("עוד ▾")'); await wait(200);
+  await has('the "more" menu lists the other tabs', 'אנשי קשר', 'ליגה', 'הגדרות'); await p.click('button:has-text("עוד ▾")'); await wait(200);
   await p.click('role=tab[name="אירועים"]'); await wait(600);
   await hasNot('events list hides past events by default', 'משחק ליגה נגד בית״ר');
   const order = async () => p.evaluate(() => [...document.querySelectorAll('.list li a')].map((a) => a.textContent));
@@ -64,7 +69,7 @@ const out = (ok, label, extra) => { if (!ok) fails++; console.log(`${ok ? 'PASS'
   const far = await order(); out(far[0] === 'גיבוש סוף עונה', 'sort switches to far-to-near', far.join(' | '));
   await p.click('role=tab[name="התקיימו"]'); await wait(300);
   await has('past filter shows the played match', 'משחק ליגה נגד בית״ר', '2:1'); await hasNot('past filter hides upcoming events', 'גיבוש סוף עונה');
-  await p.click('role=tab[name="ליגה"]'); await wait(900);
+  await p.click('button:has-text("עוד ▾")'); await wait(200); await p.click('role=tab[name="ליגה"]'); await wait(900);
   await has('league tab: table, our team, games', 'טבלת ליגה', 'הפועל השרון', 'מכבי הצפון ילדים ב׳', '6 קבוצות משתתפות', 'משחקי הקבוצה', 'לדף הקבוצה באתר ההתאחדות'); await shot('league');
   out(await p.locator('.league-table tr.ours').count() === 1, 'league tab highlights our team');
   await p.click('role=tab[name="סגל"]'); await wait(700);
@@ -94,8 +99,11 @@ const out = (ok, label, extra) => { if (!ok) fails++; console.log(`${ok ? 'PASS'
   await p.click('button:has-text("שמירת טיוטה")'); await wait(800); await hasNot('saved lineup', 'לא נשמר'); await has('saved as a draft', 'טיוטה');
   const moved = await p.locator('.pitch .pitch-slot').first().getAttribute('aria-label'); out(moved !== 'נועה מזרחי', 'saved lineup keeps the swap', moved);
   await p.click('button:has-text("אישור ההרכב")'); await wait(800); await has('coach approves the lineup', 'מאושר');
+  await p.click('button:has-text("פרסום להורים ולשחקנים")'); await wait(800); await has('coach publishes the lineup', 'פורסם', 'ההורים והשחקנים רואים אותו');
   await p.locator('.pitch .pitch-slot').nth(1).click(); await p.locator('.pitch .pitch-slot').nth(2).click(); await wait(300);
   await p.click('button:has-text("שמירת טיוטה")'); await wait(800); await has('a change after approval is a draft again', 'טיוטה');
+  await hasNot('a draft is no longer published', 'ההורים והשחקנים רואים אותו');
+  await p.click('button:has-text("אישור ההרכב")'); await wait(800); await p.click('button:has-text("פרסום להורים ולשחקנים")'); await wait(800);
   // two groups playing at once, from each player's default group
   await p.click('.bottom-nav >> text=אירועים'); await wait(1000);
   await p.click('text=טורניר 7 על 7'); await wait(1500);
@@ -123,6 +131,10 @@ const out = (ok, label, extra) => { if (!ok) fails++; console.log(`${ok ? 'PASS'
   await has('parent lands on events', 'אירועים קרובים', 'דני כהן'); await hasNot('parent sees only their child', 'רוני לוי', 'נועה מזרחי');
   await has('parent week shows the child\'s answer', 'השבוע שלי', 'מגיע/ה');
   await has('parent dashboard: next event and the next match', 'האירוע הבא', 'אימון מחר', 'המשחק הקרוב', 'הפועל', 'בעוד', 'תלבושת', 'בהמשך'); await shot('parent-dashboard');
+  await p.click('role=navigation >> text=אירועים'); await wait(800); await p.click('a[href$="/event/e_match"] >> nth=0'); await wait(1500);
+  await has('parent sees the published lineup', 'ההרכב למשחק'); await shot('parent-lineup');
+  out(await p.locator('.pitch-photo.mine').count() === 1, 'the parent\'s child is highlighted on the pitch');
+  await hasNot('the parent sees no lineup editing or absences', 'שמירת טיוטה', 'לא מגיעים על המגרש');
   await p.click('role=navigation >> text=הילדים'); await wait(800);
   await has('parent home links to the league', 'הקבוצות והליגה', 'טבלה וקבוצות בליגה');
   await p.click('text=דני כהן'); await wait(1000);
@@ -253,6 +265,17 @@ const out = (ok, label, extra) => { if (!ok) fails++; console.log(`${ok ? 'PASS'
   await has('system admin sees clubs and the creation form', 'מועדון חדש', 'מכבי הצפון');
   await p.fill('input >> nth=0', 'מועדון בדיקה'); await p.click('button:has-text("יצירת מועדון")'); await wait(800); await has('club created', 'מועדון בדיקה');
   await p.click('role=navigation >> text=רשימות'); await wait(800); await has('lists screen', 'סוגי אירוע', 'אימון', 'גיבוש'); await shot('lists');
+  // terms: the system admin publishes a new version, and everyone (here the admin) accepts it before going on
+  await p.click('role=navigation >> text=תקנון'); await wait(800); await has('terms page with the accepted version', 'תקנון ותנאי שימוש', 'גרסה 1', 'מי רואה מה');
+  await p.locator('textarea.terms-edit').fill('## תקנון מעודכן\n\nנוסח חדש לבדיקה.'); await p.click('button:has-text("פרסום גרסה חדשה")'); await wait(1200);
+  await has('a new version asks to accept it again', 'התקנון עודכן', 'תקנון מעודכן', 'אישור והמשך');
+  out(await p.locator('button:has-text("אישור והמשך")').isDisabled(), 'accept waits for the check box');
+  await p.click('.terms-agree input'); await p.click('button:has-text("אישור והמשך")'); await wait(1200);
+  await hasNot('after accepting, the app goes on', 'אישור והמשך');
+  // dark mode from the profile
+  await p.click('a.who'); await wait(800); await p.click('role=radio[name="כהה"]'); await wait(300);
+  out(await p.evaluate(() => document.documentElement.getAttribute('data-theme')) === 'dark', 'dark mode from the profile'); await shot('dark');
+  await p.click('role=radio[name="לפי הטלפון"]'); await wait(200);
 
   out(errors.length === 0, 'no runtime errors', errors.slice(0, 3).join(' || '));
   await b.close(); console.log(fails ? `${fails} DEMO CHECKS FAILED` : 'ALL DEMO CHECKS PASSED'); process.exit(fails ? 1 : 0);

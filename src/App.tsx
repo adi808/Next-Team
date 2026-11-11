@@ -6,6 +6,7 @@ import Login from './pages/Login';
 import ModePicker from './pages/ModePicker';
 import PreviewPicker from './pages/PreviewPicker';
 import CompleteProfile from './pages/CompleteProfile';
+import TermsPage, { TermsGate } from './pages/TermsPage';
 import Shell from './components/Shell';
 import ClubsPage from './pages/admin/ClubsPage';
 import ClubPage from './pages/admin/ClubPage';
@@ -74,8 +75,10 @@ function ToRequests() {
 }
 
 function Gate() {
-  const { loading, session } = useAuth();
+  const { loading, session, terms, profile } = useAuth();
   if (loading) return <p className="center">טוען…</p>;
+  // signed in: the current terms of use are accepted first (again whenever a new version is published)
+  if (session && profile && terms && (profile.terms_version ?? 0) < terms.version) return <TermsGate />;
   if (!session) {
     return (
       <Routes>
@@ -106,6 +109,7 @@ function Gate() {
         <Route path="me" element={<ProfilePage />} />
         <Route path="requests" element={<RequestsPage />} />
         <Route path="notifications" element={<NotificationsPage />} />
+        <Route path="terms" element={<TermsPage />} />
         <Route path="event/:eventId" element={<EventPage />} />
         <Route path="event/:eventId/prep" element={<EventPrepPage />} />
         <Route path="home" element={<FamilyHome />} />

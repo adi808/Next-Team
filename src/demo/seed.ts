@@ -11,6 +11,18 @@ const at = (offsetDays: number, hour: number, minute = 0) => {
 const ago = (days: number) => new Date(Date.now() - days * day).toISOString();
 const ALL = ['system_admin', 'club_admin', 'coach', 'parent', 'player'];
 
+const DEMO_TERMS = `## תקנון ותנאי שימוש – Next Team (דוגמה)
+
+ברוכים הבאים ל־Next Team. השימוש באפליקציה מותנה בהסכמה לתקנון.
+
+## מי רואה מה
+- לכל חברי הקבוצה: שם השחקן, תמונה (באישור ההורה), מקומו בהרכב שפורסם, לוח האירועים, תוצאות ופרטי קשר של הצוות וההורים.
+- לצוות בלבד: אישורי הגעה וסיבות היעדרות, טיוטות הרכב.
+- להורה ולצוות בלבד: מידע רפואי.
+
+## שינויים בתקנון
+כשהתקנון מתעדכן, תתבקשו לאשר את הגרסה החדשה.`;
+
 export function seed(): Tables {
   const lk = (id: string, domain: string, name_he: string, sort_order: number, extra: Row = {}): Row => ({
     id, domain, slug: id, name_he, icon_path: null, parent_id: null, sport_id: null, club_id: null, sort_order, meta: {}, active: true, ...extra,
@@ -119,14 +131,14 @@ export function seed(): Tables {
       { id: 'kit_away', team_id: 't1', name: 'חוץ', shirt: '#ffffff', shorts: '#1e3a8a', socks: '#ffffff', sort_order: 1, active: true },
     ],
     profiles: [
-      { id: 'u_sys', email: 'yossi@demo.nextteam.app', phone: null, full_name: 'יוסי אברהם', is_system_admin: true },
-      { id: 'u_admin', email: 'ronit@demo.nextteam.app', phone: '+972521112233', full_name: 'רונית מזרחי', is_system_admin: false },
-      { id: 'u_coach', email: 'avi@demo.nextteam.app', phone: '+972501234567', full_name: 'אבי כץ', is_system_admin: false },
-      { id: 'u_coach2', email: 'michal@demo.nextteam.app', phone: '+972547654321', full_name: 'מיכל ברק', is_system_admin: false },
-      { id: 'u_p1', email: 'sara@demo.nextteam.app', phone: '+972528887766', full_name: 'שרה כהן', is_system_admin: false },
-      { id: 'u_k2', email: 'roni@demo.nextteam.app', phone: null, full_name: 'רוני לוי', is_system_admin: false },
-      { id: 'u_p2', email: 'david@demo.nextteam.app', phone: '+972503334455', full_name: 'דוד לוי', is_system_admin: false },
-      { id: 'u_p4', email: 'ilana@demo.nextteam.app', phone: null, full_name: 'אילנה פרידמן', is_system_admin: false },
+      { id: 'u_sys', email: 'yossi@demo.nextteam.app', phone: null, full_name: 'יוסי אברהם', is_system_admin: true, terms_version: 1 },
+      { id: 'u_admin', email: 'ronit@demo.nextteam.app', phone: '+972521112233', full_name: 'רונית מזרחי', is_system_admin: false, terms_version: 1 },
+      { id: 'u_coach', email: 'avi@demo.nextteam.app', phone: '+972501234567', full_name: 'אבי כץ', is_system_admin: false, terms_version: 1 },
+      { id: 'u_coach2', email: 'michal@demo.nextteam.app', phone: '+972547654321', full_name: 'מיכל ברק', is_system_admin: false, terms_version: 1 },
+      { id: 'u_p1', email: 'sara@demo.nextteam.app', phone: '+972528887766', full_name: 'שרה כהן', is_system_admin: false, terms_version: 1 },
+      { id: 'u_k2', email: 'roni@demo.nextteam.app', phone: null, full_name: 'רוני לוי', is_system_admin: false, terms_version: 1 },
+      { id: 'u_p2', email: 'david@demo.nextteam.app', phone: '+972503334455', full_name: 'דוד לוי', is_system_admin: false, terms_version: 1 },
+      { id: 'u_p4', email: 'ilana@demo.nextteam.app', phone: null, full_name: 'אילנה פרידמן', is_system_admin: false, terms_version: 1 },
     ],
     memberships: [
       { id: 'm1', user_id: 'u_admin', club_id: 'c1', team_id: null, role: 'club_admin' },
@@ -169,6 +181,8 @@ export function seed(): Tables {
     ],
     event_lineups: [],
     event_lineup_state: [],
+    app_terms: [{ version: 1, published_at: ago(30), body: DEMO_TERMS }],
+    terms_acceptances: [],
     event_stats: [
       { id: 'es1', event_id: 'e_past', player_id: 'k2', stat_type_id: 'st_goal', minute: 12, note: '' },
       { id: 'es2', event_id: 'e_past', player_id: 'k1', stat_type_id: 'st_assist', minute: 12, note: '' },

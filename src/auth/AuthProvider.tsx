@@ -17,6 +17,8 @@ interface AuthState {
   modes: Mode[];
   adminClubIds: string[];
   coachTeamIds: string[];
+  /** the current terms of use (null while none is published) */
+  terms: { version: number; body: string } | null;
   /** "view as" a coach or a player (club admin / system admin only), read only */
   preview: (Preview & { label: string }) | null;
   /** a "view as" was just chosen and is still loading */
@@ -39,6 +41,7 @@ export function AuthProvider({ children: kids }: { children: ReactNode }) {
   const loadedOnce = useRef(false);
   const [preview, setPreview] = useState<Preview | null>(getPreview);
   const [allPlayers, setAllPlayers] = useState<Player[]>([]);
+  const [terms, setTerms] = useState<AuthState['terms']>(null);
   const [previewTeam, setPreviewTeam] = useState<{ id: string; club_id: string; name: string } | null>(null);
   useEffect(() => {
     const on = () => setPreview(getPreview());
@@ -73,12 +76,14 @@ export function AuthProvider({ children: kids }: { children: ReactNode }) {
     // a background refresh must not replace the whole screen with the loader (it would remount the caller)
     if (!loadedOnce.current) setLoading(true);
     (async () => {
-      const [p, m, g, players] = await Promise.all([
+      const [p, m, g, players, t] = await Promise.all([
         q<Profile>(supabase.from('profiles').select('*').eq('id', userId).single()),
         q<Membership[]>(supabase.from('memberships').select('id, club_id, team_id, role, staff_role_id').eq('user_id', userId)),
         q<{ player_id: string }[]>(
           supabase.from('guardianships').select('player_id').eq('parent_id', userId).eq('status', 'approved')),
         q<Player[]>(supabase.from('v_players').select('*')),
+        q<{ version: number; body: string }[]>(supabase.from('app_terms').select('version, body').order('version', { ascending: false }).limit(1))
+          .catch(() => []), // before the terms migration: no terms screen
       ]);
       if (cancelled) return;
       const mine = new Set(g.map((x) => x.player_id));
@@ -86,6 +91,7 @@ export function AuthProvider({ children: kids }: { children: ReactNode }) {
       setMemberships(m);
       setChildren(players.filter((pl) => mine.has(pl.id)));
       setMe(players.find((pl) => pl.is_me) ?? null);
+      setTerms(t[0] ?? null);
       setAllPlayers(players);
       const pv = getPreview();
       const team = pv?.kind === 'coach'
@@ -129,13 +135,13 @@ export function AuthProvider({ children: kids }: { children: ReactNode }) {
     if (meNow) modes.push('player');
     return {
       loading, session, profile, memberships: allMemberships, children, me: meNow, modes, adminClubIds, coachTeamIds, reload,
-      preview: shown, endPreview, previewPending: !!previewKey && previewKey !== resolvedKey,
+      terms, preview: shown, endPreview, previewPending: !!previewKey && previewKey !== resolvedKey,
       signOut: async () => {
         if (isDemo) { window.dispatchEvent(new Event('demo-exit')); return; }
         await supabase.auth.signOut();
       },
     };
-  }, [loading, session, profile, memberships, children, me, reload, preview, previewTeam, allPlayers, previewKey, resolvedKey]);
+  }, [loading, session, profile, memberships, children, me, reload, terms, preview, previewTeam, allPlayers, previewKey, resolvedKey]);
 
   return <AuthContext.Provider value={value}>{kids}</AuthContext.Provider>;
 }

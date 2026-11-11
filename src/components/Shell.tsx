@@ -12,7 +12,7 @@ import { InstallBanner } from './InstallBanner';
 import { Assistant } from './Assistant';
 
 const NAV: Record<Mode, { to: string; label: string; icon: IconName }[]> = {
-  sysadmin: [{ to: 'clubs', label: 'מועדונים', icon: 'shield' }, { to: 'lists', label: 'רשימות', icon: 'list' }],
+  sysadmin: [{ to: 'clubs', label: 'מועדונים', icon: 'shield' }, { to: 'lists', label: 'רשימות', icon: 'list' }, { to: 'terms', label: 'תקנון', icon: 'check' }],
   admin: [{ to: 'clubs', label: 'המועדון', icon: 'shield' }, { to: 'lists', label: 'רשימות', icon: 'list' }],
   coach: [
     { to: 'coach', label: 'בית', icon: 'home' }, { to: 't/events', label: 'אירועים', icon: 'calendar' },
