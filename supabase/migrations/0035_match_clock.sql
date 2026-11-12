@@ -198,3 +198,14 @@ begin
   delete from event_stats where event_id = p_event and ((p_stat is not null and id = p_stat) or (p_client is not null and client_id = p_client));
 end $$;
 grant execute on function delete_match_stat(uuid, uuid, uuid) to authenticated;
+
+-- ---- privileges: internal helpers are not for users; nothing here is for anonymous visitors
+revoke execute on function match_action_check(uuid, timestamptz), match_minute_at(uuid, timestamptz) from public, anon, authenticated;
+revoke execute on function can_run_match(uuid), team_match_operators(uuid), set_match_operator(uuid, uuid, boolean),
+  set_match_running(uuid, boolean, timestamptz), set_player_on(uuid, uuid, boolean, timestamptz), end_match(uuid, timestamptz),
+  record_match_stat(uuid, uuid, uuid, timestamptz, uuid), delete_match_stat(uuid, uuid, uuid) from public, anon;
+grant execute on function can_run_match(uuid), team_match_operators(uuid), set_match_operator(uuid, uuid, boolean),
+  set_match_running(uuid, boolean, timestamptz), set_player_on(uuid, uuid, boolean, timestamptz), end_match(uuid, timestamptz),
+  record_match_stat(uuid, uuid, uuid, timestamptz, uuid), delete_match_stat(uuid, uuid, uuid) to authenticated;
+revoke all on match_operators, match_periods, play_intervals from anon;
+revoke insert, update, delete, truncate, references, trigger on match_operators, match_periods, play_intervals from authenticated;

@@ -243,7 +243,8 @@ select t.as_user('O');
 select t.check('outsider sees no clock and no minutes',
   (select count(*) from match_periods) = 0 and (select count(*) from play_intervals) = 0);
 select t.check('the clock check helper is not callable by users',
-  not has_function_privilege('authenticated', 'match_action_check(uuid, timestamptz)', 'execute'));
+  not has_function_privilege('authenticated', 'match_action_check(uuid, timestamptz)', 'execute')
+  and not has_function_privilege('authenticated', 'match_minute_at(uuid, timestamptz)', 'execute'));
 
 
 -- ---------------------------------------------------------------- dynamic attributes
