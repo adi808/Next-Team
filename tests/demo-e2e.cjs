@@ -51,6 +51,19 @@ const out = (ok, label, extra) => { if (!ok) fails++; console.log(`${ok ? 'PASS'
   await has('prep list shows coming players', 'דני כהן', 'נועה מזרחי');
   await p.click('.bottom-nav >> text=אירועים'); await wait(1200);
   await has('team page opens on events', 'גיבוש סוף עונה');
+  out(await p.locator('.new-event-btn').count() === 1 && await p.locator('.card', { hasText: 'אירוע חדש' }).count() === 0, 'events tab: a "new event" button at the top, the form closed');
+  await p.click('.new-event-btn'); await wait(400);
+  const formTop = await p.locator('.card', { hasText: 'אירוע חדש' }).evaluate((el) => el.getBoundingClientRect().top);
+  const listTop = await p.locator('.list li >> nth=0').evaluate((el) => el.getBoundingClientRect().top);
+  out(formTop < listTop, 'the new-event form opens above the list');
+  await p.locator('.card', { hasText: 'אירוע חדש' }).locator('select >> nth=0').selectOption({ label: 'אימון' });
+  await p.locator('.card', { hasText: 'אירוע חדש' }).locator('input[type="datetime-local"]').fill('2030-02-01T17:00');
+  await p.click('button:has-text("יצירת אירוע")'); await wait(900);
+  await has('creating closes the form and confirms', 'האירוע נוצר ומופיע ברשימה');
+  await p.click('.bottom-nav >> text=בית'); await wait(800);
+  await p.click('.quick:has-text("אירוע חדש")'); await wait(900);
+  out(await p.locator('.card', { hasText: 'אירוע חדש' }).count() === 1, 'the home screen shortcut opens the form at once');
+  await p.click('.bottom-nav >> text=אירועים'); await wait(900);
   await p.click('.tabs button:has-text("סגל")'); await wait(600);
   await has('squad with all six players and the pending request', 'דני כהן', 'רוני לוי', 'נועה מזרחי', 'גיל פרידמן', 'תומר שמש', 'יובל אורן', 'בקשות קישור', 'אילנה פרידמן'); await shot('squad');
   for (const [tab, needles] of [['אירועים', ['משחק ליגה נגד הפועל', 'גיבוש סוף עונה', 'טרם התקיימו', 'מהקרוב לרחוק']], ['משימות', ['מתיחות 10 דקות כל יום', 'מתוך 12']], ['סקרים', ['טורניר סוף עונה', 'אולי']], ['הודעות', ['אימון מחר', 'רוני בלי הסעה']], ['הגדרות', ['שליטה בכדור', 'מהירות', 'גיל מינימלי']]]) {
@@ -61,7 +74,7 @@ const out = (ok, label, extra) => { if (!ok) fails++; console.log(`${ok ? 'PASS'
   const order = async () => p.evaluate(() => [...document.querySelectorAll('.list li a')].map((a) => a.textContent));
   const near = await order(); out(near[0] === 'אימון קבוצתי', 'upcoming events from the nearest', near.join(' | '));
   await p.click('button:has-text("מהקרוב לרחוק")'); await wait(300);
-  const far = await order(); out(far[0] === 'גיבוש סוף עונה', 'sort switches to far-to-near', far.join(' | '));
+  const far = await order(); out(far[0] === 'אימון' && far[1] === 'גיבוש סוף עונה', 'sort switches to far-to-near (the training made above, in 2030, is the farthest)', far.join(' | '));
   await p.click('role=tab[name="התקיימו"]'); await wait(300);
   await has('past filter shows the played match', 'משחק ליגה נגד בית״ר', '2:1'); await hasNot('past filter hides upcoming events', 'גיבוש סוף עונה');
   await p.click('role=tab[name="ליגה"]'); await wait(900);

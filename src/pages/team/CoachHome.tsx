@@ -78,7 +78,7 @@ export default function CoachHome() {
 
         {teamId && (
           <div className="quick-actions">
-            <Link className="quick" to="../t/events"><span className="quick-icon">＋</span>אירוע חדש</Link>
+            <Link className="quick" to="../t/events?new=1"><span className="quick-icon">＋</span>אירוע חדש</Link>
             <Link className="quick" to="../t/tasks"><span className="quick-icon">✓</span>משימה חדשה</Link>
           </div>
         )}
