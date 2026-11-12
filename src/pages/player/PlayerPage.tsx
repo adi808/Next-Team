@@ -13,6 +13,7 @@ import { PlayerAvatar, ShirtNo, useShirtNumbers } from '../../components/People'
 import { ContactLinks, fmtPhone } from '../../components/Contacts';
 import { ParentsEditor } from '../../components/Parents';
 import { average, defsFor, latestRatings } from '../../lib/scores';
+import { playedMs, type Period, type Stint } from '../../lib/matchClock';
 import type { AttrDef, AttrValue, EntityRole, EventStat, Player, Team } from '../../lib/types';
 
 interface Details { phone: string | null; account_email: string | null }
@@ -152,6 +153,7 @@ export default function PlayerPage() {
         </Card>
       )}
 
+          <MinutesCard playerId={player.id} />
           <HistoryCard playerId={player.id} scope={scope} />
         </>
       ),
@@ -310,6 +312,37 @@ function HistoryCard({ playerId, scope }: { playerId: string; scope: Scope }) {
             </li>
           );
         })}
+      </ul>
+    </Card>
+  );
+}
+
+/** Minutes played in the last matches that used the match clock (visible to staff, the parents and the player). */
+function MinutesCard({ playerId }: { playerId: string }) {
+  const { data } = useLoad(async () => {
+    const stints = await q<(Stint & { event_id: string })[]>(supabase.from('play_intervals').select('event_id, player_id, started_at, ended_at').eq('player_id', playerId));
+    const ids = [...new Set(stints.map((s) => s.event_id))];
+    if (!ids.length) return [];
+    const [periods, events] = await Promise.all([
+      q<(Period & { event_id: string })[]>(supabase.from('match_periods').select('event_id, started_at, ended_at').in('event_id', ids)),
+      q<{ id: string; title: string; opponent: string | null; starts_at: string }[]>(supabase.from('events').select('id, title, opponent, starts_at').in('id', ids)),
+    ]);
+    const now = Date.now();
+    return events.sort((a, b) => b.starts_at.localeCompare(a.starts_at)).slice(0, 8).map((e) => ({
+      ...e, minutes: Math.floor(playedMs(stints.filter((x) => x.event_id === e.id), periods.filter((x) => x.event_id === e.id), now) / 60_000),
+    }));
+  }, [playerId]);
+  if (!data?.length) return null;
+  return (
+    <Card title="⏱ דקות משחק">
+      <ul className="list compact">
+        {data.map((e) => (
+          <li key={e.id} className="row">
+            <Link className="grow" to={`../event/${e.id}`}>{e.opponent ? `נגד ${e.opponent}` : e.title}</Link>
+            <small className="muted">{fmtDate(e.starts_at)}</small>
+            <strong>{e.minutes}′</strong>
+          </li>
+        ))}
       </ul>
     </Card>
   );

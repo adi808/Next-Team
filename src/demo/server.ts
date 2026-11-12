@@ -37,6 +37,54 @@ export class DemoServer {
   private teamParent(team: string) { return this.t.team_players.some((x) => x.team_id === team && this.parentOf(x.player_id)); }
   private teamPlayer(team: string) { return this.t.team_players.some((x) => x.team_id === team && this.selfPlayer(x.player_id)); }
   private member(team: string) { return this.manageTeam(team) || this.teamParent(team) || this.teamPlayer(team) || this.adminOf(this.clubOfTeam(team)); }
+  private runMatch(team: string) {
+    return this.manageTeam(team) || (this.teamParent(team) && this.t.match_operators.some((o) => o.team_id === team && o.parent_id === this.uid));
+  }
+  private clockCheck(a: Row): Row {
+    const e = this.find('events', a.p_event);
+    if (!e || !this.runMatch(e.team_id)) this.deny();
+    if (!this.find('lookups', e.type_id)?.meta?.is_match) this.bad('the clock runs on a match only');
+    return e;
+  }
+  /** The nutrition tab without a language model: a sample answer that follows the child's day. */
+  private nutrition(b: Row) {
+    if (!this.parentOf(b.player_id) && !this.selfPlayer(b.player_id)) this.deny();
+    const day = String(b.day);
+    const teams = this.teamsOf(b.player_id);
+    const ymd = (iso: string) => new Date(iso).toLocaleDateString('en-CA', { timeZone: 'Asia/Jerusalem' });
+    const events = this.t.events.filter((e) => teams.includes(e.team_id) && ymd(e.starts_at) === day && !e.cancelled_at);
+    const match = events.find((e) => this.find('lookups', e.type_id)?.meta?.is_match);
+    const kind = match ? 'match' : events.length ? 'training' : 'rest';
+    const time = (e?: Row) => (e ? new Date(e.starts_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jerusalem' }) : '');
+    let output: Row;
+    if (b.action === 'review') {
+      const text = String(b.text ?? '');
+      const veg = /ירק|סלט|מלפפון|עגבני|פרי|בננה|תפוח/.test(text); const water = /מים/.test(text);
+      output = {
+        verdict: veg && water ? 'great' : veg || water ? 'good' : 'improve',
+        compliment: 'יופי שסיפרת! לאכול כמה ארוחות ביום זה בסיס מצוין לספורטאי.',
+        good: [veg ? 'היו ירקות או פירות' : '', water ? 'שתית מים' : ''].filter(Boolean),
+        improve: [veg ? '' : 'להוסיף ירק או פרי לארוחה הבאה', water ? '' : 'לשתות מים לאורך היום, לא רק בצמא'].filter(Boolean),
+        next: kind === 'rest' ? 'ארוחת ערב עם ירקות וחלבון, למשל חביתה וסלט' : 'אחרי הפעילות: פרי ומים, ואחר כך ארוחה עם פחמימה וחלבון',
+      };
+    } else {
+      const e = match ?? events[0];
+      output = kind === 'rest'
+        ? { day_type: 'rest', headline: 'יום מנוחה: אוכלים רגיל ומגוון, והגוף מתחזק.', meals: [
+            { when: 'בוקר', time: '07:30', ideas: 'דייסת שיבולת שועל עם בננה' }, { when: 'צהריים', time: '13:30', ideas: 'עוף, אורז וסלט' },
+            { when: 'ביניים', time: '16:30', ideas: 'יוגורט ופרי' }, { when: 'ערב', time: '19:30', ideas: 'חביתה, לחם מלא וירקות' }],
+            before: [], after: [], drink: 'מים לאורך כל היום, בקבוק ליד המיטה ובתיק', tip: 'לגוון בצבעים: כמה שיותר צבעים בצלחת' }
+        : { day_type: kind, headline: kind === 'match' ? `יום משחק! ארוחה טובה 3 שעות לפני המשחק ב־${time(e)}.` : `יש אימון ב־${time(e)}: אנרגיה לפני, והתאוששות אחרי.`,
+            meals: [{ when: 'בוקר', time: '07:30', ideas: 'פיתה עם גבינה וירקות' }, { when: 'לפני', time: '', ideas: 'פחמימה קלה: פסטה או אורז עם מעט חלבון, 2-3 שעות לפני' },
+              { when: 'ביניים', time: '', ideas: 'בננה או תמרים, שעה לפני' }, { when: 'אחרי', time: '', ideas: 'שוקו או יוגורט ופרי, ואחר כך ארוחה מלאה' }],
+            before: ['לא לאכול מטוגן ושמן לפני', 'לשתות כוס מים חצי שעה לפני'], after: ['לשתות הרבה מים', 'ארוחה עם חלבון ופחמימה תוך שעה'],
+            drink: 'בקבוק ליטר וחצי לפעילות, לגימות קטנות בהפסקות', tip: kind === 'match' ? 'להכין את התיק והבקבוק מאתמול בערב' : 'פרי בתיק לדרך הביתה' };
+    }
+    const entry = { id: this.id('nu'), player_id: b.player_id, day, kind: b.action === 'review' ? 'review' : 'plan', input: b.action === 'review' ? String(b.text) : '', output, created_by: this.uid, created_at: new Date().toISOString() };
+    if (entry.kind === 'plan') this.t.nutrition_entries = this.t.nutrition_entries.filter((x) => !(x.player_id === b.player_id && x.day === day && x.kind === 'plan'));
+    this.t.nutrition_entries.push(entry);
+    return { entry };
+  }
   private canView(player: string) {
     return this.managePlayer(player) || this.parentOf(player) || this.selfPlayer(player) || this.teamsOf(player).some((tm) => this.member(tm));
   }
@@ -93,6 +141,11 @@ export class DemoServer {
       case 'player_goals': return t.player_goals.filter((g) => this.managePlayer(g.player_id) || this.parentOf(g.player_id) || this.selfPlayer(g.player_id));
       case 'events': case 'surveys': case 'messages': case 'team_kits': return t[table].filter((r) => this.member(r.team_id));
       case 'event_responses': return t.event_responses.filter((r) => this.manageTeam(this.find('events', r.event_id)?.team_id) || this.parentOf(r.player_id) || this.selfPlayer(r.player_id));
+      case 'match_operators': return t.match_operators.filter((r) => this.manageTeam(r.team_id) || r.parent_id === this.uid);
+      case 'match_periods': return t.match_periods.filter((r) => this.member(this.find('events', r.event_id)?.team_id));
+      case 'play_intervals': return t.play_intervals.filter((r) => this.runMatch(this.find('events', r.event_id)?.team_id) || this.parentOf(r.player_id) || this.selfPlayer(r.player_id));
+      case 'team_nutrition_tips': return t.team_nutrition_tips.filter((r) => this.member(r.team_id));
+      case 'nutrition_entries': return t.nutrition_entries.filter((r) => this.parentOf(r.player_id) || this.selfPlayer(r.player_id));
       case 'event_stats': return t.event_stats.filter((r) => this.member(this.find('events', r.event_id)?.team_id));
       case 'attribute_values': return t.attribute_values.filter((v) => {
         const d = this.find('attribute_defs', v.def_id);
@@ -601,6 +654,59 @@ export class DemoServer {
       if (!this.find('lookups', e.type_id)?.meta?.is_match) this.bad('statistics can only be recorded on a match');
       const id = this.id('es'); this.t.event_stats.push({ id, event_id: a.p_event, player_id: a.p_player, stat_type_id: a.p_stat_type, minute: a.p_minute ?? null, note: a.p_note ?? '' }); return id;
     },
+    add_team_nutrition_tip(this: DemoServer, a: Row) {
+      if (!this.manageTeam(a.p_team)) this.deny();
+      const id = this.id('nt'); this.t.team_nutrition_tips.push({ id, team_id: a.p_team, day: a.p_day, tip: String(a.p_tip).trim(), created_by: this.uid, created_at: new Date().toISOString() }); return id;
+    },
+    delete_team_nutrition_tip(this: DemoServer, a: Row) {
+      const tip = this.find('team_nutrition_tips', a.p_id);
+      if (!tip || !this.manageTeam(tip.team_id)) this.deny();
+      this.t.team_nutrition_tips = this.t.team_nutrition_tips.filter((x) => x.id !== a.p_id);
+    },
+    can_run_match(this: DemoServer, a: Row) { return this.runMatch(a.p_team); },
+    team_match_operators(this: DemoServer, a: Row) {
+      if (!this.manageTeam(a.p_team)) this.deny();
+      const kids = this.t.team_players.filter((x) => x.team_id === a.p_team).map((x) => x.player_id);
+      const parents = [...new Set(this.t.guardianships.filter((g) => g.status === 'approved' && kids.includes(g.player_id)).map((g) => g.parent_id as string))];
+      return parents.map((id) => ({
+        parent_id: id, full_name: this.find('profiles', id)?.full_name ?? '',
+        children: this.t.guardianships.filter((g) => g.parent_id === id && g.status === 'approved' && kids.includes(g.player_id)).map((g) => this.find('players', g.player_id)?.full_name).join(', '),
+        is_operator: this.t.match_operators.some((o) => o.team_id === a.p_team && o.parent_id === id),
+      }));
+    },
+    set_match_operator(this: DemoServer, a: Row) {
+      if (!this.manageTeam(a.p_team)) this.deny();
+      this.t.match_operators = this.t.match_operators.filter((o) => !(o.team_id === a.p_team && o.parent_id === a.p_parent));
+      if (a.p_on) this.t.match_operators.push({ team_id: a.p_team, parent_id: a.p_parent, granted_by: this.uid, granted_at: new Date().toISOString() });
+    },
+    set_match_running(this: DemoServer, a: Row) {
+      this.clockCheck(a);
+      const open = this.t.match_periods.find((p) => p.event_id === a.p_event && !p.ended_at);
+      if (a.p_on && !open) this.t.match_periods.push({ id: this.id('mp'), event_id: a.p_event, started_at: a.p_at, ended_at: null });
+      if (!a.p_on && open) open.ended_at = a.p_at < open.started_at ? open.started_at : a.p_at;
+    },
+    set_player_on(this: DemoServer, a: Row) {
+      this.clockCheck(a);
+      const open = this.t.play_intervals.find((p) => p.event_id === a.p_event && p.player_id === a.p_player && !p.ended_at);
+      if (a.p_on && !open) this.t.play_intervals.push({ id: this.id('pi'), event_id: a.p_event, player_id: a.p_player, started_at: a.p_at, ended_at: null });
+      if (!a.p_on && open) open.ended_at = a.p_at < open.started_at ? open.started_at : a.p_at;
+    },
+    end_match(this: DemoServer, a: Row) {
+      this.clockCheck(a);
+      for (const r of [...this.t.match_periods, ...this.t.play_intervals]) if (r.event_id === a.p_event && !r.ended_at) r.ended_at = a.p_at;
+    },
+    record_match_stat(this: DemoServer, a: Row) {
+      this.clockCheck(a);
+      if (this.t.event_stats.some((s) => s.client_id === a.p_client)) return;
+      const ran = this.t.match_periods.filter((p) => p.event_id === a.p_event && p.started_at < a.p_at)
+        .reduce((sum, p) => sum + Math.max(0, new Date(p.ended_at && p.ended_at < a.p_at ? p.ended_at : a.p_at).getTime() - new Date(p.started_at).getTime()), 0);
+      this.t.event_stats.push({ id: this.id('es'), event_id: a.p_event, player_id: a.p_player, stat_type_id: a.p_stat_type, minute: Math.ceil(ran / 60000), note: '', client_id: a.p_client, created_at: new Date().toISOString() });
+    },
+    delete_match_stat(this: DemoServer, a: Row) {
+      const e = this.find('events', a.p_event);
+      if (!e || !this.runMatch(e.team_id)) this.deny();
+      this.t.event_stats = this.t.event_stats.filter((s) => !(s.event_id === a.p_event && ((a.p_stat && s.id === a.p_stat) || (a.p_client && s.client_id === a.p_client))));
+    },
     delete_stat(this: DemoServer, a: Row) { this.t.event_stats = this.t.event_stats.filter((s) => s.id !== a.p_stat); },
     create_task(this: DemoServer, a: Row) {
       if (!this.manageTeam(a.p_team)) this.deny('only the coach or club admin can create tasks');
@@ -758,6 +864,7 @@ export class DemoServer {
         return json(r.status, r.body);
       }
       if (url.pathname === '/functions/v1/league') return json(200, DEMO_LEAGUE());
+      if (url.pathname === '/functions/v1/nutrition') return json(200, this.nutrition(JSON.parse(String(init?.body ?? '{}'))));
       if (url.pathname.startsWith('/storage/')) {
         return json(400, { statusCode: '400', error: 'demo', message: 'העלאת תמונה אינה זמינה בדמו' });
       }

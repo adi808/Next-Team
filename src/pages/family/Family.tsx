@@ -18,6 +18,7 @@ import { WeekSchedule } from '../../components/WeekSchedule';
 import { isDemo } from '../../lib/supabase';
 import { eventHeading, isOver, nextAndOther } from '../../lib/events';
 import { PlayerAvatar } from '../../components/People';
+import { PlayerProgress } from '../../components/PlayerProgress';
 import type { EventResponse, EventRow, Player, Team, TeamKit } from '../../lib/types';
 
 /** The children a parent follows, or the player's own profile. */
@@ -130,6 +131,10 @@ export function FamilyHome() {
           </li>
         ))}
       </ul>
+      {kids.map((k) => (
+        <PlayerProgress key={k.id} player={k} role={asParent ? 'parent' : 'player'} showName={asParent}
+          teams={teams.filter((t) => links.some((l) => l.team_id === t.id && l.player_id === k.id))} />
+      ))}
       {teams.some((t) => sports.find((sp) => sp.id === t.sport_id)?.slug === 'football') && (
         <Card title="הקבוצות והליגה">
           <ul className="list compact">

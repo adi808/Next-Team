@@ -1,6 +1,6 @@
 import { CancelledBadge } from '../../components/Cancelled';
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { q, rpc, useAction, useLoad, fmtDate } from '../../lib/db';
 import { applyEventDefaults } from '../../lib/team';
@@ -50,6 +50,13 @@ export default function EventsTab({ team, canManage }: TeamTabProps) {
   const [created, setCreated] = useState<number | null>(null);
   const [show, setShow] = useState<Show>('upcoming');
   const [nearFirst, setNearFirst] = useState(true);
+  // the new-event form sits at the top, closed until asked for (?new=1 from the home screen opens it)
+  const [search, setSearch] = useSearchParams();
+  const [adding, setAdding] = useState(search.get('new') === '1');
+  const openForm = (on: boolean) => {
+    setAdding(on); setCreated(null);
+    if (!on && search.has('new')) { search.delete('new'); setSearch(search, { replace: true }); }
+  };
   const act = useAction();
   const isMatch = (id: string | null) => !!types.find((t) => t.id === id)?.meta?.is_match;
   const typeName = (id: string) => types.find((t) => t.id === id)?.name_he ?? '';
@@ -84,7 +91,8 @@ export default function EventsTab({ team, canManage }: TeamTabProps) {
         if (isMatch(typeId)) await applyEventDefaults(id, team.id).catch(() => {});
         setCreated(1);
       }
-      reset(); reload();
+      reset(); reload(); setAdding(false);
+      if (search.has('new')) { search.delete('new'); setSearch(search, { replace: true }); }
     });
   }
   const listed = arrange(data ?? [], show, nearFirst);
@@ -93,41 +101,12 @@ export default function EventsTab({ team, canManage }: TeamTabProps) {
   return (
     <>
       <Loading loading={loading} error={error} />
-      {data && !data.length && <Empty>אין עדיין אירועים.</Empty>}
-      {!!data?.length && (
-        <div className="row wrap list-tools">
-          <div className="segment" role="tablist" aria-label="אילו אירועים">
-            {SHOW.map(([id, label]) => (
-              <button key={id} type="button" role="tab" aria-selected={show === id} onClick={() => setShow(id)}>{label}</button>
-            ))}
-          </div>
-          <span className="grow" />
-          <button type="button" className="small secondary" onClick={() => setNearFirst((v) => !v)}>
-            {nearFirst ? '⇅ מהקרוב לרחוק' : '⇅ מהרחוק לקרוב'}
-          </button>
-        </div>
+      {canManage && !adding && !!data?.length && (
+        <button className="new-event-btn" onClick={() => openForm(true)}>＋ אירוע חדש</button>
       )}
-      {data && !!data.length && !listed.length && <Empty>{show === 'upcoming' ? 'אין אירועים שטרם התקיימו.' : 'אין אירועים שהתקיימו.'}</Empty>}
-      <ul className="list">
-        {listed.map((e) => {
-          const kit = kitOf(e.kit_id);
-          const over = isOver(e);
-          return (
-            <li key={e.id} className={`row${over ? ' past' : ''}${e.cancelled_at ? ' cancelled' : ''}`}>
-              <Badge>{typeName(e.type_id)}</Badge>
-              <CancelledBadge event={e} />
-              <Link to={`../event/${e.id}`}>{eventHeading(e, typeName(e.type_id), team.name)}</Link>
-              <small className="muted">{fmtDate(e.starts_at)}</small>
-              {e.our_score !== null && <strong>{e.our_score}:{e.their_score}</strong>}
-              <TransportChip total={transport.get(e.id)} />
-              <span className="grow" />
-              {kit && <KitAvatar kit={kit} size={30} />}
-            </li>
-          );
-        })}
-      </ul>
-      {canManage && (
-        <Card title="אירוע חדש">
+      {created !== null && !adding && <p className="ok">{created === 1 ? 'האירוע נוצר ומופיע ברשימה' : `נוצרו ${created} אירועים`}</p>}
+      {canManage && (adding || (data && !data.length)) && (
+        <Card title="אירוע חדש" actions={!!data?.length && <button className="small secondary" onClick={() => openForm(false)}>סגירה</button>}>
           <Field label="סוג"><LookupSelect domain="event_type" value={typeId} onChange={setTypeId} /></Field>
           <Field label="כותרת (לא חובה)"><input value={title} onChange={(e) => setTitle(e.target.value)} /></Field>
           <label className="check"><input type="checkbox" checked={repeat} onChange={(e) => setRepeat(e.target.checked)} /> אירוע חוזר (למשל אימון קבוע)</label>
@@ -168,6 +147,39 @@ export default function EventsTab({ team, canManage }: TeamTabProps) {
           <button disabled={!ready || act.busy} onClick={create}>{repeat ? 'יצירת האירועים' : 'יצירת אירוע'}</button>
         </Card>
       )}
+      {data && !data.length && <Empty>אין עדיין אירועים.</Empty>}
+      {!!data?.length && (
+        <div className="row wrap list-tools">
+          <div className="segment" role="tablist" aria-label="אילו אירועים">
+            {SHOW.map(([id, label]) => (
+              <button key={id} type="button" role="tab" aria-selected={show === id} onClick={() => setShow(id)}>{label}</button>
+            ))}
+          </div>
+          <span className="grow" />
+          <button type="button" className="small secondary" onClick={() => setNearFirst((v) => !v)}>
+            {nearFirst ? '⇅ מהקרוב לרחוק' : '⇅ מהרחוק לקרוב'}
+          </button>
+        </div>
+      )}
+      {data && !!data.length && !listed.length && <Empty>{show === 'upcoming' ? 'אין אירועים שטרם התקיימו.' : 'אין אירועים שהתקיימו.'}</Empty>}
+      <ul className="list">
+        {listed.map((e) => {
+          const kit = kitOf(e.kit_id);
+          const over = isOver(e);
+          return (
+            <li key={e.id} className={`row${over ? ' past' : ''}${e.cancelled_at ? ' cancelled' : ''}`}>
+              <Badge>{typeName(e.type_id)}</Badge>
+              <CancelledBadge event={e} />
+              <Link to={`../event/${e.id}`}>{eventHeading(e, typeName(e.type_id), team.name)}</Link>
+              <small className="muted">{fmtDate(e.starts_at)}</small>
+              {e.our_score !== null && <strong>{e.our_score}:{e.their_score}</strong>}
+              <TransportChip total={transport.get(e.id)} />
+              <span className="grow" />
+              {kit && <KitAvatar kit={kit} size={30} />}
+            </li>
+          );
+        })}
+      </ul>
     </>
   );
 }

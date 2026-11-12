@@ -51,6 +51,19 @@ const out = (ok, label, extra) => { if (!ok) fails++; console.log(`${ok ? 'PASS'
   await has('prep list shows coming players', 'דני כהן', 'נועה מזרחי');
   await p.click('.bottom-nav >> text=אירועים'); await wait(1200);
   await has('team page opens on events', 'גיבוש סוף עונה');
+  out(await p.locator('.new-event-btn').count() === 1 && await p.locator('.card', { hasText: 'אירוע חדש' }).count() === 0, 'events tab: a "new event" button at the top, the form closed');
+  await p.click('.new-event-btn'); await wait(400);
+  const formTop = await p.locator('.card', { hasText: 'אירוע חדש' }).evaluate((el) => el.getBoundingClientRect().top);
+  const listTop = await p.locator('.list li >> nth=0').evaluate((el) => el.getBoundingClientRect().top);
+  out(formTop < listTop, 'the new-event form opens above the list');
+  await p.locator('.card', { hasText: 'אירוע חדש' }).locator('select >> nth=0').selectOption({ label: 'אימון' });
+  await p.locator('.card', { hasText: 'אירוע חדש' }).locator('input[type="datetime-local"]').fill('2030-02-01T17:00');
+  await p.click('button:has-text("יצירת אירוע")'); await wait(900);
+  await has('creating closes the form and confirms', 'האירוע נוצר ומופיע ברשימה');
+  await p.click('.bottom-nav >> text=בית'); await wait(800);
+  await p.click('.quick:has-text("אירוע חדש")'); await wait(900);
+  out(await p.locator('.card', { hasText: 'אירוע חדש' }).count() === 1, 'the home screen shortcut opens the form at once');
+  await p.click('.bottom-nav >> text=אירועים'); await wait(900);
   await p.click('.tabs button:has-text("סגל")'); await wait(600);
   await has('squad with all six players and the pending request', 'דני כהן', 'רוני לוי', 'נועה מזרחי', 'גיל פרידמן', 'תומר שמש', 'יובל אורן', 'בקשות קישור', 'אילנה פרידמן'); await shot('squad');
   for (const [tab, needles] of [['אירועים', ['משחק ליגה נגד הפועל', 'גיבוש סוף עונה', 'טרם התקיימו', 'מהקרוב לרחוק']], ['משימות', ['מתיחות 10 דקות כל יום', 'מתוך 12']], ['סקרים', ['טורניר סוף עונה', 'אולי']], ['הודעות', ['אימון מחר', 'רוני בלי הסעה']], ['הגדרות', ['שליטה בכדור', 'מהירות', 'גיל מינימלי']]]) {
@@ -61,7 +74,7 @@ const out = (ok, label, extra) => { if (!ok) fails++; console.log(`${ok ? 'PASS'
   const order = async () => p.evaluate(() => [...document.querySelectorAll('.list li a')].map((a) => a.textContent));
   const near = await order(); out(near[0] === 'אימון קבוצתי', 'upcoming events from the nearest', near.join(' | '));
   await p.click('button:has-text("מהקרוב לרחוק")'); await wait(300);
-  const far = await order(); out(far[0] === 'גיבוש סוף עונה', 'sort switches to far-to-near', far.join(' | '));
+  const far = await order(); out(far[0] === 'אימון' && far[1] === 'גיבוש סוף עונה', 'sort switches to far-to-near (the training made above, in 2030, is the farthest)', far.join(' | '));
   await p.click('role=tab[name="התקיימו"]'); await wait(300);
   await has('past filter shows the played match', 'משחק ליגה נגד בית״ר', '2:1'); await hasNot('past filter hides upcoming events', 'גיבוש סוף עונה');
   await p.click('role=tab[name="ליגה"]'); await wait(900);
@@ -245,6 +258,53 @@ const out = (ok, label, extra) => { if (!ok) fails++; console.log(`${ok ? 'PASS'
     out(t.includes('איך נכנסים היום?') && t.includes('מנהל מועדון'), 'back after a long break: asked again how to enter', t.slice(0, 200));
     await q.close();
   }
+
+  // nutrition: a tab for the parent, a suggestion for the day and feedback on what the child ate
+  await pick('שרה כהן'); await p.locator('button:has-text("איפוס נתונים")').evaluate((b) => b.click()); await wait(1200);
+  await p.click('.bottom-nav >> text=תזונה'); await wait(900);
+  await has('nutrition tab asks what the child eats', 'מה דני אוכל/ת היום?', 'המלצה ליום', 'לא ייעוץ רפואי');
+  await p.click('button[aria-label="היום הבא"]'); await wait(400);
+  await p.click('button:has-text("הכנת המלצה ליום")'); await wait(800);
+  await has('the suggestion follows the day (training tomorrow)', 'יום אימון', 'לפני', 'אחרי');
+  await p.fill('.nutrition textarea', 'בבוקר פיתה עם גבינה ומלפפון, שתיתי מים'); await p.click('button:has-text("קבלת משוב")'); await wait(800);
+  await has('a meal report gets a compliment', 'כל הכבוד!', 'פיתה עם גבינה ומלפפון');
+  await hasNot('no weight and no calories', 'קלוריות לאכול', 'ק"ג');
+  await pick('אבי כץ');
+  out(!(await p.locator('.bottom-nav').innerText()).includes('תזונה'), 'the coach has no nutrition tab');
+  const tipCard = p.locator('.card', { hasText: 'טיפ תזונה לקבוצה' });
+  await tipCard.locator('textarea').fill('ארוחת ערב עם פסטה'); await tipCard.locator('button:has-text("שליחת הטיפ")').click(); await wait(600);
+  await has('the coach gives the team a nutrition tip for a day', 'ארוחת ערב עם פסטה');
+  await pick('רוני לוי'); await p.click('.bottom-nav >> text=תזונה'); await wait(800);
+  await has('the player sees the coach\'s tip in the nutrition tab', 'מהמאמן', 'ארוחת ערב עם פסטה');
+  await p.click('.bottom-nav >> text=הפרופיל'); await wait(900);
+  await has('the player sees the coach\'s rating and goals on his home screen', 'ההתקדמות שלי', 'הערכת המאמן', 'שליטה בכדור', 'להוביל את החימום באימון');
+
+  // match clock: a parent the staff allowed runs it; a player sees only his own minutes
+  p.on('dialog', (d) => d.accept());
+  await pick('שרה כהן'); await p.locator('button:has-text("איפוס נתונים")').evaluate((b) => b.click()); await wait(1200); // earlier steps unlinked her child
+  await p.locator('a:has-text("לכל פרטי האירוע")').nth(1).click(); await wait(1200);
+  out(await p.locator('.match-clock').count() === 1, 'the allowed parent gets the match clock with the whole squad');
+  await has('clock shows the squad with shirt numbers and the team minimum', 'המשחק עוד לא התחיל', 'מינימום 20′', 'דני כהן', 'רוני לוי', 'יובל אורן');
+  await p.click('button:has-text("המשחק התחיל")'); await wait(300);
+  await p.click('button[aria-label="התחלה לדני כהן"]'); await p.click('button[aria-label="התחלה לרוני לוי"]'); await wait(2200);
+  await has('players on the pitch run their own timer', 'המשחק רץ', '2 על המגרש', '⏹ עצור');
+  await p.click('button[aria-label="שער לדני כהן"]'); await p.click('button[aria-label="שער לדני כהן"]'); await wait(500);
+  await p.click('button[aria-label="ביטול שער לדני כהן"]'); await p.click('button[aria-label="כרטיס צהוב לרוני לוי"]'); await wait(600);
+  out(await p.locator('button[aria-label="שער לדני כהן"]').innerText() === '⚽ 1', 'goal + + − leaves one goal');
+  await p.click('button[aria-label="עצירה לדני כהן"]'); await wait(300);
+  await has('a stopped player keeps his minutes and can go back on', '▶ התחל');
+  await p.click('button:has-text("הפסקה")'); await wait(300); await has('half time pauses the clock', '▶ המשך משחק');
+  await shot('match-clock');
+  await p.click('button:has-text("סיום משחק")'); await wait(700);
+  await has('end of match gives the minutes report to share', 'דוח דקות', 'שיתוף בוואטסאפ');
+  await pick('רוני לוי');
+  await p.locator('a:has-text("לכל פרטי האירוע")').nth(1).click(); await wait(1200);
+  out(await p.locator('.match-clock').count() === 0, 'a player who does not run the clock gets no buttons');
+  await has('the player sees his own minutes only', 'דקות משחק', 'רוני לוי', 'מתוך מינימום 20 דקות');
+  await hasNot('the player does not see a teammate\'s minutes', 'דני כהן ·');
+  await pick('אבי כץ'); await p.click('.bottom-nav >> text=אירועים'); await wait(900);
+  await p.click('role=tab[name="הגדרות"]'); await wait(800);
+  await has('staff choose the parents who run the clock', 'הורים שמפעילים את שעון המשחק', 'שרה כהן', 'מינימום דקות משחק לשחקן');
 
   // system admin
   await pick('יוסי אברהם');

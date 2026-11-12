@@ -173,6 +173,117 @@ select t.denied('a parent cannot record statistics', $$select record_stat(t.id('
 select t.as_user('O');
 select t.check('outsider sees no statistics', (select count(*) from event_stats) = 0);
 
+-- ---------------------------------------------------------------- match clock (0035)
+set role authenticated;
+select t.as_user('C');
+insert into t.ctx select 'E_live', create_event(t.id('T1'), t.lk('event_type', 'match'), 'משחק חי', now() - interval '1 hour', null, 'מגרש', '', 'מכבי');
+select t.denied('a parent who was not allowed cannot run the clock',
+  $$select set_match_running(t.id('E_live'), true, now())$$) from (select t.as_user('P1')) _;
+select t.as_user('C');
+select t.check('staff list the team''s parents for the clock',
+  (select count(*) from team_match_operators(t.id('T1')) where parent_id in (t.id('P1'), t.id('P2'))) = 2);
+select set_match_operator(t.id('T1'), t.id('P1'), true);
+select t.denied('only a parent on the team can be allowed',
+  $$select set_match_operator(t.id('T1'), t.id('O'), true)$$);
+select t.denied('a parent cannot allow others',
+  $$select set_match_operator(t.id('T1'), t.id('P2'), true)$$) from (select t.as_user('P1')) _;
+select t.as_user('P1');
+select t.check('the allowed parent may run the clock', can_run_match(t.id('T1')));
+-- 40 minutes ago the match starts; K1 plays 0-15 and 25-40 (back on during half time 20-25); K2 15-40.
+select set_match_running(t.id('E_live'), true, now() - interval '40 minutes');
+select set_match_running(t.id('E_live'), true, now() - interval '39 minutes');
+select t.check('starting a running clock again changes nothing',
+  (select count(*) from match_periods where event_id = t.id('E_live')) = 1);
+select set_player_on(t.id('E_live'), t.id('K1'), true, now() - interval '40 minutes');
+select set_player_on(t.id('E_live'), t.id('K1'), false, now() - interval '25 minutes');
+select set_player_on(t.id('E_live'), t.id('K2'), true, now() - interval '25 minutes');
+select set_match_running(t.id('E_live'), false, now() - interval '20 minutes');
+select set_player_on(t.id('E_live'), t.id('K1'), true, now() - interval '18 minutes');
+select set_player_on(t.id('E_live'), t.id('K1'), true, now() - interval '17 minutes');
+select set_match_running(t.id('E_live'), true, now() - interval '15 minutes');
+select record_match_stat(t.id('E_live'), t.id('K1'), t.lk('stat_type', 'goal'), now() - interval '10 minutes', '00000000-0000-0000-0000-0000000000a1');
+select record_match_stat(t.id('E_live'), t.id('K1'), t.lk('stat_type', 'goal'), now() - interval '10 minutes', '00000000-0000-0000-0000-0000000000a1');
+select t.check('the same goal sent twice is recorded once, at the match minute',
+  (select count(*) = 1 and min(minute) between 25 and 26 from event_stats where client_id = '00000000-0000-0000-0000-0000000000a1'));
+select t.check('a player put on twice has one open stint',
+  (select count(*) from play_intervals where event_id = t.id('E_live') and player_id = t.id('K1') and ended_at is null) = 1);
+select t.denied('a time in the future is rejected',
+  $$select set_player_on(t.id('E_live'), t.id('K2'), false, now() + interval '1 hour')$$);
+select t.denied('the clock runs on a match only',
+  $$select set_match_running(t.id('E_train'), true, now())$$) from (select t.as_user('C')) _;
+select t.as_user('P1');
+select end_match(t.id('E_live'), now());
+select t.check('ending the match stops the clock and every player',
+  not exists (select 1 from match_periods where event_id = t.id('E_live') and ended_at is null)
+  and not exists (select 1 from play_intervals where event_id = t.id('E_live') and ended_at is null));
+-- played = overlap with the running clock: K1 15 + 15 = 30, K2 5 + 15 = 20
+select t.check('minutes played count only while the clock runs',
+  (select round(sum(extract(epoch from least(i.ended_at, p.ended_at) - greatest(i.started_at, p.started_at))) / 60)
+     from play_intervals i join match_periods p on p.event_id = i.event_id
+    where i.event_id = t.id('E_live') and i.player_id = t.id('K1') and least(i.ended_at, p.ended_at) > greatest(i.started_at, p.started_at)) = 30);
+select t.check('the allowed parent sees every player''s minutes',
+  (select count(distinct player_id) from play_intervals where event_id = t.id('E_live')) = 2);
+select delete_match_stat(t.id('E_live'), null, '00000000-0000-0000-0000-0000000000a1');
+select delete_match_stat(t.id('E_live'), null, '00000000-0000-0000-0000-0000000000a1');
+select t.check('a goal is removed by the phone''s id, twice is harmless',
+  not exists (select 1 from event_stats where client_id = '00000000-0000-0000-0000-0000000000a1'));
+select t.as_user('P2');
+select t.check('another parent sees only their own child''s minutes',
+  (select count(*) from play_intervals where event_id = t.id('E_live') and player_id = t.id('K1')) = 0
+  and (select count(*) from play_intervals where event_id = t.id('E_live') and player_id = t.id('K2')) = 1);
+select t.check('team members see the clock periods',
+  (select count(*) from match_periods where event_id = t.id('E_live')) = 2);
+select t.denied('another parent cannot record a goal',
+  $$select record_match_stat(t.id('E_live'), t.id('K2'), t.lk('stat_type','goal'), now(), gen_random_uuid())$$);
+select t.as_user('C');
+select set_match_operator(t.id('T1'), t.id('P1'), false);
+select t.denied('once the staff take it back the parent cannot run the clock',
+  $$select set_player_on(t.id('E_live'), t.id('K1'), true, now())$$) from (select t.as_user('P1')) _;
+select t.as_user('O');
+select t.check('outsider sees no clock and no minutes',
+  (select count(*) from match_periods) = 0 and (select count(*) from play_intervals) = 0);
+select t.check('the clock check helper is not callable by users',
+  not has_function_privilege('authenticated', 'match_action_check(uuid, timestamptz)', 'execute')
+  and not has_function_privilege('authenticated', 'match_minute_at(uuid, timestamptz)', 'execute'));
+
+
+-- ---------------------------------------------------------------- nutrition (0036)
+set role authenticated;
+select t.as_user('P1');
+select t.check('the parent gets the child''s age, allergies and the day''s events for the suggestion',
+  (select (v ->> 'age')::int >= 10 and jsonb_typeof(v -> 'events') = 'array' and v ? 'allergies'
+     from (select nutrition_context(t.id('K1'), current_date) v) x));
+select save_nutrition_entry(t.id('K1'), current_date, 'plan', '', '{"day_type": "rest"}');
+select save_nutrition_entry(t.id('K1'), current_date, 'plan', '', '{"day_type": "training"}');
+select save_nutrition_entry(t.id('K1'), current_date, 'review', 'פיתה וסלט', '{"verdict": "great"}');
+select t.check('one suggestion per day (a new one replaces it), meal reports are kept',
+  (select count(*) filter (where kind = 'plan') = 1 and count(*) filter (where kind = 'review') = 1
+          and max(output ->> 'day_type') = 'training' from nutrition_entries where player_id = t.id('K1')));
+select t.denied('a day far from today is rejected',
+  $$select save_nutrition_entry(t.id('K1'), current_date + 30, 'plan', '', '{}')$$);
+select t.as_user('U2');
+select t.check('the player sees his own nutrition only',
+  (select count(*) from nutrition_entries where player_id = t.id('K1')) = 0);
+select save_nutrition_entry(t.id('K2'), current_date, 'review', 'שניצל', '{"verdict": "improve"}');
+select t.check('the player keeps his own meal report', (select count(*) from nutrition_entries where player_id = t.id('K2')) = 1);
+select t.as_user('C');
+select t.check('the coach does not see what a child ate', (select count(*) from nutrition_entries) = 0);
+select t.denied('the coach cannot ask for a child''s nutrition details', $$select nutrition_context(t.id('K1'), current_date)$$);
+select t.denied('a parent cannot give the team a nutrition tip',
+  $$select add_team_nutrition_tip(t.id('T1'), current_date, 'פרי')$$) from (select t.as_user('P1')) _;
+select t.as_user('C');
+select add_team_nutrition_tip(t.id('T1'), current_date, 'לאכול פרי שעה לפני האימון');
+select t.as_user('P1');
+select t.check('the team sees the coach''s tip, and the suggestion gets it',
+  exists (select 1 from team_nutrition_tips where team_id = t.id('T1') and day = current_date)
+  and (select nutrition_context(t.id('K1'), current_date) -> 'coach_tips' ->> 0) = 'לאכול פרי שעה לפני האימון');
+select t.as_user('O');
+select t.check('outsider sees no team tips', (select count(*) from team_nutrition_tips) = 0);
+select t.as_user('P2');
+select t.denied('another parent cannot write for someone else''s child',
+  $$select save_nutrition_entry(t.id('K1'), current_date, 'review', 'x', '{}')$$);
+select t.check('another parent does not see someone else''s child', (select count(*) from nutrition_entries where player_id = t.id('K1')) = 0);
+
 -- ---------------------------------------------------------------- dynamic attributes
 select t.as_user('C');
 insert into t.ctx select 'D_ball', create_attribute_def('player', 'ball_control', 'שליטה בכדור', 'scale', '{"min":1,"max":10}',
@@ -361,7 +472,7 @@ select t.check('the coach sees the requesting parent name', exists (select 1 fro
 select respond_guardianship((select id from guardianships where parent_id = t.id('P3')), true);
 select t.as_user('P3');
 select t.check('after approval the parent sees the child and the team', (select count(*) from v_players) >= 2
-  and (select count(*) from events) = 2);
+  and (select count(*) from events) = 3);
 
 -- ---------------------------------------------------------------- linking to yourself (testers only)
 select t.as_user('U2');
