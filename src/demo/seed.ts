@@ -63,6 +63,9 @@ export function seed(): Tables {
     def('d_league', 'team', 'league_url', 'קישור לדף הקבוצה באתר ההתאחדות (טבלת ליגה)', 'text', {}, ALL, STAFF, { sort_order: 5 }),
     def('d_dform', 'team', 'default_formation', 'מערך (ברירת מחדל)', 'lookup', { domain: 'formation', depends_on: 'default_match_format' }, ALL, STAFF, { sort_order: 4 }),
     def('d_efmt', 'event', 'match_format', 'מספר שחקנים במגרש', 'lookup', { domain: 'match_format', default_from_team: 'default_match_format' }, ALL, STAFF, { sort_order: 1 }),
+    def('d_minplay', 'team', 'min_play_minutes', 'מינימום דקות משחק לשחקן (0 = אין)', 'number', { min: 0, max: 120, default: 20 }, ALL, STAFF, { sort_order: 7 }),
+    def('d_matchmin', 'team', 'match_minutes', 'אורך משחק בדקות', 'number', { min: 10, max: 120, default: 50 }, ALL, STAFF, { sort_order: 8 }),
+    def('d_minalert', 'team', 'min_minutes_alert', 'התראה על מינימום דקות, כמה דקות לפני הסוף', 'number', { min: 0, max: 60, default: 10 }, STAFF, STAFF, { sort_order: 9 }),
     def('d_groups', 'team', 'parallel_groups', 'מספר קבוצות שמשחקות במקביל', 'number', { min: 1, max: 4, default: 1 }, ALL, STAFF, { sort_order: 6 }),
     def('d_egroups', 'event', 'parallel_groups', 'מספר קבוצות במקביל', 'number', { min: 1, max: 4, default_from_team: 'parallel_groups' }, ALL, STAFF, { sort_order: 3 }),
     def('d_eform', 'event', 'formation', 'מערך', 'lookup', { domain: 'formation', depends_on: 'match_format', default_from_team: 'default_formation' }, ALL, STAFF, { sort_order: 2 }),
@@ -177,6 +180,18 @@ export function seed(): Tables {
     ],
     attribute_defs,
     attribute_values,
+    // the mother of דני runs the match clock; the last match has its minutes
+    match_operators: [{ team_id: 't1', parent_id: 'u_p1', granted_by: 'u_coach', granted_at: ago(10) }],
+    match_periods: [
+      { id: 'mp1', event_id: 'e_past', started_at: at(-3, 10), ended_at: at(-3, 10, 25) },
+      { id: 'mp2', event_id: 'e_past', started_at: at(-3, 10, 30), ended_at: at(-3, 10, 55) },
+    ],
+    play_intervals: [
+      { id: 'pi1', event_id: 'e_past', player_id: 'k1', started_at: at(-3, 10), ended_at: at(-3, 10, 40) },
+      { id: 'pi2', event_id: 'e_past', player_id: 'k2', started_at: at(-3, 10), ended_at: at(-3, 10, 55) },
+      { id: 'pi3', event_id: 'e_past', player_id: 'k3', started_at: at(-3, 10, 20), ended_at: at(-3, 10, 55) },
+      { id: 'pi4', event_id: 'e_past', player_id: 'k5', started_at: at(-3, 10), ended_at: at(-3, 10, 12) },
+    ],
     player_goals: [
       { id: 'pg1', player_id: 'k1', title: 'לשפר בעיטה ברגל שמאל', target_date: at(30, 12).slice(0, 10), done_at: null, archived: false, created_by: 'u_coach', created_at: ago(20) },
       { id: 'pg2', player_id: 'k1', title: '50 הרמות כדור ברצף', target_date: null, done_at: ago(5), archived: false, created_by: 'u_coach', created_at: ago(40) },

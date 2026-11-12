@@ -14,6 +14,7 @@ import { EventDashboard } from '../../components/EventDashboard';
 import { KitSelect } from '../../components/Kit';
 import { EquipmentPicker } from '../../components/Equipment';
 import { TransportCard } from '../../components/Transport';
+import { MatchClock } from '../../components/MatchClock';
 import { BulkEventEdit } from '../../components/BulkEventEdit';
 import { ShareEvent } from '../../components/ShareEvent';
 import { CancelEventBox, isCancelled } from '../../components/Cancelled';
@@ -117,6 +118,9 @@ export default function EventPage() {
       )}
       {canManage && cancelling && !isCancelled(event) && (
         <CancelEventBox event={event} onClose={() => setCancelling(false)} onDone={() => { setCancelling(false); reload(); }} />
+      )}
+      {isMatch && !isCancelled(event) && (
+        <MatchClock event={event} sportId={team.sport_id} players={players} responses={responses} myKids={myKids} />
       )}
       {canManage && share && (
         <ShareEvent onClose={() => setShare(false)} transport={event.has_transport ? { teamId: event.team_id, kitId: event.kit_id } : null} kidPool={players.filter((p) => p.photo_consent && p.photo_path).map((p) => ({ path: p.photo_path as string, name: p.full_name }))} link={`${window.location.origin}/m/parent/event/${event.id}`}

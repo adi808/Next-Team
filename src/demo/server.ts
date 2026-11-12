@@ -37,6 +37,15 @@ export class DemoServer {
   private teamParent(team: string) { return this.t.team_players.some((x) => x.team_id === team && this.parentOf(x.player_id)); }
   private teamPlayer(team: string) { return this.t.team_players.some((x) => x.team_id === team && this.selfPlayer(x.player_id)); }
   private member(team: string) { return this.manageTeam(team) || this.teamParent(team) || this.teamPlayer(team) || this.adminOf(this.clubOfTeam(team)); }
+  private runMatch(team: string) {
+    return this.manageTeam(team) || (this.teamParent(team) && this.t.match_operators.some((o) => o.team_id === team && o.parent_id === this.uid));
+  }
+  private clockCheck(a: Row): Row {
+    const e = this.find('events', a.p_event);
+    if (!e || !this.runMatch(e.team_id)) this.deny();
+    if (!this.find('lookups', e.type_id)?.meta?.is_match) this.bad('the clock runs on a match only');
+    return e;
+  }
   private canView(player: string) {
     return this.managePlayer(player) || this.parentOf(player) || this.selfPlayer(player) || this.teamsOf(player).some((tm) => this.member(tm));
   }
@@ -93,6 +102,9 @@ export class DemoServer {
       case 'player_goals': return t.player_goals.filter((g) => this.managePlayer(g.player_id) || this.parentOf(g.player_id) || this.selfPlayer(g.player_id));
       case 'events': case 'surveys': case 'messages': case 'team_kits': return t[table].filter((r) => this.member(r.team_id));
       case 'event_responses': return t.event_responses.filter((r) => this.manageTeam(this.find('events', r.event_id)?.team_id) || this.parentOf(r.player_id) || this.selfPlayer(r.player_id));
+      case 'match_operators': return t.match_operators.filter((r) => this.manageTeam(r.team_id) || r.parent_id === this.uid);
+      case 'match_periods': return t.match_periods.filter((r) => this.member(this.find('events', r.event_id)?.team_id));
+      case 'play_intervals': return t.play_intervals.filter((r) => this.runMatch(this.find('events', r.event_id)?.team_id) || this.parentOf(r.player_id) || this.selfPlayer(r.player_id));
       case 'event_stats': return t.event_stats.filter((r) => this.member(this.find('events', r.event_id)?.team_id));
       case 'attribute_values': return t.attribute_values.filter((v) => {
         const d = this.find('attribute_defs', v.def_id);
@@ -600,6 +612,50 @@ export class DemoServer {
       if (!e || !this.manageTeam(e.team_id)) this.deny();
       if (!this.find('lookups', e.type_id)?.meta?.is_match) this.bad('statistics can only be recorded on a match');
       const id = this.id('es'); this.t.event_stats.push({ id, event_id: a.p_event, player_id: a.p_player, stat_type_id: a.p_stat_type, minute: a.p_minute ?? null, note: a.p_note ?? '' }); return id;
+    },
+    can_run_match(this: DemoServer, a: Row) { return this.runMatch(a.p_team); },
+    team_match_operators(this: DemoServer, a: Row) {
+      if (!this.manageTeam(a.p_team)) this.deny();
+      const kids = this.t.team_players.filter((x) => x.team_id === a.p_team).map((x) => x.player_id);
+      const parents = [...new Set(this.t.guardianships.filter((g) => g.status === 'approved' && kids.includes(g.player_id)).map((g) => g.parent_id as string))];
+      return parents.map((id) => ({
+        parent_id: id, full_name: this.find('profiles', id)?.full_name ?? '',
+        children: this.t.guardianships.filter((g) => g.parent_id === id && g.status === 'approved' && kids.includes(g.player_id)).map((g) => this.find('players', g.player_id)?.full_name).join(', '),
+        is_operator: this.t.match_operators.some((o) => o.team_id === a.p_team && o.parent_id === id),
+      }));
+    },
+    set_match_operator(this: DemoServer, a: Row) {
+      if (!this.manageTeam(a.p_team)) this.deny();
+      this.t.match_operators = this.t.match_operators.filter((o) => !(o.team_id === a.p_team && o.parent_id === a.p_parent));
+      if (a.p_on) this.t.match_operators.push({ team_id: a.p_team, parent_id: a.p_parent, granted_by: this.uid, granted_at: new Date().toISOString() });
+    },
+    set_match_running(this: DemoServer, a: Row) {
+      this.clockCheck(a);
+      const open = this.t.match_periods.find((p) => p.event_id === a.p_event && !p.ended_at);
+      if (a.p_on && !open) this.t.match_periods.push({ id: this.id('mp'), event_id: a.p_event, started_at: a.p_at, ended_at: null });
+      if (!a.p_on && open) open.ended_at = a.p_at < open.started_at ? open.started_at : a.p_at;
+    },
+    set_player_on(this: DemoServer, a: Row) {
+      this.clockCheck(a);
+      const open = this.t.play_intervals.find((p) => p.event_id === a.p_event && p.player_id === a.p_player && !p.ended_at);
+      if (a.p_on && !open) this.t.play_intervals.push({ id: this.id('pi'), event_id: a.p_event, player_id: a.p_player, started_at: a.p_at, ended_at: null });
+      if (!a.p_on && open) open.ended_at = a.p_at < open.started_at ? open.started_at : a.p_at;
+    },
+    end_match(this: DemoServer, a: Row) {
+      this.clockCheck(a);
+      for (const r of [...this.t.match_periods, ...this.t.play_intervals]) if (r.event_id === a.p_event && !r.ended_at) r.ended_at = a.p_at;
+    },
+    record_match_stat(this: DemoServer, a: Row) {
+      this.clockCheck(a);
+      if (this.t.event_stats.some((s) => s.client_id === a.p_client)) return;
+      const ran = this.t.match_periods.filter((p) => p.event_id === a.p_event && p.started_at < a.p_at)
+        .reduce((sum, p) => sum + Math.max(0, new Date(p.ended_at && p.ended_at < a.p_at ? p.ended_at : a.p_at).getTime() - new Date(p.started_at).getTime()), 0);
+      this.t.event_stats.push({ id: this.id('es'), event_id: a.p_event, player_id: a.p_player, stat_type_id: a.p_stat_type, minute: Math.ceil(ran / 60000), note: '', client_id: a.p_client, created_at: new Date().toISOString() });
+    },
+    delete_match_stat(this: DemoServer, a: Row) {
+      const e = this.find('events', a.p_event);
+      if (!e || !this.runMatch(e.team_id)) this.deny();
+      this.t.event_stats = this.t.event_stats.filter((s) => !(s.event_id === a.p_event && ((a.p_stat && s.id === a.p_stat) || (a.p_client && s.client_id === a.p_client))));
     },
     delete_stat(this: DemoServer, a: Row) { this.t.event_stats = this.t.event_stats.filter((s) => s.id !== a.p_stat); },
     create_task(this: DemoServer, a: Row) {

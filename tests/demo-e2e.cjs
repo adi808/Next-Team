@@ -246,6 +246,33 @@ const out = (ok, label, extra) => { if (!ok) fails++; console.log(`${ok ? 'PASS'
     await q.close();
   }
 
+  // match clock: a parent the staff allowed runs it; a player sees only his own minutes
+  p.on('dialog', (d) => d.accept());
+  await pick('שרה כהן'); await p.locator('button:has-text("איפוס נתונים")').evaluate((b) => b.click()); await wait(1200); // earlier steps unlinked her child
+  await p.locator('a:has-text("לכל פרטי האירוע")').nth(1).click(); await wait(1200);
+  out(await p.locator('.match-clock').count() === 1, 'the allowed parent gets the match clock with the whole squad');
+  await has('clock shows the squad with shirt numbers and the team minimum', 'המשחק עוד לא התחיל', 'מינימום 20′', 'דני כהן', 'רוני לוי', 'יובל אורן');
+  await p.click('button:has-text("המשחק התחיל")'); await wait(300);
+  await p.click('button[aria-label="התחלה לדני כהן"]'); await p.click('button[aria-label="התחלה לרוני לוי"]'); await wait(2200);
+  await has('players on the pitch run their own timer', 'המשחק רץ', '2 על המגרש', '⏹ עצור');
+  await p.click('button[aria-label="שער לדני כהן"]'); await p.click('button[aria-label="שער לדני כהן"]'); await wait(500);
+  await p.click('button[aria-label="ביטול שער לדני כהן"]'); await p.click('button[aria-label="כרטיס צהוב לרוני לוי"]'); await wait(600);
+  out(await p.locator('button[aria-label="שער לדני כהן"]').innerText() === '⚽ 1', 'goal + + − leaves one goal');
+  await p.click('button[aria-label="עצירה לדני כהן"]'); await wait(300);
+  await has('a stopped player keeps his minutes and can go back on', '▶ התחל');
+  await p.click('button:has-text("הפסקה")'); await wait(300); await has('half time pauses the clock', '▶ המשך משחק');
+  await shot('match-clock');
+  await p.click('button:has-text("סיום משחק")'); await wait(700);
+  await has('end of match gives the minutes report to share', 'דוח דקות', 'שיתוף בוואטסאפ');
+  await pick('רוני לוי');
+  await p.locator('a:has-text("לכל פרטי האירוע")').nth(1).click(); await wait(1200);
+  out(await p.locator('.match-clock').count() === 0, 'a player who does not run the clock gets no buttons');
+  await has('the player sees his own minutes only', 'דקות משחק', 'רוני לוי', 'מתוך מינימום 20 דקות');
+  await hasNot('the player does not see a teammate\'s minutes', 'דני כהן ·');
+  await pick('אבי כץ'); await p.click('.bottom-nav >> text=אירועים'); await wait(900);
+  await p.click('role=tab[name="הגדרות"]'); await wait(800);
+  await has('staff choose the parents who run the clock', 'הורים שמפעילים את שעון המשחק', 'שרה כהן', 'מינימום דקות משחק לשחקן');
+
   // system admin
   await pick('יוסי אברהם');
   await has('a system admin also gets the "view as" card', 'איך נכנסים היום?', 'צפייה כמאמן / כשחקן');
