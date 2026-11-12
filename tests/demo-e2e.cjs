@@ -266,6 +266,7 @@ const out = (ok, label, extra) => { if (!ok) fails++; console.log(`${ok ? 'PASS'
   await p.click('button[aria-label="היום הבא"]'); await wait(400);
   await p.click('button:has-text("הכנת המלצה ליום")'); await wait(800);
   await has('the suggestion follows the day (training tomorrow)', 'יום אימון', 'לפני', 'אחרי');
+  out(await p.locator('.meals .food').count() >= 4, 'each meal shows pictures of its foods');
   await p.fill('.nutrition textarea', 'בבוקר פיתה עם גבינה ומלפפון, שתיתי מים'); await p.click('button:has-text("קבלת משוב")'); await wait(800);
   await has('a meal report gets a compliment', 'כל הכבוד!', 'פיתה עם גבינה ומלפפון');
   await hasNot('no weight and no calories', 'קלוריות לאכול', 'ק"ג');
