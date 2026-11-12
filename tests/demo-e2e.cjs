@@ -246,6 +246,19 @@ const out = (ok, label, extra) => { if (!ok) fails++; console.log(`${ok ? 'PASS'
     await q.close();
   }
 
+  // nutrition: a tab for the parent, a suggestion for the day and feedback on what the child ate
+  await pick('שרה כהן'); await p.locator('button:has-text("איפוס נתונים")').evaluate((b) => b.click()); await wait(1200);
+  await p.click('.bottom-nav >> text=תזונה'); await wait(900);
+  await has('nutrition tab asks what the child eats', 'מה דני אוכל/ת היום?', 'המלצה ליום', 'לא ייעוץ רפואי');
+  await p.click('button[aria-label="היום הבא"]'); await wait(400);
+  await p.click('button:has-text("הכנת המלצה ליום")'); await wait(800);
+  await has('the suggestion follows the day (training tomorrow)', 'יום אימון', 'לפני', 'אחרי');
+  await p.fill('.nutrition textarea', 'בבוקר פיתה עם גבינה ומלפפון, שתיתי מים'); await p.click('button:has-text("קבלת משוב")'); await wait(800);
+  await has('a meal report gets a compliment', 'כל הכבוד!', 'פיתה עם גבינה ומלפפון');
+  await hasNot('no weight and no calories', 'קלוריות לאכול', 'ק"ג');
+  await pick('אבי כץ');
+  out(!(await p.locator('.bottom-nav').innerText()).includes('תזונה'), 'the coach has no nutrition tab');
+
   // match clock: a parent the staff allowed runs it; a player sees only his own minutes
   p.on('dialog', (d) => d.accept());
   await pick('שרה כהן'); await p.locator('button:has-text("איפוס נתונים")').evaluate((b) => b.click()); await wait(1200); // earlier steps unlinked her child

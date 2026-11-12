@@ -181,6 +181,7 @@ export function seed(): Tables {
     attribute_defs,
     attribute_values,
     // the mother of דני runs the match clock; the last match has its minutes
+    nutrition_entries: [],
     match_operators: [{ team_id: 't1', parent_id: 'u_p1', granted_by: 'u_coach', granted_at: ago(10) }],
     match_periods: [
       { id: 'mp1', event_id: 'e_past', started_at: at(-3, 10), ended_at: at(-3, 10, 25) },

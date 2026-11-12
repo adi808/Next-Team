@@ -747,3 +747,31 @@ table.roster .cell-line.email { white-space: normal; overflow-wrap: anywhere; fo
 .clock-report strong.bad { color: #b91c1c; }
 .clock-report strong.ok { color: #15803d; }
 .kid-minutes { display: flex; flex-direction: column; gap: 0.2rem; padding: 0.4rem 0; }
+
+/* ---- nutrition ---- */
+.bottom-nav a { min-width: 0; }
+.nutrition-bar { display: flex; flex-direction: column; gap: 0.5rem; }
+.nutrition-day { align-items: center; text-align: center; }
+.nutrition-plan { display: flex; flex-direction: column; gap: 0.5rem; }
+.nutrition-plan ul { margin: 0; padding-inline-start: 1.1rem; }
+.day-type { display: inline-flex; align-self: flex-start; align-items: center; gap: 0.4rem; padding: 0.25rem 0.8rem; border-radius: 999px; font-size: 0.95rem; }
+.day-type.match { background: #fee2e2; color: #991b1b; }
+.day-type.training { background: #dbeafe; color: #1e3a8a; }
+.day-type.rest { background: #dcfce7; color: #166534; }
+.nutrition-headline { margin: 0; font-weight: 700; font-size: 1.05rem; }
+.meals { list-style: none; padding: 0 !important; display: flex; flex-direction: column; gap: 0.35rem; }
+.meals li { display: flex; flex-direction: column; padding: 0.5rem 0.7rem; border-radius: 10px; background: #f8fafc; border: 1px solid var(--border); }
+.meals b small { color: var(--muted); font-weight: 600; }
+.nutrition-drink, .nutrition-tip { margin: 0; padding: 0.45rem 0.7rem; border-radius: 10px; background: #eff6ff; }
+.nutrition-tip { background: #fefce8; }
+.nutrition-review { margin-top: 0.7rem; padding: 0.7rem 0.8rem; border-radius: 12px; border: 1px solid var(--border); display: flex; flex-direction: column; gap: 0.35rem; }
+.nutrition-review p { margin: 0; }
+.nutrition-review ul { margin: 0; padding-inline-start: 1.1rem; }
+.nutrition-review ul.good { list-style: none; padding: 0; color: #166534; }
+.nutrition-review.great { background: #f0fdf4; border-color: #86efac; }
+.nutrition-review.good { background: #eff6ff; border-color: #93c5fd; }
+.nutrition-review.improve { background: #fffbeb; border-color: #fcd34d; }
+.verdict-icon { font-size: 1.5rem; }
+.review-input { font-size: 0.85rem; font-style: italic; }
+.nutrition textarea { width: 100%; }
+.nutrition-note { font-size: 0.8rem; }

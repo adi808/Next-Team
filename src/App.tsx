@@ -25,6 +25,7 @@ import { recentPlace } from './lib/place';
 import { entered } from './lib/entry';
 import type { Mode } from './lib/types';
 import { FamilyChat, FamilyEvents, FamilyHome, FamilySurveys, FamilyTasks } from './pages/family/Family';
+import { FamilyNutrition } from './pages/family/Nutrition';
 
 // Signed out: keep the join link for after sign-in.
 function JoinLater() {
@@ -113,6 +114,7 @@ function Gate() {
         <Route path="tasks" element={<FamilyTasks />} />
         <Route path="surveys" element={<FamilySurveys />} />
         <Route path="chat" element={<FamilyChat />} />
+        <Route path="nutrition" element={<FamilyNutrition />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

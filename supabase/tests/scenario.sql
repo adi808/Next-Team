@@ -247,6 +247,33 @@ select t.check('the clock check helper is not callable by users',
   and not has_function_privilege('authenticated', 'match_minute_at(uuid, timestamptz)', 'execute'));
 
 
+-- ---------------------------------------------------------------- nutrition (0036)
+set role authenticated;
+select t.as_user('P1');
+select t.check('the parent gets the child''s age, allergies and the day''s events for the suggestion',
+  (select (v ->> 'age')::int >= 10 and jsonb_typeof(v -> 'events') = 'array' and v ? 'allergies'
+     from (select nutrition_context(t.id('K1'), current_date) v) x));
+select save_nutrition_entry(t.id('K1'), current_date, 'plan', '', '{"day_type": "rest"}');
+select save_nutrition_entry(t.id('K1'), current_date, 'plan', '', '{"day_type": "training"}');
+select save_nutrition_entry(t.id('K1'), current_date, 'review', 'פיתה וסלט', '{"verdict": "great"}');
+select t.check('one suggestion per day (a new one replaces it), meal reports are kept',
+  (select count(*) filter (where kind = 'plan') = 1 and count(*) filter (where kind = 'review') = 1
+          and max(output ->> 'day_type') = 'training' from nutrition_entries where player_id = t.id('K1')));
+select t.denied('a day far from today is rejected',
+  $$select save_nutrition_entry(t.id('K1'), current_date + 30, 'plan', '', '{}')$$);
+select t.as_user('U2');
+select t.check('the player sees his own nutrition only',
+  (select count(*) from nutrition_entries where player_id = t.id('K1')) = 0);
+select save_nutrition_entry(t.id('K2'), current_date, 'review', 'שניצל', '{"verdict": "improve"}');
+select t.check('the player keeps his own meal report', (select count(*) from nutrition_entries where player_id = t.id('K2')) = 1);
+select t.as_user('C');
+select t.check('the coach does not see what a child ate', (select count(*) from nutrition_entries) = 0);
+select t.denied('the coach cannot ask for a child''s nutrition details', $$select nutrition_context(t.id('K1'), current_date)$$);
+select t.as_user('P2');
+select t.denied('another parent cannot write for someone else''s child',
+  $$select save_nutrition_entry(t.id('K1'), current_date, 'review', 'x', '{}')$$);
+select t.check('another parent does not see someone else''s child', (select count(*) from nutrition_entries where player_id = t.id('K1')) = 0);
+
 -- ---------------------------------------------------------------- dynamic attributes
 select t.as_user('C');
 insert into t.ctx select 'D_ball', create_attribute_def('player', 'ball_control', 'שליטה בכדור', 'scale', '{"min":1,"max":10}',

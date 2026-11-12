@@ -20,11 +20,11 @@ const NAV: Record<Mode, { to: string; label: string; icon: IconName }[]> = {
   ],
   parent: [
     { to: 'events', label: 'אירועים', icon: 'calendar' }, { to: 'home', label: 'הילדים', icon: 'child' }, { to: 'tasks', label: 'משימות', icon: 'check' },
-    { to: 'surveys', label: 'סקרים', icon: 'poll' }, { to: 'chat', label: 'הודעות', icon: 'chat' },
+    { to: 'nutrition', label: 'תזונה', icon: 'food' }, { to: 'surveys', label: 'סקרים', icon: 'poll' }, { to: 'chat', label: 'הודעות', icon: 'chat' },
   ],
   player: [
     { to: 'events', label: 'אירועים', icon: 'calendar' }, { to: 'home', label: 'הפרופיל', icon: 'child' }, { to: 'tasks', label: 'משימות', icon: 'check' },
-    { to: 'surveys', label: 'סקרים', icon: 'poll' }, { to: 'chat', label: 'הודעות', icon: 'chat' },
+    { to: 'nutrition', label: 'תזונה', icon: 'food' }, { to: 'surveys', label: 'סקרים', icon: 'poll' }, { to: 'chat', label: 'הודעות', icon: 'chat' },
   ],
 };
 

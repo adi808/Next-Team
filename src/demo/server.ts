@@ -46,6 +46,45 @@ export class DemoServer {
     if (!this.find('lookups', e.type_id)?.meta?.is_match) this.bad('the clock runs on a match only');
     return e;
   }
+  /** The nutrition tab without a language model: a sample answer that follows the child's day. */
+  private nutrition(b: Row) {
+    if (!this.parentOf(b.player_id) && !this.selfPlayer(b.player_id)) this.deny();
+    const day = String(b.day);
+    const teams = this.teamsOf(b.player_id);
+    const ymd = (iso: string) => new Date(iso).toLocaleDateString('en-CA', { timeZone: 'Asia/Jerusalem' });
+    const events = this.t.events.filter((e) => teams.includes(e.team_id) && ymd(e.starts_at) === day && !e.cancelled_at);
+    const match = events.find((e) => this.find('lookups', e.type_id)?.meta?.is_match);
+    const kind = match ? 'match' : events.length ? 'training' : 'rest';
+    const time = (e?: Row) => (e ? new Date(e.starts_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jerusalem' }) : '');
+    let output: Row;
+    if (b.action === 'review') {
+      const text = String(b.text ?? '');
+      const veg = /ירק|סלט|מלפפון|עגבני|פרי|בננה|תפוח/.test(text); const water = /מים/.test(text);
+      output = {
+        verdict: veg && water ? 'great' : veg || water ? 'good' : 'improve',
+        compliment: 'יופי שסיפרת! לאכול כמה ארוחות ביום זה בסיס מצוין לספורטאי.',
+        good: [veg ? 'היו ירקות או פירות' : '', water ? 'שתית מים' : ''].filter(Boolean),
+        improve: [veg ? '' : 'להוסיף ירק או פרי לארוחה הבאה', water ? '' : 'לשתות מים לאורך היום, לא רק בצמא'].filter(Boolean),
+        next: kind === 'rest' ? 'ארוחת ערב עם ירקות וחלבון, למשל חביתה וסלט' : 'אחרי הפעילות: פרי ומים, ואחר כך ארוחה עם פחמימה וחלבון',
+      };
+    } else {
+      const e = match ?? events[0];
+      output = kind === 'rest'
+        ? { day_type: 'rest', headline: 'יום מנוחה: אוכלים רגיל ומגוון, והגוף מתחזק.', meals: [
+            { when: 'בוקר', time: '07:30', ideas: 'דייסת שיבולת שועל עם בננה' }, { when: 'צהריים', time: '13:30', ideas: 'עוף, אורז וסלט' },
+            { when: 'ביניים', time: '16:30', ideas: 'יוגורט ופרי' }, { when: 'ערב', time: '19:30', ideas: 'חביתה, לחם מלא וירקות' }],
+            before: [], after: [], drink: 'מים לאורך כל היום, בקבוק ליד המיטה ובתיק', tip: 'לגוון בצבעים: כמה שיותר צבעים בצלחת' }
+        : { day_type: kind, headline: kind === 'match' ? `יום משחק! ארוחה טובה 3 שעות לפני המשחק ב־${time(e)}.` : `יש אימון ב־${time(e)}: אנרגיה לפני, והתאוששות אחרי.`,
+            meals: [{ when: 'בוקר', time: '07:30', ideas: 'פיתה עם גבינה וירקות' }, { when: 'לפני', time: '', ideas: 'פחמימה קלה: פסטה או אורז עם מעט חלבון, 2-3 שעות לפני' },
+              { when: 'ביניים', time: '', ideas: 'בננה או תמרים, שעה לפני' }, { when: 'אחרי', time: '', ideas: 'שוקו או יוגורט ופרי, ואחר כך ארוחה מלאה' }],
+            before: ['לא לאכול מטוגן ושמן לפני', 'לשתות כוס מים חצי שעה לפני'], after: ['לשתות הרבה מים', 'ארוחה עם חלבון ופחמימה תוך שעה'],
+            drink: 'בקבוק ליטר וחצי לפעילות, לגימות קטנות בהפסקות', tip: kind === 'match' ? 'להכין את התיק והבקבוק מאתמול בערב' : 'פרי בתיק לדרך הביתה' };
+    }
+    const entry = { id: this.id('nu'), player_id: b.player_id, day, kind: b.action === 'review' ? 'review' : 'plan', input: b.action === 'review' ? String(b.text) : '', output, created_by: this.uid, created_at: new Date().toISOString() };
+    if (entry.kind === 'plan') this.t.nutrition_entries = this.t.nutrition_entries.filter((x) => !(x.player_id === b.player_id && x.day === day && x.kind === 'plan'));
+    this.t.nutrition_entries.push(entry);
+    return { entry };
+  }
   private canView(player: string) {
     return this.managePlayer(player) || this.parentOf(player) || this.selfPlayer(player) || this.teamsOf(player).some((tm) => this.member(tm));
   }
@@ -105,6 +144,7 @@ export class DemoServer {
       case 'match_operators': return t.match_operators.filter((r) => this.manageTeam(r.team_id) || r.parent_id === this.uid);
       case 'match_periods': return t.match_periods.filter((r) => this.member(this.find('events', r.event_id)?.team_id));
       case 'play_intervals': return t.play_intervals.filter((r) => this.runMatch(this.find('events', r.event_id)?.team_id) || this.parentOf(r.player_id) || this.selfPlayer(r.player_id));
+      case 'nutrition_entries': return t.nutrition_entries.filter((r) => this.parentOf(r.player_id) || this.selfPlayer(r.player_id));
       case 'event_stats': return t.event_stats.filter((r) => this.member(this.find('events', r.event_id)?.team_id));
       case 'attribute_values': return t.attribute_values.filter((v) => {
         const d = this.find('attribute_defs', v.def_id);
@@ -814,6 +854,7 @@ export class DemoServer {
         return json(r.status, r.body);
       }
       if (url.pathname === '/functions/v1/league') return json(200, DEMO_LEAGUE());
+      if (url.pathname === '/functions/v1/nutrition') return json(200, this.nutrition(JSON.parse(String(init?.body ?? '{}'))));
       if (url.pathname.startsWith('/storage/')) {
         return json(400, { statusCode: '400', error: 'demo', message: 'העלאת תמונה אינה זמינה בדמו' });
       }
