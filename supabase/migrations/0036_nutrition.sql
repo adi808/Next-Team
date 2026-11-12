@@ -1,7 +1,8 @@
 -- Next Team: nutrition. A daily suggestion that follows the child's day (match, training or rest), the child's age
 -- and allergies, and feedback on "what did you eat today?". The suggestions come from the `nutrition` Edge Function
 -- (a language model); what the child wrote and the answers are kept for the child and the parents only: the staff
--- do not see them, like medical information. No weight and no calories, by design.
+-- do not see them, like medical information. No weight and no calories, by design. The staff can give the team a
+-- tip for a day, which everyone sees and the suggestion follows.
 
 create table nutrition_entries (
   id uuid primary key default gen_random_uuid(),
@@ -19,6 +20,43 @@ create policy nutrition_entries_select on nutrition_entries for select using (is
 grant select on nutrition_entries to authenticated;
 revoke all on nutrition_entries from anon;
 revoke insert, update, delete, truncate, references, trigger on nutrition_entries from authenticated;
+
+-- Tips the staff give the team for a day ("fruit before training"): the whole team sees them in the nutrition tab,
+-- and the suggestion for that day takes them into account.
+create table team_nutrition_tips (
+  id uuid primary key default gen_random_uuid(),
+  team_id uuid not null references teams (id) on delete cascade,
+  day date not null,
+  tip text not null check (length(trim(tip)) between 1 and 500),
+  created_by uuid references profiles (id) on delete set null,
+  created_at timestamptz not null default now()
+);
+create index team_nutrition_tips_team_day on team_nutrition_tips (team_id, day);
+alter table team_nutrition_tips enable row level security;
+create policy team_nutrition_tips_select on team_nutrition_tips for select using (is_team_member(team_id));
+grant select on team_nutrition_tips to authenticated;
+revoke all on team_nutrition_tips from anon;
+revoke insert, update, delete, truncate, references, trigger on team_nutrition_tips from authenticated;
+
+create function add_team_nutrition_tip(p_team uuid, p_day date, p_tip text) returns uuid
+language plpgsql security definer set search_path = public as $$
+declare v_uid uuid := require_auth(); v_id uuid;
+begin
+  if not can_manage_team(p_team) then raise exception 'not allowed' using errcode = '42501'; end if;
+  if p_day not between current_date - 1 and current_date + 60 then raise exception 'day out of range' using errcode = '22023'; end if;
+  insert into team_nutrition_tips (team_id, day, tip, created_by) values (p_team, p_day, trim(p_tip), v_uid) returning id into v_id;
+  return v_id;
+end $$;
+
+create function delete_team_nutrition_tip(p_id uuid) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  perform require_auth();
+  if not can_manage_team((select team_id from team_nutrition_tips where id = p_id)) then
+    raise exception 'not allowed' using errcode = '42501';
+  end if;
+  delete from team_nutrition_tips where id = p_id;
+end $$;
 
 -- What the suggestion needs about the child and the day: first name, age, allergies and the events of that day and
 -- the next (a morning match changes the evening before). Only for a parent of the child or the child.
@@ -45,7 +83,11 @@ begin
         from events e
         join team_players tp on tp.team_id = e.team_id and tp.player_id = p.id
         join lookups l on l.id = e.type_id
-       where (e.starts_at at time zone 'Asia/Jerusalem')::date between p_day and p_day + 1), '[]'::jsonb))
+       where (e.starts_at at time zone 'Asia/Jerusalem')::date between p_day and p_day + 1), '[]'::jsonb),
+    'coach_tips', coalesce((
+      select jsonb_agg(t.tip order by t.created_at) from team_nutrition_tips t
+        join team_players tp on tp.team_id = t.team_id and tp.player_id = p.id
+       where t.day = p_day), '[]'::jsonb))
     into v
     from players p where p.id = p_player;
   return v;
@@ -68,5 +110,7 @@ begin
   return v_id;
 end $$;
 
-revoke execute on function nutrition_context(uuid, date), save_nutrition_entry(uuid, date, text, text, jsonb) from public, anon;
-grant execute on function nutrition_context(uuid, date), save_nutrition_entry(uuid, date, text, text, jsonb) to authenticated;
+revoke execute on function nutrition_context(uuid, date), save_nutrition_entry(uuid, date, text, text, jsonb),
+  add_team_nutrition_tip(uuid, date, text), delete_team_nutrition_tip(uuid) from public, anon;
+grant execute on function nutrition_context(uuid, date), save_nutrition_entry(uuid, date, text, text, jsonb),
+  add_team_nutrition_tip(uuid, date, text), delete_team_nutrition_tip(uuid) to authenticated;

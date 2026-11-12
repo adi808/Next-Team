@@ -57,6 +57,12 @@ export function FamilyNutrition() {
     () => (kid ? q<Entry[]>(supabase.from('nutrition_entries').select('id, kind, day, input, output, created_at').eq('player_id', kid.id).eq('day', day).order('created_at')) : Promise.resolve([])),
     [kid?.id, day],
   );
+  const tips = useLoad(async () => {
+    if (!kid) return [] as { id: string; tip: string }[];
+    const links = await q<{ team_id: string }[]>(supabase.from('team_players').select('team_id').eq('player_id', kid.id));
+    if (!links.length) return [];
+    return q<{ id: string; tip: string }[]>(supabase.from('team_nutrition_tips').select('id, tip').in('team_id', links.map((l) => l.team_id)).eq('day', day).order('created_at'));
+  }, [kid?.id, day]);
   const plan = data?.filter((e) => e.kind === 'plan').pop();
   const reviews = useMemo(() => (data ?? []).filter((e) => e.kind === 'review').reverse(), [data]);
 
@@ -91,6 +97,12 @@ export function FamilyNutrition() {
           </div>
           <Loading loading={loading} error={loadError} />
 
+          {!!tips.data?.length && (
+            <div className="card coach-tip">
+              <strong>💬 מהמאמן</strong>
+              {tips.data.map((t) => <p key={t.id}>{t.tip}</p>)}
+            </div>
+          )}
           <Card title="🍽️ המלצה ליום">
             {plan ? <PlanView plan={plan.output} /> : <p className="muted">ההמלצה מותאמת ללו"ז של {first} באותו יום (משחק, אימון או מנוחה), לגיל ולאלרגיות שבפרופיל.</p>}
             <button className={plan ? 'secondary' : ''} disabled={!!busy} onClick={() => run('plan')}>

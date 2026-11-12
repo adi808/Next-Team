@@ -10,6 +10,7 @@ import { useLookupName, useLookups } from '../../components/Lookups';
 import { KitAvatar } from '../../components/Kit';
 import { TransportChip, useTransportTotals } from '../../components/Transport';
 import { WeekSchedule } from '../../components/WeekSchedule';
+import { TeamNutritionTips } from '../../components/NutritionTips';
 import { eventHeading, isOver, nextAndOther } from '../../lib/events';
 import type { EventResponse, EventRow, Lookup, Team, TeamKit } from '../../lib/types';
 
@@ -73,6 +74,7 @@ export default function CoachHome() {
         {data?.other && card(data.other, `ה${typeOf(data.other.type_id)?.name_he ?? 'אירוע'} הקרוב`)}
 
         {team && <WeekSchedule teams={[team]} canShare />}
+        {team && <TeamNutritionTips teamId={team.id} />}
 
         {teamId && (
           <div className="quick-actions">

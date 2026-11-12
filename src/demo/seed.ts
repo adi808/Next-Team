@@ -182,6 +182,7 @@ export function seed(): Tables {
     attribute_values,
     // the mother of דני runs the match clock; the last match has its minutes
     nutrition_entries: [],
+    team_nutrition_tips: [{ id: 'nt1', team_id: 't1', day: at(1, 12).slice(0, 10), tip: 'לאכול פרי שעה לפני האימון ולהביא בקבוק מים מלא', created_by: 'u_coach', created_at: ago(0) }],
     match_operators: [{ team_id: 't1', parent_id: 'u_p1', granted_by: 'u_coach', granted_at: ago(10) }],
     match_periods: [
       { id: 'mp1', event_id: 'e_past', started_at: at(-3, 10), ended_at: at(-3, 10, 25) },

@@ -775,3 +775,7 @@ table.roster .cell-line.email { white-space: normal; overflow-wrap: anywhere; fo
 .review-input { font-size: 0.85rem; font-style: italic; }
 .nutrition textarea { width: 100%; }
 .nutrition-note { font-size: 0.8rem; }
+.coach-tip { background: #fefce8; border: 1px solid #fde68a; display: flex; flex-direction: column; gap: 0.25rem; }
+.coach-tip p { margin: 0; font-weight: 600; }
+.chips input[type="date"] { width: auto; padding: 0.3rem 0.5rem; }
+.goal-list { list-style: none; margin: 0 0 0.4rem; padding: 0; display: flex; flex-direction: column; gap: 0.3rem; }

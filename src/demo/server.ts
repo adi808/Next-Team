@@ -144,6 +144,7 @@ export class DemoServer {
       case 'match_operators': return t.match_operators.filter((r) => this.manageTeam(r.team_id) || r.parent_id === this.uid);
       case 'match_periods': return t.match_periods.filter((r) => this.member(this.find('events', r.event_id)?.team_id));
       case 'play_intervals': return t.play_intervals.filter((r) => this.runMatch(this.find('events', r.event_id)?.team_id) || this.parentOf(r.player_id) || this.selfPlayer(r.player_id));
+      case 'team_nutrition_tips': return t.team_nutrition_tips.filter((r) => this.member(r.team_id));
       case 'nutrition_entries': return t.nutrition_entries.filter((r) => this.parentOf(r.player_id) || this.selfPlayer(r.player_id));
       case 'event_stats': return t.event_stats.filter((r) => this.member(this.find('events', r.event_id)?.team_id));
       case 'attribute_values': return t.attribute_values.filter((v) => {
@@ -652,6 +653,15 @@ export class DemoServer {
       if (!e || !this.manageTeam(e.team_id)) this.deny();
       if (!this.find('lookups', e.type_id)?.meta?.is_match) this.bad('statistics can only be recorded on a match');
       const id = this.id('es'); this.t.event_stats.push({ id, event_id: a.p_event, player_id: a.p_player, stat_type_id: a.p_stat_type, minute: a.p_minute ?? null, note: a.p_note ?? '' }); return id;
+    },
+    add_team_nutrition_tip(this: DemoServer, a: Row) {
+      if (!this.manageTeam(a.p_team)) this.deny();
+      const id = this.id('nt'); this.t.team_nutrition_tips.push({ id, team_id: a.p_team, day: a.p_day, tip: String(a.p_tip).trim(), created_by: this.uid, created_at: new Date().toISOString() }); return id;
+    },
+    delete_team_nutrition_tip(this: DemoServer, a: Row) {
+      const tip = this.find('team_nutrition_tips', a.p_id);
+      if (!tip || !this.manageTeam(tip.team_id)) this.deny();
+      this.t.team_nutrition_tips = this.t.team_nutrition_tips.filter((x) => x.id !== a.p_id);
     },
     can_run_match(this: DemoServer, a: Row) { return this.runMatch(a.p_team); },
     team_match_operators(this: DemoServer, a: Row) {

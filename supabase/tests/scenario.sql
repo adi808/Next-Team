@@ -269,6 +269,16 @@ select t.check('the player keeps his own meal report', (select count(*) from nut
 select t.as_user('C');
 select t.check('the coach does not see what a child ate', (select count(*) from nutrition_entries) = 0);
 select t.denied('the coach cannot ask for a child''s nutrition details', $$select nutrition_context(t.id('K1'), current_date)$$);
+select t.denied('a parent cannot give the team a nutrition tip',
+  $$select add_team_nutrition_tip(t.id('T1'), current_date, 'פרי')$$) from (select t.as_user('P1')) _;
+select t.as_user('C');
+select add_team_nutrition_tip(t.id('T1'), current_date, 'לאכול פרי שעה לפני האימון');
+select t.as_user('P1');
+select t.check('the team sees the coach''s tip, and the suggestion gets it',
+  exists (select 1 from team_nutrition_tips where team_id = t.id('T1') and day = current_date)
+  and (select nutrition_context(t.id('K1'), current_date) -> 'coach_tips' ->> 0) = 'לאכול פרי שעה לפני האימון');
+select t.as_user('O');
+select t.check('outsider sees no team tips', (select count(*) from team_nutrition_tips) = 0);
 select t.as_user('P2');
 select t.denied('another parent cannot write for someone else''s child',
   $$select save_nutrition_entry(t.id('K1'), current_date, 'review', 'x', '{}')$$);

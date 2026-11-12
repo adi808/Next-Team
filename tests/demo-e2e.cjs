@@ -258,6 +258,13 @@ const out = (ok, label, extra) => { if (!ok) fails++; console.log(`${ok ? 'PASS'
   await hasNot('no weight and no calories', 'קלוריות לאכול', 'ק"ג');
   await pick('אבי כץ');
   out(!(await p.locator('.bottom-nav').innerText()).includes('תזונה'), 'the coach has no nutrition tab');
+  const tipCard = p.locator('.card', { hasText: 'טיפ תזונה לקבוצה' });
+  await tipCard.locator('textarea').fill('ארוחת ערב עם פסטה'); await tipCard.locator('button:has-text("שליחת הטיפ")').click(); await wait(600);
+  await has('the coach gives the team a nutrition tip for a day', 'ארוחת ערב עם פסטה');
+  await pick('רוני לוי'); await p.click('.bottom-nav >> text=תזונה'); await wait(800);
+  await has('the player sees the coach\'s tip in the nutrition tab', 'מהמאמן', 'ארוחת ערב עם פסטה');
+  await p.click('.bottom-nav >> text=הפרופיל'); await wait(900);
+  await has('the player sees the coach\'s rating and goals on his home screen', 'ההתקדמות שלי', 'הערכת המאמן', 'שליטה בכדור', 'להוביל את החימום באימון');
 
   // match clock: a parent the staff allowed runs it; a player sees only his own minutes
   p.on('dialog', (d) => d.accept());
