@@ -6,10 +6,12 @@ import { useAuth } from '../../auth/AuthProvider';
 import { Card, Empty, ErrorText, Loading, PageHero } from '../../components/ui';
 import { dayTitle, shortDate, ymdIL } from '../../lib/week';
 import type { Player } from '../../lib/types';
+import { foodsOf } from '../../lib/foodIcons';
+import { MicButton, SpeakButton } from '../../components/Speech';
 
-interface Meal { when?: string; time?: string; ideas?: string }
+interface Meal { when?: string; time?: string; ideas?: string; foods?: unknown }
 interface Plan { day_type?: string; headline?: string; meals?: Meal[]; before?: string[]; after?: string[]; drink?: string; tip?: string }
-interface Review { verdict?: string; compliment?: string; good?: string[]; improve?: string[]; next?: string }
+interface Review { verdict?: string; compliment?: string; good?: string[]; improve?: string[]; next?: string; next_foods?: unknown }
 interface Entry { id: string; kind: 'plan' | 'review'; day: string; input: string; output: Plan & Review; created_at: string }
 
 const DAY_TYPE: Record<string, { label: string; icon: string }> = {
@@ -111,8 +113,11 @@ export function FamilyNutrition() {
           </Card>
 
           <Card title={asParent ? `🥗 מה ${first} אכל/ה היום?` : '🥗 מה אכלת היום?'}>
-            <textarea rows={4} value={text} maxLength={2000} onChange={(e) => setText(e.target.value)}
-              placeholder="למשל: בבוקר פיתה עם גבינה ומלפפון, בצהריים שניצל ואורז, אחרי האימון בננה ומים" />
+            <div className="dictate">
+              <textarea rows={4} value={text} maxLength={2000} onChange={(e) => setText(e.target.value)}
+                placeholder="כתבו או לחצו 🎤 וספרו. למשל: בבוקר פיתה עם גבינה ומלפפון, בצהריים שניצל ואורז, אחרי האימון בננה ומים" />
+              <MicButton value={text} disabled={!!busy} onChange={setText} />
+            </div>
             <button disabled={!!busy || !text.trim()} onClick={() => run('review')}>{busy === 'review' ? 'בודק…' : 'קבלת משוב'}</button>
             {reviews.map((r) => <ReviewView key={r.id} entry={r} />)}
           </Card>
@@ -134,7 +139,11 @@ function PlanView({ plan }: { plan: Plan }) {
       {meals.length > 0 && (
         <ul className="meals">
           {meals.map((m, i) => (
-            <li key={i}><b>{str(m.when)}{str(m.time) ? <small dir="ltr"> {m.time}</small> : null}</b><span>{m.ideas}</span></li>
+            <li key={i}>
+              <b>{str(m.when)}{str(m.time) ? <small dir="ltr"> {m.time}</small> : null}</b>
+              <FoodRow foods={foodsOf(m.foods, str(m.ideas))} />
+              <span>{m.ideas}</span>
+            </li>
           ))}
         </ul>
       )}
@@ -142,6 +151,9 @@ function PlanView({ plan }: { plan: Plan }) {
       {list(plan.after).length > 0 && <><h4 className="section-title">אחרי</h4><ul>{list(plan.after).map((x, i) => <li key={i}>{x}</li>)}</ul></>}
       {str(plan.drink) && <p className="nutrition-drink">💧 {plan.drink}</p>}
       {str(plan.tip) && <p className="nutrition-tip">⭐ {plan.tip}</p>}
+      <SpeakButton text={[t.label, str(plan.headline), ...meals.map((m) => `${str(m.when)}: ${str(m.ideas)}`),
+        list(plan.before).length ? `לפני: ${list(plan.before).join('. ')}` : '', list(plan.after).length ? `אחרי: ${list(plan.after).join('. ')}` : '',
+        str(plan.drink), str(plan.tip)].filter(Boolean).join('. ')} label="הקראת ההמלצה" />
     </div>
   );
 }
@@ -157,7 +169,24 @@ function ReviewView({ entry }: { entry: Entry }) {
       {str(r.compliment) && <p>{r.compliment}</p>}
       {list(r.good).length > 0 && <ul className="good">{list(r.good).map((x, i) => <li key={i}>✓ {x}</li>)}</ul>}
       {list(r.improve).length > 0 && <><h4 className="section-title">מה אפשר לשפר</h4><ul>{list(r.improve).map((x, i) => <li key={i}>{x}</li>)}</ul></>}
-      {str(r.next) && <p className="nutrition-tip">🍎 בארוחה הבאה: {r.next}</p>}
+      {str(r.next) && (
+        <div className="nutrition-tip">
+          <FoodRow foods={foodsOf(r.next_foods, str(r.next))} />
+          🍎 בארוחה הבאה: {r.next}
+        </div>
+      )}
+      <SpeakButton text={[v.label, str(r.compliment), ...list(r.good), list(r.improve).length ? `מה אפשר לשפר: ${list(r.improve).join('. ')}` : '',
+        str(r.next) ? `בארוחה הבאה: ${r.next}` : ''].filter(Boolean).join('. ')} label="הקראת המשוב" />
     </div>
+  );
+}
+
+/** The foods of a meal as big pictures with their names. */
+function FoodRow({ foods }: { foods: { emoji: string; name: string }[] }) {
+  if (!foods.length) return null;
+  return (
+    <span className="food-row" aria-label={foods.map((f) => f.name).join(', ')}>
+      {foods.map((f, i) => <span key={i} className="food"><i aria-hidden="true">{f.emoji}</i><small>{f.name}</small></span>)}
+    </span>
   );
 }

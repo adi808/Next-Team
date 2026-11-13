@@ -4,6 +4,7 @@ import { useLookups } from './Lookups';
 import { ShirtNo, useShirtNumbers } from './People';
 import { Card, ErrorText } from './ui';
 import type { EventResponse, EventRow, Lookup, Player } from '../lib/types';
+import { isPreview } from '../auth/preview';
 
 const ICONS: [RegExp, string][] = [[/yellow/, '🟨'], [/red/, '🟥'], [/assist/, '👟'], [/goal/, '⚽']];
 const icon = (t: Lookup) => ICONS.find(([re]) => re.test(t.slug))?.[1] ?? t.name_he;
@@ -78,6 +79,7 @@ export function MatchClock({ event, sportId, players, responses, myKids }: {
           {running ? '⏸ הפסקה' : started ? '▶ המשך משחק' : '▶ המשחק התחיל'}
         </button>
       </div>
+      {isPreview() && <p className="clock-pending">👁 מצב צפייה: כך המאמן רואה את השעון. הלחיצות לא נשמרות.</p>}
       {pending > 0 && <p className="clock-pending">⏳ ממתין לסנכרון ({pending}) · נשמר בטלפון ויישלח כשתחזור קליטה</p>}
       {alert && (
         <p className="clock-alert" role="alert">⚠️ נשארו {Math.max(0, Math.ceil(left))} דקות. עדיין מתחת למינימום: {below.map((p) => `${p.full_name} (${minutes(played(p.id))}′)`).join(', ')}</p>

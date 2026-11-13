@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { isDemo, supabase } from '../lib/supabase';
 import { useAuth } from '../auth/AuthProvider';
+import { speak, stopSpeaking, useCanSpeak } from '../lib/speech';
+import { MicButton } from './Speech';
 
 // The in-app assistant: a floating button on every screen that opens a chat with the Next Team assistant
 // (the `assistant` Edge Function). It answers from the club's data with the person's own permissions, explains the
@@ -30,6 +32,11 @@ function load(uid: string): Saved {
   } catch { /* storage blocked or bad data */ }
   return { messages: [], pending: null };
 }
+// reading answers aloud: the person's choice, kept on this device
+const VOICE_KEY = 'nt-assistant-voice';
+const voiceOn = () => { try { return localStorage.getItem(VOICE_KEY) === '1'; } catch { return false; } };
+const setVoiceOn = (on: boolean) => { try { localStorage.setItem(VOICE_KEY, on ? '1' : '0'); } catch { /* storage blocked */ } };
+
 function save(uid: string, s: Saved) {
   try { sessionStorage.setItem(keyOf(uid), JSON.stringify(s)); } catch { /* storage blocked or full */ }
 }
@@ -71,6 +78,10 @@ function Panel({ uid, mode, onClose }: { uid: string; mode: string; onClose: () 
   const [draft, setDraft] = useState<string | null>(null); // the message on its way, shown until the answer arrives
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const canSpeak = useCanSpeak();
+  const [readAloud, setReadAloud] = useState(voiceOn);
+  const spoken = useRef(false); // the question was dictated: read its answer even when reading aloud is off
+  useEffect(() => () => stopSpeaking(), []);
 
   useEffect(() => { save(uid, state); }, [uid, state]);
   useEffect(() => { listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: 'smooth' }); }, [state, draft, busy]);
@@ -98,6 +109,11 @@ function Panel({ uid, mode, onClose }: { uid: string; mode: string; onClose: () 
       return;
     }
     setState({ messages: res.messages, pending: res.pending ?? null });
+    if (canSpeak && (readAloud || spoken.current)) {
+      const said = [res.reply, ...(res.pending?.actions.map((a) => a.summary) ?? [])].filter(Boolean).join('. ');
+      speak(res.pending ? `${said}. לאשר?` : said);
+    }
+    spoken.current = false;
   }
 
   function send(t: string) {
@@ -115,6 +131,13 @@ function Panel({ uid, mode, onClose }: { uid: string; mode: string; onClose: () 
           <strong>העוזר של Next Team</strong>
           <small className="muted">רואה רק את מה שמותר לך לראות</small>
         </div>
+        {canSpeak && (
+          <button type="button" className={`assistant-voice${readAloud ? ' on' : ''}`} aria-pressed={readAloud}
+            aria-label={readAloud ? 'הפסקת הקראת התשובות' : 'הקראת התשובות בקול'} title={readAloud ? 'מקריא תשובות' : 'הקראה בקול'}
+            onClick={() => { const on = !readAloud; setReadAloud(on); setVoiceOn(on); if (!on) stopSpeaking(); }}>
+            {readAloud ? '🔊' : '🔈'}
+          </button>
+        )}
         {shown.length > 0 && (
           <button type="button" className="link" disabled={busy} onClick={() => { setState({ messages: [], pending: null }); setError(null); }}>
             שיחה חדשה
@@ -153,11 +176,12 @@ function Panel({ uid, mode, onClose }: { uid: string; mode: string; onClose: () 
 
       <form className="assistant-compose" onSubmit={(e) => { e.preventDefault(); send(text); }}>
         <textarea
-          ref={inputRef} rows={1} value={text} maxLength={2000} placeholder={state.pending ? 'קודם אשרו או בטלו את הפעולה' : 'כתבו שאלה…'}
+          ref={inputRef} rows={1} value={text} maxLength={2000} placeholder={state.pending ? 'קודם אשרו או בטלו את הפעולה' : 'כתבו או לחצו 🎤 ודברו…'}
           disabled={!!state.pending || state.messages.length >= MAX_MESSAGES}
-          onChange={(e) => setText(e.target.value)}
+          onChange={(e) => { setText(e.target.value); spoken.current = false; }}
           onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(text); } }}
         />
+        <MicButton value={text} disabled={!!state.pending || busy} onChange={(t) => { setText(t); spoken.current = true; }} />
         <button type="submit" disabled={busy || !text.trim() || !!state.pending} aria-label="שליחה">שליחה</button>
       </form>
     </div>

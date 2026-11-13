@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from './supabase';
 import { q, rpc } from './db';
+import { isPreview } from '../auth/preview';
 
 /**
  * The match clock: periods when the "match started" switch is on, stints of each player on the pitch, and the
@@ -174,6 +175,7 @@ export function useMatchClock(eventId: string, teamId: string) {
   }, [flush]);
 
   const act = useCallback((action: ClockAction) => {
+    if (isPreview()) { setError('במצב צפייה הכל לקריאה בלבד: אפשר לראות את השעון, אבל לחיצות לא נשמרות.'); return; }
     setError(null);
     const item: Queued = { id: uuid(), event: eventId, at: new Date().toISOString(), action };
     const all = [...readQueue(), item];

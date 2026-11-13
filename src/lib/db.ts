@@ -40,8 +40,8 @@ export async function mutateOne(p: PromiseLike<{ data: unknown; error: PgError |
 }
 
 // Functions that only read: allowed while previewing ("view as"). Every other function changes data.
-const READ_RPCS = new Set(['club_roster', 'event_transport_list', 'join_link_info', 'pending_join_requests', 'player_details',
-  'player_email_invite', 'player_parents', 'push_public_key', 'team_contacts', 'team_param', 'team_staff']);
+const READ_RPCS = new Set(['can_run_match', 'club_roster', 'event_transport_list', 'join_link_info', 'pending_join_requests', 'player_details',
+  'player_email_invite', 'player_parents', 'push_public_key', 'team_contacts', 'team_match_operators', 'team_param', 'team_staff']);
 
 export function rpc<T = unknown>(name: string, args?: Record<string, unknown>): Promise<T> {
   // no request at all while previewing (read only); reads go through rpc too, so only known reads pass
