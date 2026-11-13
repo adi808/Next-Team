@@ -210,6 +210,8 @@ const out = (ok, label, extra) => { if (!ok) fails++; console.log(`${ok ? 'PASS'
   await p.locator('.pitch .pitch-slot').nth(1).click(); await p.locator('.pitch .pitch-slot').nth(2).click(); await wait(300);
   await p.click('button:has-text("שמירת טיוטה")'); await wait(800);
   await has('coach view is read only', 'מצב צפייה: אי אפשר לשמור שינויים');
+  out(await p.locator('.match-clock').count() === 1, 'coach view shows the match clock (read only)');
+  await has('the clock in the coach view says taps are not saved', 'כך המאמן רואה את השעון');
   await p.click('button:has-text("יציאה מצפייה")'); await wait(1000);
   await has('leaving the view returns to the entry screen', 'איך נכנסים היום?'); await hasNot('the coach card is gone after the view', 'צפייה כמאמן של');
   await p.click('button:has-text("צפייה כמאמן / כשחקן")'); await wait(800);
